@@ -6,7 +6,7 @@
 
 **Architecture:** All game logic lives in pure Lua modules under `src/`. Each module depends only on `GameState` and other `src/` modules — no TTS API calls. A separate `tts/` layer (Phase 2) will wrap these modules with TTS bindings. This separation allows unit testing with `busted` and keeps logic portable.
 
-**Tech Stack:** Lua 5.3, busted (Lua test framework), LuaRocks (package manager), dkjson (pure-Lua JSON library)
+**Tech Stack:** TTS Lua (MoonSharp/Lua 5.2 compatible), TTS built-in `JSON.encode/decode`, TTS `#include` for module splitting. No external dependencies — all testing done inside TTS.
 
 **Spec:** `docs/superpowers/specs/2026-03-30-brass-birmingham-tts-mod-design.md`
 
@@ -22,8 +22,8 @@ Based on code reuse, quality, and efficiency reviews, the following architectura
 4. **Adjacency list** — `BoardData.adjacency[cityName]` maps each city to its connected link IDs. Built once, used by Network.lua for O(1) neighbor lookup.
 5. **Slot index** — `state.slotIndex[slotId]` provides O(1) slot lookup alongside the nested `cities.slots` arrays. Both reference the same objects.
 6. **Parameterized Market** — Single `Market.buy(state, color, resourceType, count)` instead of separate coal/iron functions.
-7. **spec_helper.lua** — Centralized `package.path` setup loaded by busted config. No path manipulation in individual spec files.
-8. **dkjson** — Pure-Lua JSON library for Phase 1 serialization. Phase 2 will swap to TTS built-in `JSON.encode/decode`.
+7. **No external test framework** — Testing done directly in TTS. Modules include a `_test()` function that can be called from TTS console for smoke-testing.
+8. **TTS built-in JSON** — Use `JSON.encode()` / `JSON.decode()` for serialization (available in TTS Lua environment).
 9. **Stable sort** — `helpers.stableSort(t, comparator)` using original-index tiebreaker for turn order.
 10. **Derive, don't store** — `isFirstRound` derived from `era == "canal" and round == 1`. No redundant boolean flag.
 
@@ -48,22 +48,8 @@ brass_birmingham_tbs/
 │   ├── EraTransition.lua    — Canal→Rail transition logic
 │   ├── Lang.lua             — i18n string table (en / zh-TW)
 │   └── helpers.lua          — Shared utilities (deep copy, stable sort, table ops)
-├── spec/
-│   ├── spec_helper.lua      — Centralized package.path setup
-│   ├── Constants_spec.lua
-│   ├── GameState_spec.lua
-│   ├── BoardData_spec.lua
-│   ├── Tile_spec.lua
-│   ├── Network_spec.lua
-│   ├── Market_spec.lua
-│   ├── IncomeTrack_spec.lua
-│   ├── TurnManager_spec.lua
-│   ├── Validation_spec.lua
-│   ├── Actions_spec.lua
-│   ├── Scoring_spec.lua
-│   ├── EraTransition_spec.lua
-│   └── integration_spec.lua
-├── .busted                  — busted config (loads spec_helper)
+├── tts/
+│   └── Global.lua           — TTS entry point, #includes all src/ modules
 └── docs/
 ```
 
