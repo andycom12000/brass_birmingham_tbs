@@ -177,32 +177,91 @@ Global.lua（進入點）
 GameState = {
     era = "canal",              -- "canal" | "rail"
     round = 1,
+    isFirstRound = true,        -- 首回合只有 1 個行動
     currentPlayerIdx = 1,
-    actionsRemaining = 2,       -- 每回合 2 個行動
+    actionsRemaining = 1,       -- 首回合 1，之後 2
 
     players = {
         ["Red"] = {
             money = 30,
-            income = 10,
+            income = 10,         -- 收入等級（對應收入軌）
             vp = 0,
             spentThisRound = 0,
-            links = 14,
-            buildings = { ... },
+            linksRemaining = 14,
+            -- 玩家板上尚未建造的建築 Tile
+            unbuiltTiles = {
+                { type = "cotton", level = 1, guid = "abc123" },
+                { type = "cotton", level = 2, guid = "abc124" },
+                -- ...
+            },
         },
         -- Blue, Yellow, Green ...
     },
 
     turnOrder = { "Red", "Blue", "Yellow", "Green" },
 
+    -- 地圖上已放置的建築
     board = {
-        cities = { ... },       -- 城市建築格狀態
-        links = { ... },        -- 連結路線狀態
+        cities = {
+            ["Birmingham"] = {
+                slots = {
+                    { id = "Birmingham_cotton_1", type = "cotton",
+                      occupant = nil,       -- nil | "Red" | "Blue" ...
+                      tile = nil,           -- nil | { type, level, flipped, guid, resources = {} }
+                      snapGUID = "sp001",   -- 對應的 Snap Point GUID
+                    },
+                    { id = "Birmingham_iron_1", type = "iron",
+                      occupant = nil, tile = nil, snapGUID = "sp002",
+                    },
+                    -- ...
+                },
+            },
+            -- Coventry, Dudley, Walsall, ...
+        },
+        -- 地圖上已放置的連結
+        links = {
+            ["Birmingham-Coventry"] = {
+                id = "Birmingham-Coventry",
+                type = nil,         -- nil | "canal" | "rail"
+                owner = nil,        -- nil | "Red" | "Blue" ...
+                snapGUID = "sp100", -- 對應的 Snap Point GUID
+                tileGUID = nil,     -- 放置的連結 Tile GUID
+            },
+            -- ...
+        },
     },
 
-    coalMarket = { supply = 13 },
-    ironMarket = { supply = 8 },
+    coalMarket = { supply = 13 },  -- 目前市場上的煤炭數量
+    ironMarket = { supply = 8 },   -- 目前市場上的鐵礦數量
+
+    -- 牌庫管理
+    deck = {
+        drawPileGUID = "deck001",
+        discardPileGUID = "disc001",
+    },
+
+    lang = "en",  -- "en" | "zh-TW"
 }
 ```
+
+### Snap Point 與位置映射
+
+所有遊戲位置透過 **Snap Point GUID** 與 GameState 雙向映射：
+
+```lua
+-- SnapMap.lua — Snap Point GUID ↔ 遊戲邏輯位置 對照表
+-- 在 Setup 時掃描主地圖板上所有 Snap Points，依 tag 建立映射
+SnapMap = {
+    -- tag 格式: "city_Birmingham_cotton_1", "link_Birmingham-Coventry"
+    byTag = {},    -- tag → Snap Point reference
+    byGUID = {},   -- GUID → { locationType, locationId }
+}
+```
+
+- 主地圖板上每個 Snap Point 設定 **tag**（如 `city_Birmingham_cotton_1`、`link_Birmingham-Coventry`）
+- Setup 時掃描所有 Snap Points 並建立 `SnapMap`
+- 腳本透過 tag 識別玩家放置物件的目標位置
+- `onObjectDropped` 事件中比對 Snap Point → 查詢 GameState 對應格位 → 執行驗證
 
 ### 自動化功能
 
@@ -224,13 +283,91 @@ GameState = {
 - 花費相同維持原本相對順序（穩定排序）
 - 計數器歸零，進入下回合
 
+#### 行動詳解（Actions）
+
+##### Build（建造）
+- 打出 1 張地點卡或產業卡
+- 地點卡：建在該城市的對應產業格位
+- 產業卡：建在任何你有網路連結到的城市的對應格位（運河時代第一次建造無需網路）
+- **Overbuilding（覆蓋建造）**：可以用更高級的 Tile 替換自己已有的同產業 Tile（不可替換他人的）
+- 支付金錢 + 煤炭/鐵礦需求（見下方費用表）
+- 建造完成後，若該建築產出資源（煤炭/鐵礦/啤酒），放置對應 Token
+
+##### Network（建立連結）
+- 打出任意 1 張牌
+- **運河時代**：花費 £3 放置 1 條運河連結，不需煤炭
+- **鐵路時代**：花費 £5 + 1 煤炭放置 1 條鐵路連結；或花費 £15 + 2 煤炭放置 2 條
+- 連結必須連接到你已有建築或已有連結的城市
+- 每條路線最多 1 條連結（不同玩家不可重疊）
+
+##### Develop（升級科技）
+- 打出任意 1 張牌
+- 從玩家板上移除 1 或 2 個最低等級的建築 Tile（回到遊戲盒外）
+- 每次 Develop 移除的 Tile 需花費 1 鐵礦/個
+- **限制**：不可跳過等級；製造廠（Manufacturer）不可透過 Develop 升級
+
+##### Sell（銷售）
+- 打出任意 1 張牌
+- 可銷售的建築類型：棉花廠、製造廠、陶瓷廠（有銷售圖示的產業）
+- **銷售條件**：該建築必須透過網路連結到至少一個商人 Tile，且消耗所需的啤酒
+- 銷售成功：翻面建築 Tile，獲得收入等級提升和/或 VP
+- 可在同一行動中銷售多個建築（只要各自滿足條件）
+
+##### Loan（貸款）
+- 打出任意 1 張牌
+- 獲得 £30
+- 收入等級降低 3 級（最低降至 0，不會變負數）
+- 無借貸次數限制
+
+##### Scout（偵查）
+- 打出任意 1 張牌
+- 棄掉手牌中最多 3 張，然後從棄牌堆或牌庫抽取等量的萬用卡（Wild Card）
+- 若萬用卡不足，有多少抽多少
+
+#### 建造費用表
+
+| 產業 | 等級 | 金錢 | 煤炭 | 鐵礦 | 產出 | 翻面獲得 |
+|------|------|------|------|------|------|----------|
+| 棉花廠 Cotton | Lv1 | £12 | 0 | 0 | — | 收入+5, VP 3 |
+| 棉花廠 Cotton | Lv2 | £14 | 1 coal | 0 | — | 收入+4, VP 5 |
+| 棉花廠 Cotton | Lv3 | £16 | 1 coal | 1 iron | — | 收入+3, VP 9 |
+| 棉花廠 Cotton | Lv4 | £18 | 1 coal | 1 iron | — | 收入+2, VP 12 |
+| 鐵工廠 Iron | Lv1 | £5 | 1 coal | 0 | 4 iron | 收入+3, VP 3 |
+| 鐵工廠 Iron | Lv2 | £7 | 1 coal | 0 | 4 iron | 收入+3, VP 5 |
+| 鐵工廠 Iron | Lv3 | £9 | 1 coal | 0 | 5 iron | 收入+2, VP 7 |
+| 鐵工廠 Iron | Lv4 | £12 | 1 coal | 0 | 6 iron | 收入+1, VP 9 |
+| 煤礦 Coal | Lv1 | £5 | 0 | 0 | 2 coal | 收入+4, VP 1 |
+| 煤礦 Coal | Lv2 | £7 | 0 | 0 | 3 coal | 收入+7, VP 2 |
+| 煤礦 Coal | Lv3 | £8 | 0 | 1 iron | 4 coal | 收入+6, VP 3 |
+| 煤礦 Coal | Lv4 | £10 | 0 | 1 iron | 5 coal | 收入+5, VP 4 |
+| 釀酒廠 Brewery | Lv1 | £5 | 0 | 1 iron | 1 beer | 收入+4, VP 2 |
+| 釀酒廠 Brewery | Lv2 | £7 | 0 | 1 iron | 1 beer | 收入+5, VP 5 |
+| 釀酒廠 Brewery | Lv3 | £9 | 0 | 1 iron | 1 beer | 收入+5, VP 7 |
+| 釀酒廠 Brewery | Lv4 | £9 | 0 | 1 iron | 2 beer | 收入+5, VP 10 |
+| 製造廠 Mfr | Lv1 | £8 | 0 | 0 | — | 收入+3, VP 3 |
+| 製造廠 Mfr | Lv2 | £10 | 1 coal | 0 | — | 收入+5, VP 5 |
+| 製造廠 Mfr | Lv3 | £12 | 1 coal | 1 iron | — | 收入+4, VP 4 |
+| 製造廠 Mfr | Lv4 | £8 | 0 | 1 iron | — | 收入+3, VP 3 |
+| 製造廠 Mfr | Lv5 | £16 | 1 coal | 0 | — | 收入+8, VP 8 |
+| 製造廠 Mfr | Lv6 | £20 | 0 | 0 | — | 收入+7, VP 7 |
+| 製造廠 Mfr | Lv7 | £16 | 1 coal | 1 iron | — | 收入+9, VP 9 |
+| 製造廠 Mfr | Lv8 | £20 | 0 | 1 iron | — | 收入+8, VP 11 |
+| 陶瓷廠 Pottery | Lv1 | £17 | 0 | 1 iron | — | 收入+5, VP 10 |
+| 陶瓷廠 Pottery | Lv2 | £0 | 1 coal | 0 | — | 收入+1, VP 1 |
+| 陶瓷廠 Pottery | Lv3 | £22 | 2 coal | 0 | — | 收入+5, VP 11 |
+| 陶瓷廠 Pottery | Lv4 | £0 | 1 coal | 0 | — | 收入+1, VP 1 |
+| 陶瓷廠 Pottery | Lv5 | £24 | 2 coal | 0 | — | 收入+5, VP 20 |
+
+> 注：以上費用為原版參考值，實作時應以最終確認的遊戲數據為準。
+
 #### 合法行動提示（Validation）
-- Build：高亮可建造的城市格位
-- Network：高亮可連結的路線
-- Sell：高亮可銷售的建築
-- Develop：高亮可升級的產業
+- Build：高亮可建造的城市格位（依打出的卡牌、網路連結、金錢/資源是否足夠）
+- Network：高亮可連結的路線（依時代、金錢/煤炭是否足夠、網路連結）
+- Sell：高亮可銷售的建築（依網路是否連到商人、啤酒是否足夠）
+- Develop：高亮可升級的產業（依鐵礦是否足夠、產業是否允許 Develop）
 - 使用 `highlightOn()` 物件發光提示
 - 非法操作彈出提示訊息
+- 玩家放置到錯誤位置時，物件自動彈回原位
 
 #### 資源自動扣除（Market）
 - 建造時自動計算煤炭/鐵礦需求
