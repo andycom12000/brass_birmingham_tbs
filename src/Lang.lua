@@ -1,0 +1,143 @@
+local Lang = {}
+
+-- English string table
+Lang.strings = {
+    en = {
+        -- Turn/Round management
+        your_turn = "Your turn",
+        round_N = "Round {round}",
+        canal_era = "Canal Era",
+        rail_era = "Rail Era",
+        actions_remaining = "{count} action(s) remaining",
+
+        -- Actions
+        action_build = "Build",
+        action_network = "Network",
+        action_develop = "Develop",
+        action_sell = "Sell",
+        action_loan = "Loan",
+        action_scout = "Scout",
+
+        -- Game events
+        player_spent = "{player} spent £{amount}",
+        player_built = "{player} built {industry} Lv{level} in {city}",
+        player_linked = "{player} linked {city1} — {city2}",
+        player_sold = "{player} sold {industry} in {city}",
+        player_loaned = "{player} took a loan (£30, income -3)",
+        player_scouted = "{player} scouted",
+        player_developed = "{player} developed {count} tile(s)",
+
+        -- Scoring
+        scoring_start = "Scoring...",
+        building_vp = "Building VP: {vp}",
+        link_vp = "Link VP: {vp}",
+        income_vp = "Income VP: {vp}",
+        total_vp = "Total: {vp} VP",
+        winner = "{player} wins!",
+        tie = "Shared victory!",
+
+        -- Era transition
+        era_transition = "Era transition: Canal → Rail",
+        removing_canals = "Removing canal links...",
+        removing_lv1 = "Removing Level 1 buildings...",
+
+        -- Errors/Validation
+        invalid_action = "Invalid action",
+        not_enough_money = "Not enough money",
+        not_in_network = "Not in your network",
+        slot_occupied = "Slot already occupied",
+        no_beer = "Not enough beer",
+        cannot_develop = "Cannot develop this tile",
+        cannot_loan = "Income too low for loan",
+        cannot_scout = "Cannot scout (already holding wild cards)",
+
+        -- Industry names (for display)
+        industry_cotton = "Cotton Mill",
+        industry_coal = "Coal Mine",
+        industry_iron = "Iron Works",
+        industry_brewery = "Brewery",
+        industry_manufacturer = "Manufacturer",
+        industry_pottery = "Pottery",
+    },
+
+    -- Traditional Chinese Taiwan
+    ["zh-TW"] = {
+        -- Turn/Round management
+        your_turn = "輪到你的回合",
+        round_N = "第 {round} 回合",
+        canal_era = "運河時代",
+        rail_era = "鐵路時代",
+        actions_remaining = "剩餘 {count} 個行動",
+
+        -- Actions
+        action_build = "建造",
+        action_network = "建立連結",
+        action_develop = "升級科技",
+        action_sell = "銷售",
+        action_loan = "貸款",
+        action_scout = "偵查",
+
+        -- Game events
+        player_spent = "{player} 花費了 £{amount}",
+        player_built = "{player} 在 {city} 建造了 {industry} Lv{level}",
+        player_linked = "{player} 連結了 {city1} — {city2}",
+        player_sold = "{player} 在 {city} 銷售了 {industry}",
+        player_loaned = "{player} 進行了貸款（£30，收入 -3）",
+        player_scouted = "{player} 進行了偵查",
+        player_developed = "{player} 升級了 {count} 張科技",
+
+        -- Scoring
+        scoring_start = "計分中...",
+        building_vp = "建築分數：{vp}",
+        link_vp = "連結分數：{vp}",
+        income_vp = "收入分數：{vp}",
+        total_vp = "總分：{vp} 分",
+        winner = "{player} 獲勝！",
+        tie = "共同勝利！",
+
+        -- Era transition
+        era_transition = "時代轉換：運河 → 鐵路",
+        removing_canals = "移除運河連結...",
+        removing_lv1 = "移除等級 1 建築...",
+
+        -- Errors/Validation
+        invalid_action = "無效行動",
+        not_enough_money = "金錢不足",
+        not_in_network = "不在你的網路中",
+        slot_occupied = "格位已被佔用",
+        no_beer = "啤酒不足",
+        cannot_develop = "無法升級此科技",
+        cannot_loan = "收入太低無法貸款",
+        cannot_scout = "無法偵查（已持有萬用卡）",
+
+        -- Industry names (for display)
+        industry_cotton = "棉花廠",
+        industry_coal = "煤礦",
+        industry_iron = "鐵工廠",
+        industry_brewery = "釀酒廠",
+        industry_manufacturer = "製造廠",
+        industry_pottery = "陶瓷廠",
+    },
+}
+
+-- Get a localized string
+-- locale: "en" or "zh-TW"
+function Lang.get(key, locale)
+    local strings = Lang.strings[locale] or Lang.strings["en"]
+    return strings[key] or Lang.strings["en"][key] or ("?" .. key .. "?")
+end
+
+-- Format a localized string with parameter substitution
+-- params: { player = "Red", amount = 15 }
+-- Template uses {key} syntax: "Player {player} spent £{amount}"
+function Lang.format(key, locale, params)
+    local str = Lang.get(key, locale)
+    if params then
+        for k, v in pairs(params) do
+            str = str:gsub("{" .. k .. "}", tostring(v))
+        end
+    end
+    return str
+end
+
+return Lang
