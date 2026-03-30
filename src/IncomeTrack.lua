@@ -1,3 +1,5 @@
+local Constants = require("src/Constants")
+
 local IncomeTrack = {}
 
 -- Returns the income £ amount for a given level (level = income)
@@ -54,9 +56,9 @@ function IncomeTrack.decreaseLevels(currentLevel, currentSpace, levels)
     return newLevel, newSpace
 end
 
--- Can the player take a loan? (level - 3 >= -10)
+-- Can the player take a loan? (level - penalty >= -10)
 function IncomeTrack.canLoan(currentLevel)
-    return (currentLevel - 3) >= -10
+    return (currentLevel - Constants.LOAN_INCOME_PENALTY) >= -10
 end
 
 return IncomeTrack

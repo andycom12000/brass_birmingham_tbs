@@ -54,16 +54,29 @@ end
 --- Consumed coal is returned to market.
 local function consumeCoalFromBuildings(state, cityName, needed)
     local remaining = needed
+    local sources = Network.findNearestCoal(state, cityName)
     while remaining > 0 do
-        local sources = Network.findNearestCoal(state, cityName)
         if not sources or #sources == 0 then break end
         -- Take one coal from the first source (nearest)
         local src = sources[1]
         local resources = src.slot.tile.resources
-        table.remove(resources, #resources)  -- remove last token
-        Market.returnToMarket(state, Constants.Resource.COAL, 1)
-        autoFlipIfEmpty(state, src.slot)
-        remaining = remaining - 1
+        if #resources > 0 then
+            table.remove(resources, #resources)  -- remove last token
+            Market.returnToMarket(state, Constants.Resource.COAL, 1)
+            autoFlipIfEmpty(state, src.slot)
+            remaining = remaining - 1
+            -- If this source is exhausted, remove it from the list
+            if #resources == 0 then
+                table.remove(sources, 1)
+            end
+        else
+            -- Source exhausted, remove and continue
+            table.remove(sources, 1)
+        end
+        -- If all sources at this distance are exhausted, re-search for next nearest
+        if #sources == 0 and remaining > 0 then
+            sources = Network.findNearestCoal(state, cityName)
+        end
     end
     return remaining
 end
@@ -73,15 +86,24 @@ end
 --- Consumed iron is returned to market.
 local function consumeIronFromBuildings(state, needed)
     local remaining = needed
+    local sources = Network.findIronSources(state)
+    local srcIdx = 1
     while remaining > 0 do
-        local sources = Network.findIronSources(state)
-        if not sources or #sources == 0 then break end
-        local src = sources[1]
+        if srcIdx > #sources then break end
+        local src = sources[srcIdx]
         local resources = src.slot.tile.resources
-        table.remove(resources, #resources)
-        Market.returnToMarket(state, Constants.Resource.IRON, 1)
-        autoFlipIfEmpty(state, src.slot)
-        remaining = remaining - 1
+        if #resources > 0 then
+            table.remove(resources, #resources)
+            Market.returnToMarket(state, Constants.Resource.IRON, 1)
+            autoFlipIfEmpty(state, src.slot)
+            remaining = remaining - 1
+            -- If this source is exhausted, move to the next
+            if #resources == 0 then
+                srcIdx = srcIdx + 1
+            end
+        else
+            srcIdx = srcIdx + 1
+        end
     end
     return remaining
 end
@@ -132,19 +154,6 @@ local function consumeBeer(state, color, cityName, needed, merchantName)
     end
 end
 
---- Find the city name for a given slot ID.
-local function cityForSlot(state, slotId)
-    for cityName, city in pairs(state.board.cities) do
-        if city.slots then
-            for _, slot in ipairs(city.slots) do
-                if slot.id == slotId then
-                    return cityName
-                end
-            end
-        end
-    end
-    return nil
-end
 
 --- Remove the first tile matching `industryType` and `level` from
 --- the player's unbuiltTiles stack.
@@ -210,7 +219,7 @@ function Actions.build(state, color, params)
     local slotId       = params.slotId
 
     local slot     = GameState.getSlot(state, slotId)
-    local cityName = cityForSlot(state, slotId)
+    local cityName = GameState.getCityForSlot(state, slotId)
 
     local costData = BoardData.buildingCosts[industryType][level]
 
@@ -263,7 +272,7 @@ function Actions.build(state, color, params)
     end
 
     -- Step 10: Update handSize (player played a card)
-    player.handSize = (player.handSize or 0) - 1
+    GameState.playCard(state, color)
 
     return ok()
 end
@@ -302,15 +311,15 @@ function Actions.network(state, color, params)
     -- Determine costs
     local moneyCost, coalNeeded, beerNeeded
     if era == Constants.Era.CANAL then
-        moneyCost  = 3
+        moneyCost  = Constants.LinkCost.CANAL
         coalNeeded = 0
         beerNeeded = 0
     elseif isDouble then
-        moneyCost  = 15
+        moneyCost  = Constants.LinkCost.DOUBLE_RAIL
         coalNeeded = 2
         beerNeeded = 1
     else
-        moneyCost  = 5
+        moneyCost  = Constants.LinkCost.SINGLE_RAIL
         coalNeeded = 1
         beerNeeded = 0
     end
@@ -342,7 +351,7 @@ function Actions.network(state, color, params)
     player.linksRemaining = (player.linksRemaining or 0) - linksPlaced
 
     -- Step 7: Update handSize
-    player.handSize = (player.handSize or 0) - 1
+    GameState.playCard(state, color)
 
     return ok()
 end
@@ -367,7 +376,7 @@ function Actions.sell(state, color, params)
     for _, slotId in ipairs(slotIds) do
         local slot = GameState.getSlot(state, slotId)
         local tile = slot.tile
-        local cityName = cityForSlot(state, slotId)
+        local cityName = GameState.getCityForSlot(state, slotId)
 
         -- 2a. Consume required beer
         local beerNeeded = tile.beerToSell or 0
@@ -406,8 +415,7 @@ function Actions.sell(state, color, params)
     end
 
     -- Step 4: Update handSize
-    local player = GameState.getPlayer(state, color)
-    player.handSize = (player.handSize or 0) - 1
+    GameState.playCard(state, color)
 
     return ok()
 end
@@ -437,7 +445,7 @@ function Actions.develop(state, color, params)
     end
 
     -- Step 4: Update handSize
-    player.handSize = (player.handSize or 0) - 1
+    GameState.playCard(state, color)
 
     return ok()
 end
@@ -456,17 +464,17 @@ function Actions.loan(state, color)
 
     local player = GameState.getPlayer(state, color)
 
-    -- Step 2: Gain £30
-    GameState.gainMoney(state, color, 30)
+    -- Step 2: Gain £LOAN_AMOUNT
+    GameState.gainMoney(state, color, Constants.LOAN_AMOUNT)
 
-    -- Step 3: Decrease income by 3 levels
+    -- Step 3: Decrease income by LOAN_INCOME_PENALTY levels
     local newLevel, newSpace = IncomeTrack.decreaseLevels(
-        player.incomeLevel, player.incomeSpace, 3)
+        player.incomeLevel, player.incomeSpace, Constants.LOAN_INCOME_PENALTY)
     player.incomeLevel = newLevel
     player.incomeSpace = newSpace
 
     -- Step 4: Update handSize (player played a card)
-    player.handSize = (player.handSize or 0) - 1
+    GameState.playCard(state, color)
 
     return ok()
 end
@@ -487,8 +495,9 @@ function Actions.scout(state, color)
 
     -- Steps 2 & 3: Net handSize change is -1 (lost 3 cards, gained 2 wilds).
     -- The card played counts as -1, the 2 discarded are -2, gaining 2 wilds = +2.
-    player.handSize = (player.handSize or 0) - 3  -- lose 3 (1 played + 2 discarded)
-    player.handSize = player.handSize + 2          -- gain 2 wild cards
+    GameState.playCard(state, color)       -- lose 1 (played card)
+    player.handSize = player.handSize - 2  -- lose 2 (discarded)
+    player.handSize = player.handSize + 2  -- gain 2 wild cards
     player.hasWilds = true
 
     -- Step 4: Decrease wildSupply

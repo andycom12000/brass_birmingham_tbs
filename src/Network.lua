@@ -7,14 +7,11 @@ local Network = {}
 -- Internal helpers
 -- ============================================================
 
--- Set of merchant city names for fast O(1) lookup
-local MERCHANT_CITIES = {
-    Shrewsbury = true,
-    Gloucester = true,
-    Oxford     = true,
-    Warrington = true,
-    Nottingham = true,
-}
+-- Set of merchant city names for fast O(1) lookup (derived from BoardData)
+local MERCHANT_CITIES = {}
+for _, m in ipairs(BoardData.merchants) do
+    MERCHANT_CITIES[m.name] = true
+end
 
 --- BFS over all placed links starting from `startCity`.
 --- Calls `visitor(cityName, distance)` for every reachable city
@@ -178,6 +175,25 @@ function Network.isConnectedToMerchant(state, color, cityName)
         end
     end)
     return found
+end
+
+--- Find a connected merchant city reachable from cityName via ANY player's links.
+--- Returns the merchant name, or nil if none found.
+---
+--- @param state table
+--- @param cityName string
+--- @return string|nil  merchant city name
+function Network.findConnectedMerchant(state, cityName)
+    local merchantName = nil
+    bfsAllLinks(state, cityName, function(reachedCity, _distance)
+        if MERCHANT_CITIES[reachedCity] then
+            if state.board.merchants[reachedCity] then
+                merchantName = reachedCity
+                return true  -- stop BFS
+            end
+        end
+    end)
+    return merchantName
 end
 
 --- Find the nearest coal source connected to a city, following ANY player's links.

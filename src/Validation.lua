@@ -47,19 +47,6 @@ local function totalIronOnBoard(state)
     return total
 end
 
---- Find the city name for a given slotId.
-local function cityForSlot(state, slotId)
-    for cityName, city in pairs(state.board.cities) do
-        if city.slots then
-            for _, slot in ipairs(city.slots) do
-                if slot.id == slotId then
-                    return cityName
-                end
-            end
-        end
-    end
-    return nil
-end
 
 --- Count how many coal cubes are reachable from cityName (via any placed links,
 --- including coal at the city itself) plus market supply.
@@ -135,7 +122,7 @@ function Validation.canBuild(state, color, params)
         return fail("Slot '" .. tostring(slotId) .. "' does not exist")
     end
 
-    local cityName = cityForSlot(state, slotId)
+    local cityName = GameState.getCityForSlot(state, slotId)
     if not cityName then
         return fail("Cannot determine city for slot '" .. tostring(slotId) .. "'")
     end
@@ -321,16 +308,16 @@ function Validation.canNetwork(state, color, params)
 
     -- ---- 5. Cost and resource checks ----
     if era == Constants.Era.CANAL then
-        -- Canal: £3, no resources
-        if player.money < 3 then
-            return fail("Not enough money for canal link: need £3, have £" .. player.money)
+        -- Canal: £CANAL cost, no resources
+        if player.money < Constants.LinkCost.CANAL then
+            return fail("Not enough money for canal link: need £" .. Constants.LinkCost.CANAL .. ", have £" .. player.money)
         end
 
     elseif era == Constants.Era.RAIL then
         if isDouble then
-            -- Double rail: £15 + 2 coal + 1 beer (covers 2 links)
-            if player.money < 15 then
-                return fail("Not enough money for double rail: need £15, have £" .. player.money)
+            -- Double rail: £DOUBLE_RAIL + 2 coal + 1 beer (covers 2 links)
+            if player.money < Constants.LinkCost.DOUBLE_RAIL then
+                return fail("Not enough money for double rail: need £" .. Constants.LinkCost.DOUBLE_RAIL .. ", have £" .. player.money)
             end
             -- Need 2 coal
             local cityA = linkData.cities[1]
@@ -346,9 +333,9 @@ function Validation.canNetwork(state, color, params)
                 return fail("Not enough beer for double rail: need 1, none available")
             end
         else
-            -- Single rail: £5 + 1 coal
-            if player.money < 5 then
-                return fail("Not enough money for rail link: need £5, have £" .. player.money)
+            -- Single rail: £SINGLE_RAIL + 1 coal
+            if player.money < Constants.LinkCost.SINGLE_RAIL then
+                return fail("Not enough money for rail link: need £" .. Constants.LinkCost.SINGLE_RAIL .. ", have £" .. player.money)
             end
             local cityA = linkData.cities[1]
             local boardCoal, marketCoal = countCoalAvailable(state, cityA)
@@ -410,7 +397,7 @@ function Validation.canSell(state, color, params)
         end
 
         -- ---- 4. Must be connected to a merchant via network ----
-        local cityName = cityForSlot(state, slotId)
+        local cityName = GameState.getCityForSlot(state, slotId)
         if not cityName then
             return fail("Cannot determine city for slot '" .. slotId .. "'")
         end
@@ -423,36 +410,7 @@ function Validation.canSell(state, color, params)
         local beerNeeded = tile.beerToSell or 0
         if beerNeeded > 0 then
             -- Find the merchant city this is connected to (first one found)
-            local merchantName = nil
-            local MERCHANT_CITIES = {
-                Shrewsbury = true, Gloucester = true, Oxford = true,
-                Warrington = true, Nottingham = true,
-            }
-            -- Use BFS to find a connected merchant city name
-            local bfsQueue  = { cityName }
-            local bfsVisited = { [cityName] = true }
-            local bfsHead   = 1
-            while bfsHead <= #bfsQueue and not merchantName do
-                local current = bfsQueue[bfsHead]
-                bfsHead = bfsHead + 1
-                if MERCHANT_CITIES[current] and state.board.merchants[current] then
-                    merchantName = current
-                    break
-                end
-                local adjLinks = BoardData.adjacency[current] or {}
-                for _, linkId in ipairs(adjLinks) do
-                    local link = state.board.links[linkId]
-                    if link and link.owner then
-                        local ld = BoardData.links[linkId]
-                        for _, neighbor in ipairs(ld.cities) do
-                            if not bfsVisited[neighbor] and state.board.cities[neighbor] then
-                                bfsVisited[neighbor] = true
-                                bfsQueue[#bfsQueue + 1] = neighbor
-                            end
-                        end
-                    end
-                end
-            end
+            local merchantName = Network.findConnectedMerchant(state, cityName)
 
             local beerSources = Network.findBeerSources(state, color, cityName, merchantName)
             -- Count total beer tokens across all sources

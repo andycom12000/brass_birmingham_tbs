@@ -156,14 +156,13 @@ function afterAction(color)
     local p = GameState.getPlayer(state, color)
     updateSpendCounter(color, p.spentThisRound)
 
-    -- Process turn/round advancement
-    TurnManager.endAction(state)
-
-    -- Check era end
+    -- Check era end BEFORE advancing turn
     if EraTransition.isEraOver(state) then
         if state.era == Constants.Era.CANAL then
             printToAll(Lang.get("era_transition", state.lang))
             EraTransition.transition(state)
+            broadcastCurrentPlayer()
+            return
         else
             -- Game over — final scoring
             Scoring.scoreEndOfEra(state, true)
@@ -173,7 +172,8 @@ function afterAction(color)
         end
     end
 
-    -- Announce next player
+    -- Normal turn advancement
+    TurnManager.endAction(state)
     broadcastCurrentPlayer()
 end
 

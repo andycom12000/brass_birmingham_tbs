@@ -1,5 +1,6 @@
 local GameState = require("src/GameState")
 local Network   = require("src/Network")
+local BoardData = require("src/BoardData")
 
 local Scoring = {}
 
@@ -40,30 +41,15 @@ function Scoring.scoreLinkVP(state, color)
     local total = 0
     for linkId, link in pairs(state.board.links) do
         if link.owner == color then
-            local cities = Network.getLinkCities(linkId)
-            if cities then
-                -- getLinkCities can return 1 or 2 values; handle both
-                local cityList = type(cities) == "table" and cities or { cities }
-                local secondCity = Network.getLinkCities(linkId)
-                -- If getLinkCities returns two separate values, collect them
-                if secondCity and secondCity ~= cities then
-                    cityList = { cities, secondCity }
-                else
-                    -- Otherwise parse from BoardData to ensure we get both cities
-                    local BoardData = require("src/BoardData")
-                    local linkData = BoardData.links[linkId]
-                    if linkData and linkData.cities then
-                        cityList = linkData.cities
-                    end
-                end
+            local linkData = BoardData.links[linkId]
+            local cityList = linkData and linkData.cities or {}
 
-                for _, cityName in ipairs(cityList) do
-                    local city = state.board.cities[cityName]
-                    if city and city.slots then
-                        for _, slot in ipairs(city.slots) do
-                            if slot.tile and slot.tile.flipped then
-                                total = total + (slot.tile.linkIcons or 0)
-                            end
+            for _, cityName in ipairs(cityList) do
+                local city = state.board.cities[cityName]
+                if city and city.slots then
+                    for _, slot in ipairs(city.slots) do
+                        if slot.tile and slot.tile.flipped then
+                            total = total + (slot.tile.linkIcons or 0)
                         end
                     end
                 end

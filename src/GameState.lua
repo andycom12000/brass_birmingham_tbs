@@ -96,6 +96,21 @@ local function buildSlotIndex(cities)
     return index
 end
 
+--- Build city index: slotId -> cityName for O(1) lookup.
+local function buildCityIndex(cities)
+    local index = {}
+    for cityName, city in pairs(cities) do
+        if city.slots then
+            for _, slot in ipairs(city.slots) do
+                if slot.id then
+                    index[slot.id] = cityName
+                end
+            end
+        end
+    end
+    return index
+end
+
 --- Build initial merchant state for active merchants.
 --- Each active merchant city gets a `merchantBonus` field and `merchantSlots` table.
 local function buildMerchants(playerCount, cities)
@@ -137,14 +152,14 @@ function GameState.new(playerCount)
         local color = Constants.ALL_COLORS[i]
         players[color] = {
             color              = color,
-            money              = 17,
-            incomeLevel        = 10,
+            money              = Constants.INITIAL_MONEY,
+            incomeLevel        = Constants.INITIAL_INCOME,
             incomeSpace        = 0,
             vp                 = 0,
             spentThisRound     = 0,
-            linksRemaining     = 14,
+            linksRemaining     = Constants.INITIAL_LINKS,
             hasWilds           = false,
-            handSize           = 8,
+            handSize           = Constants.INITIAL_HAND_SIZE,
             scoutUsedThisRound = false,
             unbuiltTiles       = buildUnbuiltTiles(),
         }
@@ -154,6 +169,7 @@ function GameState.new(playerCount)
     local cities, removedSet = buildBoardCities(playerCount)
     local links              = buildBoardLinks(removedSet)
     local slotIndex          = buildSlotIndex(cities)
+    local cityIndex          = buildCityIndex(cities)
     local merchants          = buildMerchants(playerCount, cities)
 
     return {
@@ -172,12 +188,13 @@ function GameState.new(playerCount)
             merchants = merchants,
         },
 
-        slotIndex = slotIndex,
+        slotIndex  = slotIndex,
+        cityIndex  = cityIndex,
 
-        coalMarket = { supply = 13 },
-        ironMarket = { supply = 8  },
+        coalMarket = { supply = Constants.INITIAL_COAL_SUPPLY },
+        ironMarket = { supply = Constants.INITIAL_IRON_SUPPLY },
 
-        wildSupply = { location = 4, industry = 4 },
+        wildSupply = { location = Constants.WILD_SUPPLY_COUNT, industry = Constants.WILD_SUPPLY_COUNT },
 
         deckEmpty = false,
 
@@ -196,6 +213,17 @@ end
 --- Get a slot by its ID string.  O(1) via slotIndex.
 function GameState.getSlot(state, slotId)
     return state.slotIndex[slotId]
+end
+
+--- Get the city name for a given slot ID.  O(1) via cityIndex.
+function GameState.getCityForSlot(state, slotId)
+    return state.cityIndex[slotId]
+end
+
+--- Deduct one card from a player's hand (playing a card).
+function GameState.playCard(state, color)
+    local p = GameState.getPlayer(state, color)
+    p.handSize = math.max(0, (p.handSize or 0) - 1)
 end
 
 --- Deduct money from a player and record spending for turn-order purposes.
@@ -255,13 +283,14 @@ end
 
 --- Return true if the player has at least one building or link on the board.
 function GameState.hasPresenceOnBoard(state, color)
-    -- Check buildings
-    local found = false
-    GameState.forEachSlot(state, function(_, slot)
-        if slot.occupant == color then found = true end
-    end)
-    if found then return true end
-
+    -- Check buildings (direct loop for early exit)
+    for _, city in pairs(state.board.cities) do
+        if city.slots then
+            for _, slot in ipairs(city.slots) do
+                if slot.occupant == color then return true end
+            end
+        end
+    end
     -- Check links
     for _, link in pairs(state.board.links) do
         if link.owner == color then return true end

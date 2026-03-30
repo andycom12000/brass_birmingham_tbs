@@ -3,6 +3,10 @@ local Lang = {}
 -- English string table
 Lang.strings = {
     en = {
+        -- Game lifecycle
+        game_loaded = "Game loaded",
+        game_started = "Game started ({count} players)",
+
         -- Turn/Round management
         your_turn = "Your turn",
         round_N = "Round {round}",
@@ -62,6 +66,10 @@ Lang.strings = {
 
     -- Traditional Chinese Taiwan
     ["zh-TW"] = {
+        -- Game lifecycle
+        game_loaded = "遊戲已載入",
+        game_started = "遊戲開始（{count} 位玩家）",
+
         -- Turn/Round management
         your_turn = "輪到你的回合",
         round_N = "第 {round} 回合",

@@ -34,11 +34,10 @@ function EraTransition.transition(state)
     -- 1. Score canal era (mid-game scoring: buildings + links, no income)
     Scoring.scoreEndOfEra(state, false)
 
-    -- 2. Remove ALL canal links (set owner = nil, type = nil, tileGUID = nil)
+    -- 2. Remove ALL placed links (during canal era, only canal links can be placed)
     for linkId, link in pairs(state.board.links) do
-        if link.type == Constants.Era.CANAL then
+        if link.owner then
             link.owner = nil
-            link.type = nil
             link.tileGUID = nil
         end
     end
@@ -73,12 +72,12 @@ function EraTransition.transition(state)
     end
 
     -- 8. Reset market supplies to initial values
-    state.coalMarket.supply = 13
-    state.ironMarket.supply = 8
+    state.coalMarket.supply = Constants.INITIAL_COAL_SUPPLY
+    state.ironMarket.supply = Constants.INITIAL_IRON_SUPPLY
 
     -- 9. Reset wild supply
-    state.wildSupply.location = 4
-    state.wildSupply.industry = 4
+    state.wildSupply.location = Constants.WILD_SUPPLY_COUNT
+    state.wildSupply.industry = Constants.WILD_SUPPLY_COUNT
 
     -- 10. Reset deck state (TTS layer will handle actual card shuffling)
     state.deckEmpty = false
@@ -86,7 +85,7 @@ function EraTransition.transition(state)
     -- 11. Reset player states for new era
     for _, color in ipairs(state.turnOrder) do
         local p = GameState.getPlayer(state, color)
-        p.handSize = 8  -- TTS will deal cards
+        p.handSize = Constants.INITIAL_HAND_SIZE  -- TTS will deal cards
         p.hasWilds = false
         p.spentThisRound = 0
         p.scoutUsedThisRound = false
