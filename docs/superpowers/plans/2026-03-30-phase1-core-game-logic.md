@@ -6,9 +6,26 @@
 
 **Architecture:** All game logic lives in pure Lua modules under `src/`. Each module depends only on `GameState` and other `src/` modules — no TTS API calls. A separate `tts/` layer (Phase 2) will wrap these modules with TTS bindings. This separation allows unit testing with `busted` and keeps logic portable.
 
-**Tech Stack:** Lua 5.3, busted (Lua test framework), LuaRocks (package manager)
+**Tech Stack:** Lua 5.3, busted (Lua test framework), LuaRocks (package manager), dkjson (pure-Lua JSON library)
 
 **Spec:** `docs/superpowers/specs/2026-03-30-brass-birmingham-tts-mod-design.md`
+
+---
+
+## Review-Driven Architecture Decisions
+
+Based on code reuse, quality, and efficiency reviews, the following architectural decisions apply:
+
+1. **Constants.lua** — All string enums (era, player colors, industry types, card types, resource types) defined as constants. No raw string literals in logic code.
+2. **Network.lua** — Dedicated module for graph operations: player network reachability, BFS nearest resource, merchant connectivity. Uses adjacency list built by BoardData.
+3. **Tile.lua** — Factory for creating tile objects with consistent shape from BoardData.buildingCosts. No ad-hoc tile construction.
+4. **Adjacency list** — `BoardData.adjacency[cityName]` maps each city to its connected link IDs. Built once, used by Network.lua for O(1) neighbor lookup.
+5. **Slot index** — `state.slotIndex[slotId]` provides O(1) slot lookup alongside the nested `cities.slots` arrays. Both reference the same objects.
+6. **Parameterized Market** — Single `Market.buy(state, color, resourceType, count)` instead of separate coal/iron functions.
+7. **spec_helper.lua** — Centralized `package.path` setup loaded by busted config. No path manipulation in individual spec files.
+8. **dkjson** — Pure-Lua JSON library for Phase 1 serialization. Phase 2 will swap to TTS built-in `JSON.encode/decode`.
+9. **Stable sort** — `helpers.stableSort(t, comparator)` using original-index tiebreaker for turn order.
+10. **Derive, don't store** — `isFirstRound` derived from `era == "canal" and round == 1`. No redundant boolean flag.
 
 ---
 
@@ -17,9 +34,12 @@
 ```
 brass_birmingham_tbs/
 ├── src/
-│   ├── GameState.lua        — Central game state, initialization, player data
-│   ├── BoardData.lua        — Static board topology (cities, slots, links, merchants)
-│   ├── Market.lua           — Coal/iron market pricing, resource consumption
+│   ├── Constants.lua        — String enums: Era, Color, Industry, Resource, CardType
+│   ├── GameState.lua        — Central game state, initialization, player data, slot index
+│   ├── BoardData.lua        — Static board topology (cities, slots, links, merchants, adjacency)
+│   ├── Tile.lua             — Tile factory: creates tiles with consistent shape from BoardData
+│   ├── Network.lua          — Graph operations: reachability, BFS nearest resource, merchant connectivity
+│   ├── Market.lua           — Coal/iron market pricing, resource consumption (parameterized)
 │   ├── IncomeTrack.lua      — Income level ↔ space conversion, advance/decrease
 │   ├── TurnManager.lua      — Turn order, round flow, spending tracker, income phase
 │   ├── Validation.lua       — Legal move checking for all 6 actions
@@ -27,18 +47,23 @@ brass_birmingham_tbs/
 │   ├── Scoring.lua          — End-of-era scoring (building VP + link VP + income VP)
 │   ├── EraTransition.lua    — Canal→Rail transition logic
 │   ├── Lang.lua             — i18n string table (en / zh-TW)
-│   └── helpers.lua          — Shared utilities (deep copy, table find, etc.)
+│   └── helpers.lua          — Shared utilities (deep copy, stable sort, table ops)
 ├── spec/
+│   ├── spec_helper.lua      — Centralized package.path setup
+│   ├── Constants_spec.lua
 │   ├── GameState_spec.lua
 │   ├── BoardData_spec.lua
+│   ├── Tile_spec.lua
+│   ├── Network_spec.lua
 │   ├── Market_spec.lua
 │   ├── IncomeTrack_spec.lua
 │   ├── TurnManager_spec.lua
 │   ├── Validation_spec.lua
 │   ├── Actions_spec.lua
 │   ├── Scoring_spec.lua
-│   └── EraTransition_spec.lua
-├── .busted                  — busted config
+│   ├── EraTransition_spec.lua
+│   └── integration_spec.lua
+├── .busted                  — busted config (loads spec_helper)
 └── docs/
 ```
 
@@ -129,7 +154,7 @@ function helpers.deepCopy(orig)
     if type(orig) ~= "table" then return orig end
     local copy = {}
     for k, v in pairs(orig) do
-        copy[helpers.deepCopy(k)] = helpers.deepCopy(v)
+        copy[k] = helpers.deepCopy(v)  -- keys are strings/numbers, no need to deep copy
     end
     return setmetatable(copy, getmetatable(orig))
 end
@@ -155,6 +180,31 @@ function helpers.tableMap(t, fn)
         result[i] = fn(v, i)
     end
     return result
+end
+
+function helpers.tableContains(t, value)
+    for _, v in ipairs(t) do
+        if v == value then return true end
+    end
+    return false
+end
+
+function helpers.tableSum(t, fn)
+    local sum = 0
+    for _, v in ipairs(t) do sum = sum + fn(v) end
+    return sum
+end
+
+function helpers.stableSort(t, comparator)
+    -- Decorate with original index for stability
+    local decorated = {}
+    for i, v in ipairs(t) do decorated[i] = { value = v, index = i } end
+    table.sort(decorated, function(a, b)
+        if comparator(a.value, b.value) then return true end
+        if comparator(b.value, a.value) then return false end
+        return a.index < b.index  -- stable tiebreak
+    end)
+    for i, d in ipairs(decorated) do t[i] = d.value end
 end
 
 function helpers.shallowCopy(t)
