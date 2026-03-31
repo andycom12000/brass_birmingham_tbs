@@ -1,0 +1,105 @@
+================================================================================
+Brass: Birmingham TTS Mod — Source Image Catalog
+================================================================================
+Source directory: C:/Users/andyc/Downloads/Brass Birmingham images/
+Generated: 2026-03-31
+================================================================================
+
+FILENAME -> IDENTIFIED_AS (dimensions)
+
+--- BOARD ---
+
+httpssteamusercontentaakamaihdnetugc216572860965317704425817700C7529A9657879940356D6E405A8D2DF1.jpg -> BOARD: Main game board with map, market tracks, scoring track (10000x6144)
+
+--- CARD SHEETS ---
+
+httpssteamusercontentaakamaihdnetugc21657286096531745750E0587829BF940706A3160EBEA5D9C11E512D805.jpg -> CARD_SHEET: Card face sprite sheet — location and industry cards, 6x6 grid (3500x3510)
+httpssteamusercontentaakamaihdnetugc2188247245679406117E9CD95F3F60A03C9E5AA3D64980223601DE4032F.jpg -> CARD_SHEET: Card face sprite sheet — location and industry cards, 4x8 grid (2995x6223)
+httpssteamusercontentaakamaihdnetugc2188247245679406828525F74C1593BA710AE408CEC85475DFF9C4E0ABC.jpg -> CARD_SHEET: Card back sprite sheet — card backs with stone/net textures, 4x8 grid (2996x6225)
+
+--- CARD BACK ---
+
+httpssteamusercontentaakamaihdnetugc987863257461228308C0D0FF1693A1F219F9DC3A8DB86B77EAE81712C4.jpg -> CARD_BACK: Single card back — ornate industrial gear/engine design, dark silver (500x702)
+
+--- PLAYER AIDS (Chinese / Traditional Chinese) ---
+
+httpssteamusercontentaakamaihdnetugc2165728609653173001BB0D630F58B87EACCD2C11D60594B6AE9F7C02A0.jpg -> PLAYER_AID: Game flow reference card (Chinese) — action types, era end steps (2780x3924)
+httpssteamusercontentaakamaihdnetugc216572860965317371849D6FA3BD82AE451E208B217A8BA96D07E68083E.jpg -> PLAYER_AID: Card distribution reference card (Chinese) — card counts per player count (2816x3959)
+httpmqpiccnpsbV11KbKJY3WF7aeDxShnlGKEn2JGSbPTfBlNPVXclr313ogBFkIt1EPaobdFMBAAAAAAAAbogAJaBjoDMwgRCeIrfviewer4.jpg -> PLAYER_AID: Action types reference card (Chinese) — tall narrow format (640x1626)
+
+--- TILE SHEETS (Building Tiles — front faces, one per player color) ---
+
+httpssteamusercontentaakamaihdnetugc987863257460567094CA13E07E6BDA1D54A13D6A1ECF51CF97DA8274BF.jpg -> TILE_SHEET: Building tile fronts — purple/white player color, 8x7 grid (2142x1666)
+httpssteamusercontentaakamaihdnetugc98786325746056767035AF4950AD7FFCBB6B0A7D218479A6F973565A1A.jpg -> TILE_SHEET: Building tile fronts — dark/grey player color, 8x7 grid (2142x1666)
+httpssteamusercontentaakamaihdnetugc98786325746056911059EF30BD1439C1D8BEFDA8B9F12C55737ACFAFFB.jpg -> TILE_SHEET: Building tile fronts — orange/red player color, 8x7 grid (2142x1666)
+httpssteamusercontentaakamaihdnetugc987863257460569681AD8E8F3CE520FBCCAEB5E34866665F92C4C812E2.jpg -> TILE_SHEET: Building tile fronts — yellow/gold player color, 8x7 grid (2142x1666)
+
+--- PLAYER BOARDS (one per player color, front and back) ---
+
+httpssteamusercontentaakamaihdnetugc970984067088082589B3025B9E696DC4F1836387323787349F6CCB30B9.jpg -> PLAYER_BOARD: Player board front — purple/white player color (2380x1428)
+httpssteamusercontentaakamaihdnetugc970984067088083184F762DED5739F7E2342BD360914A99F33C1D756B5.jpg -> PLAYER_BOARD: Player board back — dark/grey player color (2380x1428)
+httpssteamusercontentaakamaihdnetugc97098406708808414207A38E5F19253940B65F9CC6BAD401B515C8AEFD.jpg -> PLAYER_BOARD: Player board front — orange/yellow player color (2380x1428)
+httpssteamusercontentaakamaihdnetugc9709840670880845349BE428A0E6C3435C60867D9C6709919FD05E5462.jpg -> PLAYER_BOARD: Player board back — dark gold/brown player color (2380x1428)
+
+--- TILE SHEET (Building Tile Backs / Overview) ---
+
+httpssteamusercontentaakamaihdnetugc970984067088078265C95C1F18A9C023CF94514C5529424F4341EF5F38.jpg -> TILE_SHEET: Building tile backs — dark side with resource/VP icons, all industries (2818x2280)
+
+--- WILD INDUSTRY TILES ---
+
+httpssteamusercontentaakamaihdnetugc9878632574608394792CF61FBBB2A79F4A48861340C4A847FE9353250F.jpg -> TILE_SHEET: Wild industry marker tiles — pottery, manufactured goods, cotton mill, combos on dark metallic tray backgrounds, 3x2 grid (1378x916)
+httpssteamusercontentaakamaihdnetugc987863257460840171A36EF817659328A2AF568F3B1375AB0C3A72ACC6.jpg -> TOKEN: Wild location tile back — dark metallic tray/bowl shape (459x458)
+
+--- MERCHANT TILES (circular portrait tokens) ---
+
+httpssteamusercontentaakamaihdnetugc18166147348818094339201AF6238228FFBAA3D3C9724749D262BCFC5DF.png -> MERCHANT: Merchant tile — red/brown background, male portrait with white wig (2223x2239)
+httpssteamusercontentaakamaihdnetugc18166147348818103397274369F1B6F52C9702880649E4935A14A085E48.png -> MERCHANT: Merchant tile — red/brown background, male portrait dark hair (2293x2308)
+httpssteamusercontentaakamaihdnetugc1816614734881813871ED38ED8DF91EC55B9CE4440DE67B52458D8E80DB.png -> MERCHANT: Merchant tile — purple background, male portrait with top hat (2241x2257)
+httpssteamusercontentaakamaihdnetugc18166147348818148631CE52794F1223B094CF95554F775BA750926A7B1.png -> MERCHANT: Merchant tile — purple background, young male portrait dark hair (2156x2162)
+httpssteamusercontentaakamaihdnetugc18166147348818159165763E97572AED6F045D96D36DD8CF7B14DADB057.png -> MERCHANT: Merchant tile — light blue background, female portrait with bonnet (2259x2292)
+httpssteamusercontentaakamaihdnetugc1816614734881817322FDB5E5650284FB9464384E979C3ACF6C2EDB064D.png -> MERCHANT: Merchant tile — light blue background, older bald male portrait (2294x2317)
+httpssteamusercontentaakamaihdnetugc181661473488181855546ECCD1BF1B9B19A8789EF0F0C1A5FEF4D6B767D.png -> MERCHANT: Merchant tile — gold/olive background, young female portrait blue dress (2254x2272)
+httpssteamusercontentaakamaihdnetugc1816614734881818977714C5AF249BA118087E3D65C5244ACE586A26A15.png -> MERCHANT: Merchant tile — gold/olive background, older male portrait white wig (2168x2192)
+
+--- LINK TILES (canal/rail transport tokens, sprite sheets with 2 tiles each) ---
+
+httpssteamusercontentaakamaihdnetugc20091985920315691182E559286F55EC094241CEB9CAC2BAEA760C2553D.jpg -> TOKEN: Link tile sheet — purple player, train (rail link), 2 tiles (768x768)
+httpssteamusercontentaakamaihdnetugc2009198592031571374628ED4FCAD34FE324DB45F471DB1214611D530E6.jpg -> TOKEN: Link tile sheet — purple player, canal boat (canal link), 2 tiles (768x768)
+httpssteamusercontentaakamaihdnetugc2009198592031590736E074A3EB8BF273B61D8F83B3506286152E427F07.jpg -> TOKEN: Link tile sheet — orange player, train (rail link), 2 tiles (768x768)
+httpssteamusercontentaakamaihdnetugc20091985920315916614F313AAD5CE2463311909AD03D44F2674CD3BC7B.jpg -> TOKEN: Link tile sheet — orange player, canal boat (canal link), 2 tiles (768x768)
+httpssteamusercontentaakamaihdnetugc20091985920315926767F362422FCEDB3D7CA5E12E88E1466642F1F2A2D.jpg -> TOKEN: Link tile sheet — white player, canal boat (canal link), 2 tiles (768x768)
+httpssteamusercontentaakamaihdnetugc200919859203159338465307CD170C805D7F1F9F25F8B58F00990400E81.jpg -> TOKEN: Link tile sheet — white player, train (rail link), 2 tiles (768x768)
+httpssteamusercontentaakamaihdnetugc2009198592031594123C55EEF4F6F4DC665A0851B50BFC70C1CDE564C31.jpg -> TOKEN: Link tile sheet — yellow player, canal boat (canal link), 2 tiles (768x768)
+httpssteamusercontentaakamaihdnetugc200919859203159484593428099F4D8BB8331C1091368AF150259F0351F.jpg -> TOKEN: Link tile sheet — yellow player, train (rail link), 2 tiles (768x768)
+
+--- 3D MODEL TEXTURES ---
+
+httpssteamusercontentaakamaihdnetugc2009198592028039882D7532857A29A7433532A558CE8CF9B5321CA0936.jpg -> TOKEN: 3D model UV texture — barrel/wagon parts, wood and metal (1024x1024)
+httpssteamusercontentaakamaihdnetugc2009198592028077463C518D80E31E27DB23EEAC8CF9253E59798865790.jpg -> TOKEN: 3D model UV texture — building facades, brick and industrial (2048x2048)
+httpssteamusercontentaakamaihdnetugc2009198592028115280FDE6AA64575F7CA00503D877E257D94800AA66BE.jpg -> TOKEN: 3D model UV texture — machinery parts, gears and metal (256x256)
+
+--- NON-BRASS ASSET ---
+
+httpssteamusercontentaakamaihdnetugc9056525636446379511F7066C4600F641A1853BBABB62AD3EC2BD9C140.png -> UNKNOWN: "MEGA CREDITS" token — not a Brass: Birmingham asset, appears to be from Terraforming Mars or similar; +5/-5 +1/-1 scoring widget (594x382)
+
+================================================================================
+SUMMARY
+================================================================================
+Total images: 39
+
+  1  BOARD          — Main game board
+  3  CARD_SHEET     — Card face/back sprite sheets
+  1  CARD_BACK      — Single card back image
+  3  PLAYER_AID     — Chinese-language reference cards
+  5  TILE_SHEET     — Building tile sprite sheets (4 front colors + 1 back)
+  4  PLAYER_BOARD   — Player boards (4 player colors, front/back variants)
+  8  MERCHANT       — Merchant portrait tiles (4 colors x 2 portraits each)
+  1  TILE_SHEET     — Wild industry marker tiles
+  1  TOKEN          — Wild location tile back
+  8  TOKEN          — Link tiles (4 player colors x canal/rail)
+  3  TOKEN          — 3D model UV textures
+  1  UNKNOWN        — Non-Brass asset (Mega Credits widget)
+
+Player colors identified: purple, orange/red, white/grey, yellow/gold
+Languages: Chinese (Traditional) for player aid cards
+================================================================================
