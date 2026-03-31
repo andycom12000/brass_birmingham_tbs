@@ -474,9 +474,7 @@ AI_BUTTON_GUID = "f714a5"
 
 CROWN_CALLBACK_SNIPPET = """
     -- Injected by inject_scripts.py: trigger game state initialization
-    Wait.time(function()
-        Global.call('onPhysicalSetupComplete', {{playerCount = {player_count}}})
-    end, 2.0)
+    Global.call('onPhysicalSetupComplete', {{playerCount = {player_count}}})
 """
 
 CROWN_LABELS = {
