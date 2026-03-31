@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Ui>
+    <!-- Red Player Spend Counter (top-left) -->
+    <Panel id="counterPanel_Red" position="-550 -300 0" width="120" height="80"
+           color="#111111E0" visibility="Red|Host">
+        <VerticalLayout>
+            <Text id="counterLabel_Red" text="Spent" fontSize="12" color="#E74C3C"/>
+            <Text id="counterValue_Red" text="£0" fontSize="28" color="#FFFFFF" fontStyle="Bold"/>
+        </VerticalLayout>
+    </Panel>
+
+    <!-- Blue Player Spend Counter (top-right) -->
+    <Panel id="counterPanel_Blue" position="550 -300 0" width="120" height="80"
+           color="#111111E0" visibility="Blue|Host">
+        <VerticalLayout>
+            <Text id="counterLabel_Blue" text="Spent" fontSize="12" color="#3498DB"/>
+            <Text id="counterValue_Blue" text="£0" fontSize="28" color="#FFFFFF" fontStyle="Bold"/>
+        </VerticalLayout>
+    </Panel>
+
+    <!-- Yellow Player Spend Counter (bottom-left) -->
+    <Panel id="counterPanel_Yellow" position="-550 300 0" width="120" height="80"
+           color="#111111E0" visibility="Yellow|Host">
+        <VerticalLayout>
+            <Text id="counterLabel_Yellow" text="Spent" fontSize="12" color="#F1C40F"/>
+            <Text id="counterValue_Yellow" text="£0" fontSize="28" color="#FFFFFF" fontStyle="Bold"/>
+        </VerticalLayout>
+    </Panel>
+
+    <!-- Green Player Spend Counter (bottom-right) -->
+    <Panel id="counterPanel_Green" position="550 300 0" width="120" height="80"
+           color="#111111E0" visibility="Green|Host">
+        <VerticalLayout>
+            <Text id="counterLabel_Green" text="Spent" fontSize="12" color="#2ECC71"/>
+            <Text id="counterValue_Green" text="£0" fontSize="28" color="#FFFFFF" fontStyle="Bold"/>
+        </VerticalLayout>
+    </Panel>
+
+    <!-- Turn Indicator (top center) -->
+    <Panel id="turnPanel" position="0 400 0" width="350" height="45" color="#1A1A2EE0" active="false">
+        <Text id="turnText" text="" fontSize="16" color="#FFFFFF"/>
+    </Panel>
+
+    <!-- Setup Panel (center, shown before game starts) -->
+    <Panel id="setupPanel" position="0 0 0" width="400" height="200" color="#2A1A0AF0" active="true">
+        <VerticalLayout spacing="15" padding="20">
+            <Text text="BRASS: BIRMINGHAM" fontSize="22" color="#D4C5A0" fontStyle="Bold"/>
+            <Text text="Select Players" fontSize="14" color="#A89870"/>
+            <HorizontalLayout spacing="15">
+                <Button id="setup2p" onClick="onSetup2P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">2P</Button>
+                <Button id="setup3p" onClick="onSetup3P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">3P</Button>
+                <Button id="setup4p" onClick="onSetup4P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">4P</Button>
+            </HorizontalLayout>
+        </VerticalLayout>
+    </Panel>
+
+    <!-- Language Toggle (bottom left) -->
+    <Button id="langToggle" onClick="toggleLanguage" position="-600 -380 0"
+            width="80" height="30" fontSize="11" color="#8B7355" textColor="#D4C5A0">EN/中文</Button>
+</Ui>
