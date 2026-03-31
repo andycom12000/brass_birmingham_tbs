@@ -166,33 +166,24 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
             if result.success then
                 Highlights.clearAll()
                 state._pendingCard = nil
-
                 ObjectManager.moveTo(tileObj, SnapMap.getPositionForSlot(snapInfo.id))
                 ObjectManager.lock(tileObj)
-
-            spawnTileResources(state, snapInfo.id)
-
-            -- Auto-deduct money cost
-            local moneyCost = meta.money or 0
-            if moneyCost > 0 then
-                EventHandlers.deductTileCost(playerColor, moneyCost, meta)
+                spawnTileResources(state, snapInfo.id)
+                printToAll(Lang.format("player_built", state.lang, {
+                    player   = playerColor,
+                    industry = tileType,
+                    level    = tileLevel,
+                    city     = cityName,
+                }))
+                afterAction(playerColor)
+            else
+                printToColor(result.error, playerColor, {1, 0, 0})
+                returnToPlayerArea(tileObj, playerColor)
             end
-
-            printToAll(Lang.format("player_built", state.lang, {
-                player   = playerColor,
-                industry = tileType,
-                level    = tileLevel,
-                city     = cityName,
-            }))
-
-            afterAction(playerColor)
         else
-            printToColor(result.error, playerColor, {1, 0, 0})
+            printToColor("Invalid placement.", playerColor, {1, 0, 0})
             returnToPlayerArea(tileObj, playerColor)
         end
-    else
-        printToColor("Invalid placement.", playerColor, {1, 0, 0})
-        returnToPlayerArea(tileObj, playerColor)
     end
 end
 
@@ -203,30 +194,39 @@ end
 -- @param cost         integer money cost to deduct
 -- @param meta         GMNotes table (used for announcement)
 function EventHandlers.deductTileCost(playerColor, cost, meta)
+    printToAll("[DEBUG] deductTileCost: color=" .. tostring(playerColor) .. " cost=" .. tostring(cost))
+
     -- Accumulate total spend this round
     PLAYER_SPEND[playerColor] = (PLAYER_SPEND[playerColor] or 0) + cost
 
     -- Update spend tracker display
     local spendGUID = COLOR_TO_SPEND_GUID[playerColor]
+    printToAll("[DEBUG] spendGUID=" .. tostring(spendGUID))
     if spendGUID then
         local spendObj = getObjectFromGUID(spendGUID)
+        printToAll("[DEBUG] spendObj=" .. tostring(spendObj))
         if spendObj then
             spendObj.setDescription(tostring(PLAYER_SPEND[playerColor]))
             spendObj.call('customSet')
+            printToAll("[DEBUG] spend counter updated to " .. tostring(PLAYER_SPEND[playerColor]))
         end
     end
 
     -- Update money counter (read via getCount, then set via customSet)
     local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
+    printToAll("[DEBUG] moneyGUID=" .. tostring(moneyGUID))
     if moneyGUID then
         local moneyObj = getObjectFromGUID(moneyGUID)
+        printToAll("[DEBUG] moneyObj=" .. tostring(moneyObj))
         if moneyObj then
-            local current = moneyObj.call('getCount')
-            if current then
+            local ok, current = pcall(function() return moneyObj.call('getCount') end)
+            printToAll("[DEBUG] getCount ok=" .. tostring(ok) .. " current=" .. tostring(current))
+            if ok and current then
                 local remaining = current - cost
                 if remaining < 0 then remaining = 0 end
                 moneyObj.setDescription(tostring(remaining))
                 moneyObj.call('customSet')
+                printToAll("[DEBUG] money counter updated to " .. tostring(remaining))
             end
         end
     end

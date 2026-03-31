@@ -271,21 +271,21 @@ SPEND_TO_MONEY_MAP = {
     ["719019"] = "4d732a",  -- White spend → White money
 }
 
--- Maps player color to spend tracker GUID
--- (reference mod colors: Orange=Green, Purple=Red, Yellow=Yellow, White=Blue)
+-- Maps TTS seat color to spend tracker GUID
+-- TTS seat colors in reference mod: White, Purple, Orange, Yellow
 COLOR_TO_SPEND_GUID = {
-    ["Green"]  = "9f808b",  -- Orange spend tracker
-    ["Red"]    = "b05299",  -- Purple spend tracker
-    ["Yellow"] = "26e57c",  -- Yellow spend tracker
-    ["Blue"]   = "719019",  -- White spend tracker
+    ["Orange"] = "9f808b",
+    ["Purple"] = "b05299",
+    ["Yellow"] = "26e57c",
+    ["White"]  = "719019",
 }
 
--- Maps player color to money counter GUID
+-- Maps TTS seat color to money counter GUID
 COLOR_TO_MONEY_GUID = {
-    ["Green"]  = "bfdaf2",
-    ["Red"]    = "4a0fce",
+    ["Orange"] = "bfdaf2",
+    ["Purple"] = "4a0fce",
     ["Yellow"] = "b56836",
-    ["Blue"]   = "4d732a",
+    ["White"]  = "4d732a",
 }
 
 STARTING_MONEY = 17
