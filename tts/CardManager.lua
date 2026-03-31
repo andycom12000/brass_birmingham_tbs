@@ -3,35 +3,34 @@
 
 local CardManager = {}
 
---- Build the initial draw deck for player count
--- Removes location cards for cities not in the game
--- @param state Game state object
--- @param deckObj TTS deck object
-function CardManager.buildDeck(state, deckObj)
-    local removedCities = require("src/BoardData").getRemovedCities(state.playerCount)
-    if #removedCities > 0 then
-        local cards = deckObj.getObjects()  -- get list of cards in deck
-        for i = #cards, 1, -1 do
-            local card = cards[i]
-            for _, city in ipairs(removedCities) do
-                if card.name and card.name:find(city) then
-                    deckObj.takeObject({
-                        index = card.index,
-                        position = {0, -5, 0},  -- off-table
-                        callback_function = function(obj) obj.destruct() end,
-                    })
-                    break
-                end
+--- Find the card deck on the board (placed by crown setup button).
+--- Searches for a Deck or Card object near the known deck snap point position.
+--- @return TTS object|nil  the deck object
+function CardManager.findDeckOnBoard()
+    local deckPos = Vector(-12.67, 0.96, 11.71)
+    local bestObj = nil
+    local bestDist = 5
+
+    for _, obj in ipairs(getAllObjects()) do
+        if obj.type == "Deck" or obj.type == "Card" then
+            local pos = obj.getPosition()
+            local dist = math.sqrt(
+                (pos.x - deckPos.x)^2 + (pos.z - deckPos.z)^2
+            )
+            if dist < bestDist then
+                bestDist = dist
+                bestObj = obj
             end
         end
     end
-    Wait.time(function() deckObj.shuffle() end, 0.5)
+
+    return bestObj
 end
 
---- Deal cards to all players (up to hand size 8)
--- @param state Game state object
-function CardManager.dealToAll(state)
-    local deckObj = ObjectManager.getObject("drawDeck")
+--- Deal cards from a deck to all players.
+--- @param state table  game state
+--- @param deckObj TTS object  the deck to deal from
+function CardManager.dealFromDeck(state, deckObj)
     if not deckObj then return end
     for _, color in ipairs(state.turnOrder) do
         local p = GameState.getPlayer(state, color)
@@ -40,6 +39,15 @@ function CardManager.dealToAll(state)
             deckObj.deal(toDeal, color)
             p.handSize = Constants.INITIAL_HAND_SIZE
         end
+    end
+end
+
+--- Deal cards to all players (up to hand size 8)
+-- @param state Game state object
+function CardManager.dealToAll(state)
+    local deckObj = CardManager.findDeckOnBoard()
+    if deckObj then
+        CardManager.dealFromDeck(state, deckObj)
     end
 end
 
@@ -101,39 +109,18 @@ end
 --- Check if the draw deck is empty
 -- @return Boolean true if deck is empty
 function CardManager.isDeckEmpty()
-    local deckObj = ObjectManager.getObject("drawDeck")
+    local deckObj = CardManager.findDeckOnBoard()
     if not deckObj then return true end
     if deckObj.type == "Deck" then return deckObj.getQuantity() <= 0 end
     if deckObj.type == "Card" then return false end  -- single card left
     return true
 end
 
---- Rebuild deck for rail era transition
--- Collects all cards from discard zone and prepares for rail era
--- @param state Game state object
-function CardManager.rebuildDeckForRailEra(state)
-    -- Collect all cards from discard zone
-    local discardZone = ObjectManager.getObject("discardZone")
-    if not discardZone then return end
-
-    -- Get objects in the zone
-    local objects = discardZone.getObjects and discardZone.getObjects() or {}
-    -- Group them into a deck, then build and shuffle
-    -- Note: actual implementation depends on how TTS zones work
-    -- This is a simplified version
-    Wait.time(function()
-        local deckObj = ObjectManager.getObject("drawDeck")
-        if deckObj then
-            CardManager.buildDeck(state, deckObj)
-        end
-    end, 1.0)
-end
-
 --- Refill a player's hand to 8 cards
 -- @param state Game state object
 -- @param color Player color string
 function CardManager.refillHand(state, color)
-    local deckObj = ObjectManager.getObject("drawDeck")
+    local deckObj = CardManager.findDeckOnBoard()
     if not deckObj then return end
     local p = GameState.getPlayer(state, color)
     local toDeal = Constants.INITIAL_HAND_SIZE - (p.handSize or 0)
