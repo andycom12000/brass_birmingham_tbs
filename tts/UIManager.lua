@@ -1,7 +1,7 @@
 local UIManager = {}
 
 function UIManager.updateSpendCounter(color, amount)
-    UI.setAttribute("counterValue_" .. color, "text", "£" .. amount)
+    UI.setAttribute("counterValue_" .. color, "text", "$" .. amount)
 end
 
 function UIManager.showTurnIndicator(text)
@@ -43,8 +43,8 @@ function UIManager.configureForPlayerCount(playerCount)
 end
 
 function UIManager.updateLanguage(lang)
-    local label = (lang == "zh-TW") and "本回合花費" or "Spent"
-    local btnText = (lang == "zh-TW") and "回合結束" or "End Turn"
+    local label = (lang == "zh-TW") and "Spent" or "Spent"
+    local btnText = (lang == "zh-TW") and "End Turn" or "End Turn"
     for _, color in ipairs({"Red", "Blue", "Yellow", "Green"}) do
         UI.setAttribute("counterLabel_" .. color, "text", label)
     end

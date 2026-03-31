@@ -1,67 +1,60 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <Ui>
-    <!-- ===== Player Spend Counters (map board bottom-left area, stacked vertically) ===== -->
-    <Panel id="counterPanel_Red" position="-720 -220 0" width="140" height="50"
-           color="#1A1010E8" outline="true" outlineColor="#E74C3C">
-        <HorizontalLayout spacing="6" padding="8 8 4 4">
-            <Text text="●" fontSize="16" color="#E74C3C" minWidth="20"/>
-            <Text id="counterLabel_Red" text="本回合花費" fontSize="11" color="#CCCCCC" flexibleWidth="1"/>
-            <Text id="counterValue_Red" text="£0" fontSize="22" color="#FFFFFF" fontStyle="Bold" minWidth="50" alignment="MiddleRight"/>
+    <Panel id="counterPanel_Red" position="-720 -220 0" width="160" height="45"
+           color="#1A1010E8">
+        <HorizontalLayout spacing="4" padding="6 6 4 4">
+            <Image width="14" height="14" color="#E74C3C"/>
+            <Text id="counterLabel_Red" text="Spent" fontSize="11" color="#CCCCCC"/>
+            <Text id="counterValue_Red" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
         </HorizontalLayout>
     </Panel>
 
-    <Panel id="counterPanel_Blue" position="-720 -270 0" width="140" height="50"
-           color="#1A1010E8" outline="true" outlineColor="#3498DB">
-        <HorizontalLayout spacing="6" padding="8 8 4 4">
-            <Text text="●" fontSize="16" color="#3498DB" minWidth="20"/>
-            <Text id="counterLabel_Blue" text="本回合花費" fontSize="11" color="#CCCCCC" flexibleWidth="1"/>
-            <Text id="counterValue_Blue" text="£0" fontSize="22" color="#FFFFFF" fontStyle="Bold" minWidth="50" alignment="MiddleRight"/>
+    <Panel id="counterPanel_Blue" position="-720 -268 0" width="160" height="45"
+           color="#1A1010E8">
+        <HorizontalLayout spacing="4" padding="6 6 4 4">
+            <Image width="14" height="14" color="#3498DB"/>
+            <Text id="counterLabel_Blue" text="Spent" fontSize="11" color="#CCCCCC"/>
+            <Text id="counterValue_Blue" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
         </HorizontalLayout>
     </Panel>
 
-    <Panel id="counterPanel_Yellow" position="-720 -320 0" width="140" height="50"
-           color="#1A1010E8" outline="true" outlineColor="#F1C40F">
-        <HorizontalLayout spacing="6" padding="8 8 4 4">
-            <Text text="●" fontSize="16" color="#F1C40F" minWidth="20"/>
-            <Text id="counterLabel_Yellow" text="本回合花費" fontSize="11" color="#CCCCCC" flexibleWidth="1"/>
-            <Text id="counterValue_Yellow" text="£0" fontSize="22" color="#FFFFFF" fontStyle="Bold" minWidth="50" alignment="MiddleRight"/>
+    <Panel id="counterPanel_Yellow" position="-720 -316 0" width="160" height="45"
+           color="#1A1010E8">
+        <HorizontalLayout spacing="4" padding="6 6 4 4">
+            <Image width="14" height="14" color="#F1C40F"/>
+            <Text id="counterLabel_Yellow" text="Spent" fontSize="11" color="#CCCCCC"/>
+            <Text id="counterValue_Yellow" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
         </HorizontalLayout>
     </Panel>
 
-    <Panel id="counterPanel_Green" position="-720 -370 0" width="140" height="50"
-           color="#1A1010E8" outline="true" outlineColor="#2ECC71">
-        <HorizontalLayout spacing="6" padding="8 8 4 4">
-            <Text text="●" fontSize="16" color="#2ECC71" minWidth="20"/>
-            <Text id="counterLabel_Green" text="本回合花費" fontSize="11" color="#CCCCCC" flexibleWidth="1"/>
-            <Text id="counterValue_Green" text="£0" fontSize="22" color="#FFFFFF" fontStyle="Bold" minWidth="50" alignment="MiddleRight"/>
+    <Panel id="counterPanel_Green" position="-720 -364 0" width="160" height="45"
+           color="#1A1010E8">
+        <HorizontalLayout spacing="4" padding="6 6 4 4">
+            <Image width="14" height="14" color="#2ECC71"/>
+            <Text id="counterLabel_Green" text="Spent" fontSize="11" color="#CCCCCC"/>
+            <Text id="counterValue_Green" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
         </HorizontalLayout>
     </Panel>
 
-    <!-- ===== End Turn Button (upper center, in front of clock) ===== -->
     <Button id="endTurnBtn" onClick="onEndTurn" position="0 350 0"
             width="160" height="50" fontSize="18" fontStyle="Bold"
-            color="#8B2500" textColor="#FFD700" active="false"
-            tooltip="結束你的回合">回合結束</Button>
+            color="#8B2500" textColor="#FFD700" active="false">End Turn</Button>
 
-    <!-- ===== Turn Indicator (above end turn button) ===== -->
     <Panel id="turnPanel" position="0 405 0" width="350" height="40" color="#1A1A2EE0" active="false">
         <Text id="turnText" text="" fontSize="15" color="#FFFFFF" alignment="MiddleCenter"/>
     </Panel>
 
-    <!-- ===== Setup Panel (center, shown before game starts) ===== -->
     <Panel id="setupPanel" position="0 0 0" width="400" height="200" color="#2A1A0AF0" active="true">
-        <VerticalLayout spacing="15" padding="20">
+        <VerticalLayout spacing="15" padding="20 20 20 20">
             <Text text="BRASS: BIRMINGHAM" fontSize="22" color="#D4C5A0" fontStyle="Bold"/>
-            <Text text="工業革命：伯明翰" fontSize="14" color="#A89870"/>
+            <Text text="Select Players" fontSize="14" color="#A89870"/>
             <HorizontalLayout spacing="15">
-                <Button id="setup2p" onClick="onSetup2P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">2P</Button>
-                <Button id="setup3p" onClick="onSetup3P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">3P</Button>
-                <Button id="setup4p" onClick="onSetup4P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">4P</Button>
+                <Button onClick="onSetup2P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">2P</Button>
+                <Button onClick="onSetup3P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">3P</Button>
+                <Button onClick="onSetup4P" fontSize="14" color="#D4C5A0" textColor="#1A0A00">4P</Button>
             </HorizontalLayout>
         </VerticalLayout>
     </Panel>
 
-    <!-- ===== Language Toggle (bottom left) ===== -->
     <Button id="langToggle" onClick="toggleLanguage" position="-600 -420 0"
-            width="80" height="28" fontSize="11" color="#8B7355" textColor="#D4C5A0">EN / 中文</Button>
+            width="80" height="28" fontSize="11" color="#8B7355" textColor="#D4C5A0">EN / ZH</Button>
 </Ui>
