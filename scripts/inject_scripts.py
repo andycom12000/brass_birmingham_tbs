@@ -275,20 +275,37 @@ def build_lua_bundle() -> str:
 # Spend tracker patcher
 # ---------------------------------------------------------------------------
 
+SPEND_TRACKER_POSITIONS = {
+    "26e57c": {"posX": -35.4, "posY": 0.9, "posZ": -27.5},  # Yellow -> below board 2
+    "719019": {"posX":  35.3, "posY": 0.9, "posZ": -27.5},  # White  -> below board 82
+    "9f808b": {"posX":  35.5, "posY": 0.9, "posZ":  27.5},  # Orange -> below board 81
+    "b05299": {"posX": -35.4, "posY": 0.9, "posZ":  27.5},  # Purple -> below board 80
+}
+
+SPEND_TRACKER_SCALE = {"scaleX": 0.80, "scaleY": 1.0, "scaleZ": 0.80}
+
+
 def patch_spend_trackers(mod_data: dict) -> int:
     """
     Walk ObjectStates and replace the 4 board Counter objects (by GUID) with
     spend tracker versions: inject the spend tracker LuaScript, set
-    LuaScriptState to the initial saved state, and set Nickname.
+    LuaScriptState, Nickname, and reposition below player boards.
 
     Returns the number of objects patched.
     """
     patched = 0
     for obj in mod_data.get("ObjectStates", []):
-        if obj.get("GUID") in SPEND_TRACKER_GUIDS:
+        guid = obj.get("GUID")
+        if guid in SPEND_TRACKER_GUIDS:
             obj["LuaScript"] = SPEND_TRACKER_SCRIPT
             obj["LuaScriptState"] = SPEND_TRACKER_STATE
             obj["Nickname"] = "Spend Tracker"
+            # Reposition below player board, centered
+            if guid in SPEND_TRACKER_POSITIONS:
+                t = obj.get("Transform", {})
+                t.update(SPEND_TRACKER_POSITIONS[guid])
+                t.update(SPEND_TRACKER_SCALE)
+                obj["Transform"] = t
             patched += 1
     return patched
 
