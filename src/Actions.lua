@@ -21,7 +21,7 @@ local function fail(reason)
 end
 
 --- Advance a player's income track by N spaces and update state.
-local function advanceIncome(state, color, spaces)
+function Actions.advanceIncome(state, color, spaces)
     if spaces <= 0 then return end
     local player = GameState.getPlayer(state, color)
     local newLevel, newSpace = IncomeTrack.advanceSpaces(
@@ -32,7 +32,7 @@ end
 
 --- Auto-flip a tile (coal/iron) when its resources are exhausted.
 --- Awards income advancement to the tile's owner.
-local function autoFlipIfEmpty(state, slot)
+function Actions.autoFlipIfEmpty(state, slot)
     local tile = slot.tile
     if not tile then return end
     if tile.flipped then return end
@@ -44,7 +44,7 @@ local function autoFlipIfEmpty(state, slot)
         tile.flipped = true
         -- Award income to the owner
         if slot.occupant then
-            advanceIncome(state, slot.occupant, tile.incomeSpaces)
+            Actions.advanceIncome(state, slot.occupant, tile.incomeSpaces)
         end
     end
 end
@@ -63,7 +63,7 @@ local function consumeCoalFromBuildings(state, cityName, needed)
         if #resources > 0 then
             table.remove(resources, #resources)  -- remove last token
             Market.returnToMarket(state, Constants.Resource.COAL, 1)
-            autoFlipIfEmpty(state, src.slot)
+            Actions.autoFlipIfEmpty(state, src.slot)
             remaining = remaining - 1
             -- If this source is exhausted, remove it from the list
             if #resources == 0 then
@@ -95,7 +95,7 @@ local function consumeIronFromBuildings(state, needed)
         if #resources > 0 then
             table.remove(resources, #resources)
             Market.returnToMarket(state, Constants.Resource.IRON, 1)
-            autoFlipIfEmpty(state, src.slot)
+            Actions.autoFlipIfEmpty(state, src.slot)
             remaining = remaining - 1
             -- If this source is exhausted, move to the next
             if #resources == 0 then
@@ -157,7 +157,7 @@ end
 
 --- Remove the first tile matching `industryType` and `level` from
 --- the player's unbuiltTiles stack.
-local function removeTileFromUnbuilt(player, industryType, level)
+function Actions.removeTileFromUnbuilt(player, industryType, level)
     local stack = player.unbuiltTiles[industryType]
     if not stack then return nil end
     for i, tile in ipairs(stack) do
@@ -241,7 +241,7 @@ function Actions.autoSellToMarket(state, color, slot)
     end
 
     -- Auto-flip if all cubes sold
-    autoFlipIfEmpty(state, slot)
+    Actions.autoFlipIfEmpty(state, slot)
 
     return { sold = sellCount, kept = produced - sellCount }
 end
@@ -273,7 +273,7 @@ function Actions.build(state, color, params)
     end
 
     -- Step 2: Remove tile from player's unbuiltTiles
-    local tile = removeTileFromUnbuilt(player, industryType, level)
+    local tile = Actions.removeTileFromUnbuilt(player, industryType, level)
     if not tile then
         return fail("Could not find tile " .. industryType .. " level " .. level
                     .. " in unbuiltTiles (internal error)")
@@ -310,7 +310,7 @@ function Actions.build(state, color, params)
     -- Breweries award income when they are sold/flipped; since they flip on build,
     -- we advance income now.
     if industryType == Constants.Industry.BREWERY then
-        advanceIncome(state, color, tile.incomeSpaces)
+        Actions.advanceIncome(state, color, tile.incomeSpaces)
     end
 
     -- Auto-sell for coal mines and iron works (mandatory rule)
@@ -433,7 +433,7 @@ function Actions.sell(state, color, params)
         tile.flipped = true
 
         -- 2c. Advance income track
-        advanceIncome(state, color, tile.incomeSpaces)
+        Actions.advanceIncome(state, color, tile.incomeSpaces)
     end
 
     -- Step 3: Process merchant bonus if a merchant city was involved
@@ -447,7 +447,7 @@ function Actions.sell(state, color, params)
             elseif bonus.type == "money" then
                 GameState.gainMoney(state, color, bonus.value or 0)
             elseif bonus.type == "income_advance" then
-                advanceIncome(state, color, bonus.value or 0)
+                Actions.advanceIncome(state, color, bonus.value or 0)
             elseif bonus.type == "develop_free" then
                 -- Grant a free develop: flag for the caller to handle, or
                 -- remove one developable tile from unbuiltTiles without iron cost.

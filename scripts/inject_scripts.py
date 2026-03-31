@@ -496,6 +496,13 @@ def patch_crown_buttons(mod_data: dict) -> int:
             script = obj.get("LuaScript", "")
             callback = CROWN_CALLBACK_SNIPPET.format(player_count=player_count)
 
+            # Idempotency guard: don't inject twice
+            if "onPhysicalSetupComplete" in script:
+                if guid in CROWN_LABELS:
+                    obj["Nickname"] = CROWN_LABELS[guid]
+                patched += 1
+                continue
+
             last_end_idx = script.rfind("\nend")
             if last_end_idx != -1:
                 obj["LuaScript"] = script[:last_end_idx] + callback + script[last_end_idx:]

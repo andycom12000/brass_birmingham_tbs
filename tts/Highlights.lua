@@ -219,7 +219,7 @@ Highlights._resourceCandidateState = {
 function Highlights.showResourceCandidates(candidates, resourceType, onClickCallback)
     Highlights.clearResourceCandidates()
 
-    local color = (resourceType == "coal") and {1, 0.5, 0} or {0.6, 0.6, 0.6}  -- orange / grey
+    local color = (resourceType == Constants.Resource.COAL) and {1, 0.5, 0} or {0.6, 0.6, 0.6}  -- orange / grey
 
     for _, cand in ipairs(candidates) do
         local snapPos = SnapMap.getPositionForSlot(cand.slotId)
@@ -247,7 +247,7 @@ function Highlights.showResourceCandidates(candidates, resourceType, onClickCall
 
     Highlights._resourceClickCallback = onClickCallback
 
-    local resName = (resourceType == "coal") and "Coal" or "Iron"
+    local resName = (resourceType == Constants.Resource.COAL) and "Coal" or "Iron"
     local msg = "Choose " .. resName .. " source: click a highlighted building"
     if state and state._pendingResource then
         printToColor(msg, state._pendingResource.playerColor, color)

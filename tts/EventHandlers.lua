@@ -9,6 +9,41 @@
 local EventHandlers = {}
 
 ------------------------------------------------------
+-- MODULE-LEVEL HELPERS
+------------------------------------------------------
+
+local function updatePhysicalCounters(playerColor, spentAmount)
+    PLAYER_SPEND[playerColor] = (PLAYER_SPEND[playerColor] or 0) + spentAmount
+    local spendGUID = COLOR_TO_SPEND_GUID[playerColor]
+    if spendGUID then
+        local spendObj = getObjectFromGUID(spendGUID)
+        if spendObj and spendObj.Counter then
+            spendObj.Counter.setValue(PLAYER_SPEND[playerColor])
+        end
+    end
+    local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
+    if moneyGUID then
+        local moneyObj = getObjectFromGUID(moneyGUID)
+        if moneyObj then
+            pcall(function()
+                local player = GameState.getPlayer(state, playerColor)
+                moneyObj.setDescription(tostring(player.money))
+                moneyObj.call('customSet')
+            end)
+        end
+    end
+end
+
+local INDUSTRY_LABELS = {
+    cotton       = "Cotton Mill",
+    coal         = "Coal Mine",
+    iron         = "Iron Works",
+    brewery      = "Brewery",
+    manufacturer = "Manufacturer",
+    pottery      = "Pottery",
+}
+
+------------------------------------------------------
 -- PUBLIC API
 ------------------------------------------------------
 
@@ -178,10 +213,13 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     end
 
     -- Count board resources and calculate market shortfall
-    local cachedIronSources = Network.findIronSources(state)
+    local cachedIronSources = {}
     local boardIron = 0
-    for _, src in ipairs(cachedIronSources) do
-        boardIron = boardIron + #src.slot.tile.resources
+    if ironNeeded > 0 then
+        cachedIronSources = Network.findIronSources(state)
+        for _, src in ipairs(cachedIronSources) do
+            boardIron = boardIron + #src.slot.tile.resources
+        end
     end
 
     -- Coal requires knowing the city for BFS connectivity
@@ -228,26 +266,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     -- Deduct ONLY base building cost (market costs deducted by buyFromMarket later)
     if cost > 0 then
         GameState.spendMoney(state, playerColor, cost)
-        PLAYER_SPEND[playerColor] = (PLAYER_SPEND[playerColor] or 0) + cost
-
-        -- Update physical counters (money and spend)
-        local spendGUID = COLOR_TO_SPEND_GUID[playerColor]
-        if spendGUID then
-            local spendObj = getObjectFromGUID(spendGUID)
-            if spendObj and spendObj.Counter then
-                spendObj.Counter.setValue(PLAYER_SPEND[playerColor])
-            end
-        end
-        local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
-        if moneyGUID then
-            local moneyObj = getObjectFromGUID(moneyGUID)
-            if moneyObj then
-                pcall(function()
-                    moneyObj.setDescription(tostring(player.money))
-                    moneyObj.call('customSet')
-                end)
-            end
-        end
+        updatePhysicalCounters(playerColor, cost)
     end
 
     -- Place tile on slot (when SnapMap data available)
@@ -263,15 +282,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         end
 
         -- Remove tile from unbuilt stack
-        if player.unbuiltTiles and player.unbuiltTiles[industryType] then
-            local tileStack = player.unbuiltTiles[industryType]
-            for i, t in ipairs(tileStack) do
-                if t.level == level then
-                    table.remove(tileStack, i)
-                    break
-                end
-            end
-        end
+        Actions.removeTileFromUnbuilt(player, industryType, level)
 
         -- Create tile and place on slot
         local tile = Tile.newWithResources(industryType, level)
@@ -299,13 +310,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     -- Brewery income on placement (breweries auto-flip and give income immediately)
     local tile = slot and slot.tile or nil
     if industryType == Constants.Industry.BREWERY and tile then
-        local advanceSpaces = tile.incomeSpaces or 0
-        if advanceSpaces > 0 then
-            local newLevel, newSpace = IncomeTrack.advanceSpaces(
-                player.incomeLevel, player.incomeSpace, advanceSpaces)
-            player.incomeLevel = newLevel
-            player.incomeSpace = newSpace
-        end
+        Actions.advanceIncome(state, playerColor, tile.incomeSpaces or 0)
     end
 
     -- If no resources needed, skip directly to auto-sell / finish
@@ -451,19 +456,7 @@ function EventHandlers._consumeOneFromSource(pending, slotId)
 
     -- Auto-flip if empty
     if #slot.tile.resources == 0 then
-        local tile = slot.tile
-        if not tile.flipped and (tile.type == Constants.Industry.COAL or tile.type == Constants.Industry.IRON) then
-            tile.flipped = true
-            if slot.occupant then
-                local owner = GameState.getPlayer(state, slot.occupant)
-                if owner and tile.incomeSpaces then
-                    local newLevel, newSpace = IncomeTrack.advanceSpaces(
-                        owner.incomeLevel, owner.incomeSpace, tile.incomeSpaces)
-                    owner.incomeLevel = newLevel
-                    owner.incomeSpace = newSpace
-                end
-            end
-        end
+        Actions.autoFlipIfEmpty(state, slot)
     end
 
     -- Decrement need
@@ -534,34 +527,14 @@ function EventHandlers._buyMarketResources(pending, resourceType)
     local marketData = Market.getMarketSupply(state, resourceType)
     if not marketData.cubeGUIDs then marketData.cubeGUIDs = {} end
 
+    local totalPrice = 0
     for _ = 1, fromMarket do
         -- Get price before buying (for tracking)
         local price = Market.getPrice(state, resourceType)
-        pending.totalSpent = pending.totalSpent + price
+        totalPrice = totalPrice + price
 
         -- Actually buy (deducts money, decreases supply)
         Market.buyFromMarket(state, pending.playerColor, resourceType, 1)
-
-        -- Update physical money counter
-        local player = GameState.getPlayer(state, pending.playerColor)
-        local moneyGUID = COLOR_TO_MONEY_GUID[pending.playerColor]
-        if moneyGUID then
-            local moneyObj = getObjectFromGUID(moneyGUID)
-            if moneyObj then
-                pcall(function()
-                    moneyObj.setDescription(tostring(player.money))
-                    moneyObj.call('customSet')
-                end)
-            end
-        end
-        PLAYER_SPEND[pending.playerColor] = (PLAYER_SPEND[pending.playerColor] or 0) + price
-        local spendGUID = COLOR_TO_SPEND_GUID[pending.playerColor]
-        if spendGUID then
-            local spendObj = getObjectFromGUID(spendGUID)
-            if spendObj and spendObj.Counter then
-                spendObj.Counter.setValue(PLAYER_SPEND[pending.playerColor])
-            end
-        end
 
         -- Queue animation: cube from market to build site (destroyed on arrival)
         local cubeGUID = nil
@@ -576,6 +549,10 @@ function EventHandlers._buyMarketResources(pending, resourceType)
             }
         end
     end
+
+    -- Update counters once after all market purchases
+    pending.totalSpent = pending.totalSpent + totalPrice
+    updatePhysicalCounters(pending.playerColor, totalPrice)
 end
 
 ------------------------------------------------------
@@ -607,6 +584,7 @@ function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildP
             local result = Actions.autoSellToMarket(state, playerColor, slot)
 
             if result.sold > 0 or result.kept > 0 then
+                if state then state._animating = true end
                 local resourceType = (tileType == Constants.Industry.COAL) and Constants.Resource.COAL or Constants.Resource.IRON
 
                 -- Animate sold cubes: spawn at build site, move to market
@@ -640,6 +618,7 @@ function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildP
                             + ResourceAnimation.MOVE_DURATION
                             + ResourceAnimation.ARRIVE_BUFFER
                 Wait.time(function()
+                    if state then state._animating = false end
                     EventHandlers._finishBuild(playerColor, meta, totalSpent)
                 end, delay)
                 return
@@ -656,14 +635,6 @@ end
 -- @param meta table  GMNotes metadata
 -- @param totalSpent number  Total money spent
 function EventHandlers._finishBuild(playerColor, meta, totalSpent)
-    local INDUSTRY_LABELS = {
-        cotton       = "Cotton Mill",
-        coal         = "Coal Mine",
-        iron         = "Iron Works",
-        brewery      = "Brewery",
-        manufacturer = "Manufacturer",
-        pottery      = "Pottery",
-    }
     local label = (INDUSTRY_LABELS[meta.industry] or meta.industry or "Building")
                   .. " Lv" .. (meta.level or "?")
     printToAll(playerColor .. " built " .. label .. " ($" .. totalSpent .. " total)")
