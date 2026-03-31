@@ -3,7 +3,7 @@
 -- Global Script
 ------------------------------------------------------
 
--- Module includes (TTS will inline these)
+-- Phase 1: Game Logic Modules
 #include src/helpers
 #include src/Constants
 #include src/BoardData
@@ -19,26 +19,52 @@
 #include src/EraTransition
 #include src/Lang
 
-------------------------------------------------------
--- GAME STATE
-------------------------------------------------------
-local state = nil  -- initialized in onLoad or setupGame
+-- Phase 2: TTS Integration Modules
+#include tts/SnapMap
+#include tts/ObjectManager
+#include tts/CardManager
+#include tts/Highlights
+#include tts/UIManager
+#include tts/EventHandlers
 
 ------------------------------------------------------
--- TTS CALLBACKS
+-- GAME STATE (global)
+------------------------------------------------------
+state = nil
+
+------------------------------------------------------
+-- TTS LIFECYCLE CALLBACKS
 ------------------------------------------------------
 
 function onLoad(save_state)
-    -- Restore or initialize game state from save data
     if save_state and save_state ~= "" then
-        state = GameState.deserialize(save_state)
-        printToAll(Lang.get("game_loaded", state.lang))
+        local saved = JSON.decode(save_state)
+        if saved then
+            state = saved.gameState
+            ObjectManager.loadGUIDs(saved.objectGUIDs)
+
+            -- Rebuild snap map
+            local board = ObjectManager.getObject("mainBoard")
+            if board then SnapMap.buildFromObject(board) end
+
+            UIManager.hideSetup()
+            UIManager.configureForPlayerCount(state.playerCount)
+            UIManager.updateLanguage(state.lang)
+            broadcastCurrentPlayer()
+
+            printToAll(Lang.get("game_loaded", state.lang))
+        end
+    else
+        UIManager.showSetup()
     end
 end
 
 function onSave()
     if state then
-        return GameState.serialize(state)
+        return JSON.encode({
+            gameState = state,
+            objectGUIDs = ObjectManager.saveGUIDs(),
+        })
     end
     return ""
 end
@@ -47,120 +73,78 @@ end
 -- SETUP
 ------------------------------------------------------
 
--- Called when host clicks "Setup Game" button
--- playerCount: 2, 3, or 4
-function setupGame(playerCount)
+function onSetup2P() startGame(2) end
+function onSetup3P() startGame(3) end
+function onSetup4P() startGame(4) end
+
+function startGame(playerCount)
+    UIManager.hideSetup()
     state = GameState.new(playerCount)
+
+    -- Scan objects on table
+    ObjectManager.scanTable()
+
+    -- Build snap point mappings
+    local board = ObjectManager.getObject("mainBoard")
+    if board then SnapMap.buildFromObject(board) end
+
+    -- Setup cards
+    local deck = ObjectManager.getObject("drawDeck")
+    if deck then
+        CardManager.buildDeck(state, deck)
+        CardManager.dealToAll(state)
+    end
+
+    -- Income phase for first round
+    TurnManager.incomePhase(state)
+
+    -- Configure UI
+    UIManager.configureForPlayerCount(playerCount)
+    UIManager.resetAllCounters(state.turnOrder)
+    UIManager.updateLanguage(state.lang)
+    broadcastCurrentPlayer()
+
     printToAll(Lang.format("game_started", state.lang, { count = playerCount }))
     printToAll(Lang.get("canal_era", state.lang))
-    broadcastCurrentPlayer()
 end
 
 ------------------------------------------------------
--- ACTION HANDLERS
--- These are called from TTS UI/object interactions
+-- TTS EVENT CALLBACKS
 ------------------------------------------------------
 
-function onBuild(color, params)
-    if not isCurrentPlayer(color) then return end
-    local result = Actions.build(state, color, params)
-    if result.success then
-        printToAll(Lang.format("player_built", state.lang, {
-            player = color,
-            industry = params.industryType,
-            level = params.level,
-            city = params.location,
-        }))
-        afterAction(color)
-    else
-        printToColor(result.error, color, {1, 0, 0})
-    end
+function onObjectDrop(playerColor, droppedObject)
+    EventHandlers.onObjectDrop(playerColor, droppedObject)
 end
 
-function onNetwork(color, params)
-    if not isCurrentPlayer(color) then return end
-    local result = Actions.network(state, color, params)
-    if result.success then
-        printToAll(Lang.format("player_linked", state.lang, {
-            player = color,
-            city1 = params.city1 or "",
-            city2 = params.city2 or "",
-        }))
-        afterAction(color)
-    else
-        printToColor(result.error, color, {1, 0, 0})
-    end
-end
-
-function onSell(color, params)
-    if not isCurrentPlayer(color) then return end
-    local result = Actions.sell(state, color, params)
-    if result.success then
-        printToAll(Lang.format("player_sold", state.lang, {
-            player = color,
-            industry = params.industryType or "",
-            city = params.location or "",
-        }))
-        afterAction(color)
-    else
-        printToColor(result.error, color, {1, 0, 0})
-    end
-end
-
-function onDevelop(color, params)
-    if not isCurrentPlayer(color) then return end
-    local result = Actions.develop(state, color, params)
-    if result.success then
-        printToAll(Lang.format("player_developed", state.lang, {
-            player = color,
-            count = params.count,
-        }))
-        afterAction(color)
-    else
-        printToColor(result.error, color, {1, 0, 0})
-    end
-end
-
-function onLoan(color)
-    if not isCurrentPlayer(color) then return end
-    local result = Actions.loan(state, color)
-    if result.success then
-        printToAll(Lang.format("player_loaned", state.lang, { player = color }))
-        afterAction(color)
-    else
-        printToColor(result.error, color, {1, 0, 0})
-    end
-end
-
-function onScout(color)
-    if not isCurrentPlayer(color) then return end
-    local result = Actions.scout(state, color)
-    if result.success then
-        printToAll(Lang.format("player_scouted", state.lang, { player = color }))
-        afterAction(color)
-    else
-        printToColor(result.error, color, {1, 0, 0})
-    end
+function onObjectPickUp(playerColor, pickedUpObject)
+    EventHandlers.onObjectPickUp(playerColor, pickedUpObject)
 end
 
 ------------------------------------------------------
--- HELPERS
+-- ACTION HELPERS (called by EventHandlers)
 ------------------------------------------------------
 
 function isCurrentPlayer(color)
+    if not state then return false end
     return GameState.getCurrentPlayerColor(state) == color
 end
 
 function afterAction(color)
-    -- Update spend counter display
+    -- Update spend counter
     local p = GameState.getPlayer(state, color)
-    updateSpendCounter(color, p.spentThisRound)
+    UIManager.updateSpendCounter(color, p.spentThisRound)
+
+    -- Update deck empty flag
+    state.deckEmpty = CardManager.isDeckEmpty()
 
     -- Check era end BEFORE advancing turn
     if EraTransition.isEraOver(state) then
         if state.era == Constants.Era.CANAL then
             printToAll(Lang.get("era_transition", state.lang))
             EraTransition.transition(state)
+            CardManager.rebuildDeckForRailEra(state)
+            CardManager.dealToAll(state)
+            UIManager.resetAllCounters(state.turnOrder)
             broadcastCurrentPlayer()
             return
         else
@@ -172,37 +156,127 @@ function afterAction(color)
         end
     end
 
-    -- Normal turn advancement
+    -- Refill hand
+    CardManager.refillHand(state, color)
+
+    -- Advance turn
     TurnManager.endAction(state)
     broadcastCurrentPlayer()
 end
 
 function broadcastCurrentPlayer()
+    if not state then return end
     local color = GameState.getCurrentPlayerColor(state)
-    printToAll(Lang.format("your_turn", state.lang, { player = color }))
-    printToAll(Lang.format("actions_remaining", state.lang, { count = state.actionsRemaining }))
-end
-
-function updateSpendCounter(color, amount)
-    -- Phase 2: update XML UI counter for this player
-    -- For now, just print
-    printToColor("Spent this round: \xC2\xA3" .. amount, color)
+    local turnText = Lang.format("your_turn", state.lang, { player = color })
+    local actionsText = Lang.format("actions_remaining", state.lang, { count = state.actionsRemaining })
+    UIManager.showTurnIndicator(turnText .. " — " .. actionsText)
+    printToAll(turnText)
 end
 
 function announceResults(ranking)
-    printToAll("=== GAME OVER ===")
+    UIManager.hideTurnIndicator()
+    printToAll("═══════════════════════════")
+    printToAll(Lang.get("scoring_start", state.lang))
     for i, entry in ipairs(ranking) do
-        printToAll(i .. ". " .. entry.color .. " \xe2\x80\x94 " .. entry.vp .. " VP")
+        printToAll(i .. ". " .. entry.color .. " — " .. entry.vp .. " VP (£" .. entry.money .. ")")
     end
     if ranking[1] then
         printToAll(Lang.format("winner", state.lang, { player = ranking[1].color }))
     end
+    printToAll("═══════════════════════════")
 end
 
--- Language toggle (bound to a TTS UI button in Phase 2)
+------------------------------------------------------
+-- LANGUAGE TOGGLE
+------------------------------------------------------
+
 function toggleLanguage()
-    if state then
-        state.lang = (state.lang == "en") and "zh-TW" or "en"
-        printToAll("Language: " .. state.lang)
+    if not state then return end
+    state.lang = (state.lang == "en") and "zh-TW" or "en"
+    UIManager.updateLanguage(state.lang)
+    printToAll("Language: " .. (state.lang == "en" and "English" or "繁體中文"))
+end
+
+------------------------------------------------------
+-- SELL / DEVELOP / LOAN / SCOUT (button-triggered actions)
+-- These are called from TTS context menu or buttons
+------------------------------------------------------
+
+function onSellAction(playerColor, slotIds, merchantName)
+    if not state or not isCurrentPlayer(playerColor) then return end
+    if not state._pendingCard then
+        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+        return
+    end
+    local result = Actions.sell(state, playerColor, {
+        slotIds = slotIds,
+        merchantName = merchantName,
+    })
+    if result.success then
+        Highlights.clearAll()
+        state._pendingCard = nil
+        printToAll(Lang.format("player_sold", state.lang, { player = playerColor, industry = "", city = "" }))
+        afterAction(playerColor)
+    else
+        printToColor(result.error, playerColor, {1, 0, 0})
+    end
+end
+
+function onDevelopAction(playerColor, count)
+    if not state or not isCurrentPlayer(playerColor) then return end
+    if not state._pendingCard then
+        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+        return
+    end
+    local result = Actions.develop(state, playerColor, { count = count or 1 })
+    if result.success then
+        Highlights.clearAll()
+        state._pendingCard = nil
+        printToAll(Lang.format("player_developed", state.lang, { player = playerColor, count = count or 1 }))
+        afterAction(playerColor)
+    else
+        printToColor(result.error, playerColor, {1, 0, 0})
+    end
+end
+
+function onLoanAction(playerColor)
+    if not state or not isCurrentPlayer(playerColor) then return end
+    if not state._pendingCard then
+        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+        return
+    end
+    local result = Actions.loan(state, playerColor)
+    if result.success then
+        Highlights.clearAll()
+        state._pendingCard = nil
+        -- Spawn £30 money at player area
+        local board = ObjectManager.getPlayerBoard(playerColor)
+        if board then
+            local pos = board.getPosition() + Vector(5, 1, 0)
+            ObjectManager.spawnMoney(15, pos)
+            ObjectManager.spawnMoney(15, pos + Vector(1, 0, 0))
+        end
+        printToAll(Lang.format("player_loaned", state.lang, { player = playerColor }))
+        afterAction(playerColor)
+    else
+        printToColor(result.error, playerColor, {1, 0, 0})
+    end
+end
+
+function onScoutAction(playerColor)
+    if not state or not isCurrentPlayer(playerColor) then return end
+    if not state._pendingCard then
+        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+        return
+    end
+    local result = Actions.scout(state, playerColor)
+    if result.success then
+        Highlights.clearAll()
+        state._pendingCard = nil
+        CardManager.giveWilds(playerColor)
+        printToAll(Lang.format("player_scouted", state.lang, { player = playerColor }))
+        afterAction(playerColor)
+    else
+        printToColor(result.error, playerColor, {1, 0, 0})
     end
 end
