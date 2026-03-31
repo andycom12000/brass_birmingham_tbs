@@ -1,0 +1,142 @@
+---
+base: lua51
+name: tts
+
+globals:
+  # ── TTS built-in objects ──
+  JSON:
+    any: true
+  UI:
+    any: true
+  Wait:
+    any: true
+  Timer:
+    any: true
+  Player:
+    any: true
+  WebRequest:
+    any: true
+  self:
+    any: true
+  Global:
+    any: true
+  Vector:
+    any: true
+  Color:
+    any: true
+  Notes:
+    any: true
+
+  # ── TTS built-in functions ──
+  getObjectFromGUID:
+    any: true
+  getAllObjects:
+    any: true
+  getObjects:
+    any: true
+  spawnObject:
+    any: true
+  spawnObjectJSON:
+    any: true
+  spawnObjectData:
+    any: true
+  destroyObject:
+    any: true
+  broadcastToAll:
+    any: true
+  broadcastToColor:
+    any: true
+  printToAll:
+    any: true
+  printToColor:
+    any: true
+  log:
+    any: true
+  logStyle:
+    any: true
+  getSnapPoints:
+    any: true
+  setSnapPoints:
+    any: true
+  getObjectsWithTag:
+    any: true
+  group:
+    any: true
+
+  # ── Game modules (available after #include preprocessing) ──
+  helpers:
+    any: true
+  Constants:
+    any: true
+  BoardData:
+    any: true
+  Tile:
+    any: true
+  IncomeTrack:
+    any: true
+  GameState:
+    any: true
+  Network:
+    any: true
+  Market:
+    any: true
+  TurnManager:
+    any: true
+  Validation:
+    any: true
+  Actions:
+    any: true
+  Scoring:
+    any: true
+  EraTransition:
+    any: true
+  Lang:
+    any: true
+
+  # ── TTS integration modules ──
+  SnapMap:
+    any: true
+  ObjectManager:
+    any: true
+  CardManager:
+    any: true
+  Highlights:
+    any: true
+  UIManager:
+    any: true
+  EventHandlers:
+    any: true
+  MarketLayout:
+    any: true
+  ResourceAnimation:
+    any: true
+
+  # ── Global game state variables (defined in Global.lua) ──
+  state:
+    any: true
+  PLAYER_SPEND:
+    any: true
+  SPEND_TO_MONEY_MAP:
+    any: true
+  COLOR_TO_SPEND_GUID:
+    any: true
+  COLOR_TO_MONEY_GUID:
+    any: true
+  STARTING_MONEY:
+    any: true
+
+  # ── Global functions (defined in Global.lua, used by tts/ modules) ──
+  isCurrentPlayer:
+    any: true
+  afterAction:
+    any: true
+  broadcastCurrentPlayer:
+    any: true
+  setCounterValue:
+    any: true
+  onSpendChanged:
+    any: true
+  updateSpendCounterFromState:
+    any: true
+  resetAllSpendCounters:
+    any: true
