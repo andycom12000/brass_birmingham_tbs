@@ -184,9 +184,15 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         boardIron = boardIron + #src.slot.tile.resources
     end
 
+    -- Coal requires knowing the city for BFS connectivity
     local cachedCoalSources = {}
     local boardCoal = 0
-    if coalNeeded > 0 and cityName then
+    if coalNeeded > 0 then
+        if not cityName then
+            printToColor("Cannot determine city for coal connection (SnapMap not available)", playerColor, {1, 0, 0})
+            returnToPlayerArea(tileObj, playerColor)
+            return
+        end
         cachedCoalSources = Network.findNearestCoal(state, cityName) or {}
         for _, src in ipairs(cachedCoalSources) do
             boardCoal = boardCoal + #src.slot.tile.resources
@@ -196,8 +202,8 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     local ironFromMarket = math.max(0, ironNeeded - boardIron)
     local coalFromMarket = math.max(0, coalNeeded - boardCoal)
 
-    -- Coal market access check (only when city is known via SnapMap)
-    if coalFromMarket > 0 and cityName then
+    -- Coal market access check
+    if coalFromMarket > 0 then
         if not Network.hasMarketConnection(state, playerColor, cityName) then
             printToColor("Cannot buy coal: no connection to merchant", playerColor, {1, 0, 0})
             returnToPlayerArea(tileObj, playerColor)
