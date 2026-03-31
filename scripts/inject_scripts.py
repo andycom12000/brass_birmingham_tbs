@@ -520,22 +520,43 @@ def patch_crown_buttons(mod_data: dict) -> int:
 # ---------------------------------------------------------------------------
 
 def lock_resource_cubes(mod_data: dict) -> int:
+    """
+    Lock coal/iron cube objects on the market track.
+    Reference mod uses Chinese names: 煤炭 (coal), 钢铁 (iron).
+    Object type is BlockSquare, not Custom_Token.
+    """
     locked = 0
+
+    # Match patterns for coal/iron cubes (English + Chinese)
+    COAL_NAMES = {"coal", "煤炭", "煤"}
+    IRON_NAMES = {"iron", "钢铁", "铁"}
+    # Object types that are cubes (not bags or boards)
+    CUBE_TYPES = {"BlockSquare", "Custom_Token", "Custom_Model"}
 
     def _walk(obj: dict) -> None:
         nonlocal locked
-        name = (obj.get("Nickname", "") or obj.get("Name", "")).lower()
-        if "coal" in name or "iron" in name:
-            # Only lock small token-like objects, not boards or bags
-            obj_type = obj.get("Name", "")
-            if obj_type in ("Custom_Token", "Custom_Model"):
-                resource_type = "coal" if "coal" in name else "iron"
-                obj["Locked"] = True
-                obj["GMNotes"] = json.dumps(
-                    {"type": "resource", "resource": resource_type},
-                    separators=(",", ":"),
-                )
-                locked += 1
+        nickname = obj.get("Nickname", "") or ""
+        obj_type = obj.get("Name", "")
+
+        if obj_type not in CUBE_TYPES:
+            # Recurse into containers but don't lock them
+            for contained in obj.get("ContainedObjects", []):
+                _walk(contained)
+            return
+
+        resource_type = None
+        if nickname in COAL_NAMES or nickname.lower() in COAL_NAMES:
+            resource_type = "coal"
+        elif nickname in IRON_NAMES or nickname.lower() in IRON_NAMES:
+            resource_type = "iron"
+
+        if resource_type:
+            obj["Locked"] = True
+            obj["GMNotes"] = json.dumps(
+                {"type": "resource", "resource": resource_type},
+                separators=(",", ":"),
+            )
+            locked += 1
 
         for contained in obj.get("ContainedObjects", []):
             _walk(contained)

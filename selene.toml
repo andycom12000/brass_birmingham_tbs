@@ -1,0 +1,7 @@
+std = "tts"
+
+[rules]
+# TTS mods define global callback functions — this is expected
+global_usage = "allow"
+# Single-line if-then-end is common style in this project
+multiple_statements = "allow"
