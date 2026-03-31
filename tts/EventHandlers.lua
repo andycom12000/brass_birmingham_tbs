@@ -194,39 +194,36 @@ end
 -- @param cost         integer money cost to deduct
 -- @param meta         GMNotes table (used for announcement)
 function EventHandlers.deductTileCost(playerColor, cost, meta)
-    printToAll("[DEBUG] deductTileCost: color=" .. tostring(playerColor) .. " cost=" .. tostring(cost))
-
     -- Accumulate total spend this round
     PLAYER_SPEND[playerColor] = (PLAYER_SPEND[playerColor] or 0) + cost
 
-    -- Update spend tracker display
+    -- Update spend tracker (TTS built-in Counter object — use Counter.setValue)
     local spendGUID = COLOR_TO_SPEND_GUID[playerColor]
-    printToAll("[DEBUG] spendGUID=" .. tostring(spendGUID))
     if spendGUID then
         local spendObj = getObjectFromGUID(spendGUID)
-        printToAll("[DEBUG] spendObj=" .. tostring(spendObj))
         if spendObj then
-            spendObj.setDescription(tostring(PLAYER_SPEND[playerColor]))
-            spendObj.call('customSet')
-            printToAll("[DEBUG] spend counter updated to " .. tostring(PLAYER_SPEND[playerColor]))
+            -- TTS Counter object: use setValue directly
+            if spendObj.Counter then
+                spendObj.Counter.setValue(PLAYER_SPEND[playerColor])
+            else
+                -- Fallback: MrStump script
+                spendObj.setDescription(tostring(PLAYER_SPEND[playerColor]))
+                spendObj.call('customSet')
+            end
         end
     end
 
-    -- Update money counter (read via getCount, then set via customSet)
+    -- Update money counter (Custom_Token with MrStump script — use getCount/customSet)
     local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
-    printToAll("[DEBUG] moneyGUID=" .. tostring(moneyGUID))
     if moneyGUID then
         local moneyObj = getObjectFromGUID(moneyGUID)
-        printToAll("[DEBUG] moneyObj=" .. tostring(moneyObj))
         if moneyObj then
             local ok, current = pcall(function() return moneyObj.call('getCount') end)
-            printToAll("[DEBUG] getCount ok=" .. tostring(ok) .. " current=" .. tostring(current))
             if ok and current then
                 local remaining = current - cost
                 if remaining < 0 then remaining = 0 end
                 moneyObj.setDescription(tostring(remaining))
                 moneyObj.call('customSet')
-                printToAll("[DEBUG] money counter updated to " .. tostring(remaining))
             end
         end
     end
