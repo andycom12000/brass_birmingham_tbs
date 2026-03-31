@@ -208,7 +208,7 @@ def process_module(name: str, path: Path) -> str:
     Read a Lua module file and transform it for inline bundling:
       - Drop all require() lines
       - Promote the first `local Name = {}` to a global `Name = {}`
-      - Drop the final `return Name` line
+      - Drop ONLY the final `return <Name>` line (not other return statements)
     Returns the processed Lua source as a string.
     """
     text = path.read_text(encoding="utf-8")
@@ -230,11 +230,17 @@ def process_module(name: str, path: Path) -> str:
                 line = m.group(2) + m.group(3) + m.group(4)
                 promoted = True
 
-        # 3. Drop `return <Name>` at module end
-        if RETURN_RE.match(line):
-            continue
-
         out.append(line)
+
+    # 3. Remove ONLY the last `return <ModuleName>` line (scan backwards)
+    for i in range(len(out) - 1, -1, -1):
+        stripped = out[i].strip()
+        if stripped == "return " + name or stripped == "return  " + name:
+            out.pop(i)
+            break
+        # Stop scanning backwards once we hit actual code (not blank/comment)
+        if stripped and not stripped.startswith("--"):
+            break
 
     return "\n".join(out)
 
