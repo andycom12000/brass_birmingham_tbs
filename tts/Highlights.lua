@@ -188,6 +188,8 @@ end
 --- Clear all active highlights and temporary markers
 -- Removes all spawned markers and highlights from objects
 function Highlights.clearAll()
+    Highlights.clearResourceCandidates()
+
     -- Destroy all temporary markers
     for _, marker in ipairs(Highlights.activeHighlights.markers) do
         if marker and not marker.isDestroyed() then
@@ -203,6 +205,64 @@ function Highlights.clearAll()
         end
     end
     Highlights.activeHighlights.objects = {}
+end
+
+-- Separate tracking for resource candidate highlights
+Highlights._resourceCandidateState = {
+    markers = {},
+}
+
+--- Show resource source candidates with highlights and click handlers.
+--- @param candidates table  array of { slotId=string, cityName=string, cubesAvailable=number }
+--- @param resourceType string  "coal" or "iron"
+--- @param onClickCallback function(slotId)  called when player clicks a candidate
+function Highlights.showResourceCandidates(candidates, resourceType, onClickCallback)
+    Highlights.clearResourceCandidates()
+
+    local color = (resourceType == "coal") and {1, 0.5, 0} or {0.6, 0.6, 0.6}  -- orange / grey
+
+    for _, cand in ipairs(candidates) do
+        local snapPos = SnapMap.getPositionForSlot(cand.slotId)
+        if snapPos then
+            local marker = Highlights._spawnMarker(snapPos + Vector(0, 0.5, 0), color)
+            if marker then
+                marker.setGMNotes(JSON.encode({
+                    type = "resource_candidate",
+                    slotId = cand.slotId,
+                }))
+                marker.interactable = true
+                marker.createButton({
+                    click_function = "onResourceMarkerClicked",
+                    function_owner = Global,
+                    label          = "",
+                    position       = {0, 0.2, 0},
+                    width          = 1200,
+                    height         = 1200,
+                    color          = {0, 0, 0, 0},
+                })
+                table.insert(Highlights._resourceCandidateState.markers, marker)
+            end
+        end
+    end
+
+    Highlights._resourceClickCallback = onClickCallback
+
+    local resName = (resourceType == "coal") and "Coal" or "Iron"
+    local msg = "Choose " .. resName .. " source: click a highlighted building"
+    if state and state._pendingResource then
+        printToColor(msg, state._pendingResource.playerColor, color)
+    end
+end
+
+--- Clear only resource candidate highlights.
+function Highlights.clearResourceCandidates()
+    for _, marker in ipairs(Highlights._resourceCandidateState.markers) do
+        if marker and not marker.isDestroyed() then
+            marker.destruct()
+        end
+    end
+    Highlights._resourceCandidateState.markers = {}
+    Highlights._resourceClickCallback = nil
 end
 
 return Highlights
