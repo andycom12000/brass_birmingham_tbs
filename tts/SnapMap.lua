@@ -6,9 +6,8 @@ SnapMap.byLinkId = {}   -- "Birmingham-Coventry" → snap data
 
 --- Scan a board object's snap points and build all mappings
 -- Snap point tags follow format:
---   "city_Birmingham_cotton_1" for building slots
+--   "city_Birmingham_1" for building slots
 --   "link_Birmingham-Coventry" for route links
---   "market_coal_3" for market positions
 function SnapMap.buildFromObject(boardObject)
     SnapMap.byTag = {}
     SnapMap.bySlotId = {}
@@ -26,9 +25,40 @@ function SnapMap.buildFromObject(boardObject)
             }
             SnapMap.byTag[tag] = data
 
-            -- Parse tag to categorize
             if tag:sub(1, 5) == "city_" then
-                -- "city_Birmingham_cotton_1" → slotId = "Birmingham_cotton_1"
+                local slotId = tag:sub(6)
+                SnapMap.bySlotId[slotId] = data
+            elseif tag:sub(1, 5) == "link_" then
+                local linkId = tag:sub(6)
+                SnapMap.byLinkId[linkId] = data
+            end
+        end
+    end
+end
+
+--- Scan save-level (Global) snap points and build mappings.
+-- Used when snap points are at the save root level, not attached to a board object.
+-- Positions are already in world coordinates.
+function SnapMap.buildFromGlobal()
+    SnapMap.byTag = {}
+    SnapMap.bySlotId = {}
+    SnapMap.byLinkId = {}
+
+    local snaps = Global.getSnapPoints()
+    if not snaps then return end
+
+    for i, snap in ipairs(snaps) do
+        local tags = snap.tags or {}
+        for _, tag in ipairs(tags) do
+            local data = {
+                position = snap.position,
+                rotation = snap.rotation,
+                snapIndex = i,
+                tag = tag,
+            }
+            SnapMap.byTag[tag] = data
+
+            if tag:sub(1, 5) == "city_" then
                 local slotId = tag:sub(6)
                 SnapMap.bySlotId[slotId] = data
             elseif tag:sub(1, 5) == "link_" then

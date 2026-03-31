@@ -51,8 +51,7 @@ function onLoad(save_state)
             ObjectManager.loadGUIDs(saved.objectGUIDs)
 
             -- Rebuild snap map
-            local board = ObjectManager.getObject("mainBoard")
-            if board then SnapMap.buildFromObject(board) end
+            SnapMap.buildFromGlobal()
 
             UIManager.hideSetup()
             UIManager.configureForPlayerCount(state.playerCount)
