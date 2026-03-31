@@ -109,4 +109,29 @@ function Market.getMaxPrice(resourceType)
     return 0
 end
 
+--- Simulate buying count units from the market WITHOUT modifying state.
+--- Returns the total cost using current supply levels for dynamic price calculation.
+--- Each simulated purchase decreases a local simulated supply, increasing the next unit's price.
+function Market.estimateCost(state, resourceType, count)
+    if count <= 0 then return 0 end
+    local market = Market.getMarketSupply(state, resourceType)
+    if not market then return 0 end
+    local track = Market.getTrack(resourceType)
+    local trackLen = #track
+    local simSupply = market.supply
+    local total = 0
+
+    for i = 1, count do
+        if simSupply <= 0 then
+            total = total + Market.getMaxPrice(resourceType)
+        else
+            local pos = trackLen - simSupply + 1
+            if pos < 1 then pos = 1 end
+            total = total + track[pos]
+            simSupply = simSupply - 1
+        end
+    end
+    return total
+end
+
 return Market
