@@ -74,7 +74,9 @@ SRC_MODULES = [
     ("CardManager",   PROJECT_ROOT / "tts" / "CardManager.lua"),
     ("Highlights",    PROJECT_ROOT / "tts" / "Highlights.lua"),
     ("UIManager",     PROJECT_ROOT / "tts" / "UIManager.lua"),
-    ("EventHandlers", PROJECT_ROOT / "tts" / "EventHandlers.lua"),
+    ("EventHandlers",     PROJECT_ROOT / "tts" / "EventHandlers.lua"),
+    ("MarketLayout",       PROJECT_ROOT / "tts" / "MarketLayout.lua"),
+    ("ResourceAnimation",  PROJECT_ROOT / "tts" / "ResourceAnimation.lua"),
 ]
 
 GLOBAL_LUA = PROJECT_ROOT / "tts" / "Global.lua"
@@ -459,6 +461,92 @@ def patch_money_counters(mod_data: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Crown button callback injection
+# ---------------------------------------------------------------------------
+
+CROWN_BUTTON_GUIDS = {
+    "5f8b97": 2,  # 2-player crown
+    "9c5d5e": 3,  # 3-player crown
+    "3ba14f": 4,  # 4-player crown
+}
+
+AI_BUTTON_GUID = "f714a5"
+
+CROWN_CALLBACK_SNIPPET = """
+    -- Injected by inject_scripts.py: trigger game state initialization
+    Wait.time(function()
+        Global.call('onPhysicalSetupComplete', {{playerCount = {player_count}}})
+    end, 2.0)
+"""
+
+CROWN_LABELS = {
+    "5f8b97": "2 Players / 2\u4eba\u904a\u6232",
+    "9c5d5e": "3 Players / 3\u4eba\u904a\u6232",
+    "3ba14f": "4 Players / 4\u4eba\u904a\u6232",
+}
+
+
+def patch_crown_buttons(mod_data: dict) -> int:
+    patched = 0
+    for obj in mod_data.get("ObjectStates", []):
+        guid = obj.get("GUID")
+
+        if guid in CROWN_BUTTON_GUIDS:
+            player_count = CROWN_BUTTON_GUIDS[guid]
+            script = obj.get("LuaScript", "")
+            callback = CROWN_CALLBACK_SNIPPET.format(player_count=player_count)
+
+            last_end_idx = script.rfind("\nend")
+            if last_end_idx != -1:
+                obj["LuaScript"] = script[:last_end_idx] + callback + script[last_end_idx:]
+            else:
+                obj["LuaScript"] = script + "\n" + callback
+
+            if guid in CROWN_LABELS:
+                obj["Nickname"] = CROWN_LABELS[guid]
+            patched += 1
+
+        elif guid == AI_BUTTON_GUID:
+            obj["LuaScript"] = ""
+            obj["LuaScriptState"] = ""
+            obj["Locked"] = True
+            obj["Nickname"] = "(Disabled)"
+
+    return patched
+
+
+# ---------------------------------------------------------------------------
+# Lock coal/iron resource cubes
+# ---------------------------------------------------------------------------
+
+def lock_resource_cubes(mod_data: dict) -> int:
+    locked = 0
+
+    def _walk(obj: dict) -> None:
+        nonlocal locked
+        name = (obj.get("Nickname", "") or obj.get("Name", "")).lower()
+        if "coal" in name or "iron" in name:
+            # Only lock small token-like objects, not boards or bags
+            obj_type = obj.get("Name", "")
+            if obj_type in ("Custom_Token", "Custom_Model"):
+                resource_type = "coal" if "coal" in name else "iron"
+                obj["Locked"] = True
+                obj["GMNotes"] = json.dumps(
+                    {"type": "resource", "resource": resource_type},
+                    separators=(",", ":"),
+                )
+                locked += 1
+
+        for contained in obj.get("ContainedObjects", []):
+            _walk(contained)
+
+    for obj in mod_data.get("ObjectStates", []):
+        _walk(obj)
+
+    return locked
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -527,6 +615,18 @@ def main():
             f"{n_money}. Some may already have getCount() or GUIDs have changed.",
             file=sys.stderr,
         )
+
+    # 4e. Inject crown button callbacks
+    print()
+    print("Patching crown setup buttons...")
+    n_crowns = patch_crown_buttons(mod_data)
+    print(f"  Patched {n_crowns} crown button(s).")
+
+    # 4f. Lock resource cubes
+    print()
+    print("Locking coal/iron resource cubes...")
+    n_cubes = lock_resource_cubes(mod_data)
+    print(f"  Locked {n_cubes} resource cube(s).")
 
     # 5. Write output JSON
     print()
