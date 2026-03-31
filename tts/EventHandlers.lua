@@ -204,11 +204,17 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
 
     local buildPos = tileObj.getPosition()
     local snapInfo = SnapMap.findNearestPosition(buildPos, 2.0)
-    local buildSlotId = snapInfo and snapInfo.id or nil
-    local cityName = buildSlotId and GameState.getCityForSlot(state, buildSlotId) or nil
+    if not snapInfo or snapInfo.type ~= "slot" then
+        printToColor("Invalid placement: no valid board slot found.", playerColor, {1, 0, 0})
+        rejectTile(tileObj, playerColor)
+        return
+    end
 
-    -- Full game-rule validation via Validation.canBuild (only when SnapMap + pendingCard active)
-    if buildSlotId and state._pendingCard then
+    local buildSlotId = snapInfo.id
+    local cityName = GameState.getCityForSlot(state, buildSlotId)
+
+    -- Full game-rule validation via Validation.canBuild
+    if state._pendingCard then
         local v = Validation.canBuild(state, playerColor, {
             cardType     = state._pendingCard.cardType,
             location     = state._pendingCard.location or cityName,
@@ -280,35 +286,29 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         updatePhysicalCounters(playerColor, cost)
     end
 
-    -- Place tile on slot (when SnapMap data available)
-    local slot = buildSlotId and GameState.getSlot(state, buildSlotId) or nil
+    -- Place tile on slot
+    local slot = GameState.getSlot(state, buildSlotId)
     local industryType = meta.industry
     local level = meta.level
 
-    if slot then
-        -- Handle overbuilding
-        if slot.occupant then
-            slot.occupant = nil
-            slot.tile = nil
-        end
+    -- Handle overbuilding
+    if slot.occupant then
+        slot.occupant = nil
+        slot.tile = nil
+    end
 
-        -- Remove tile from unbuilt stack
-        Actions.removeTileFromUnbuilt(player, industryType, level)
+    -- Remove tile from unbuilt stack
+    Actions.removeTileFromUnbuilt(player, industryType, level)
 
-        -- Create tile and place on slot
-        local tile = Tile.newWithResources(industryType, level)
-        slot.occupant = playerColor
-        slot.tile = tile
+    -- Create tile and place on slot
+    local tile = Tile.newWithResources(industryType, level)
+    slot.occupant = playerColor
+    slot.tile = tile
 
-        -- Snap to position
-        local snapPos = SnapMap.getPositionForSlot(buildSlotId)
-        if snapPos then
-            ObjectManager.moveTo(tileObj, snapPos)
-        end
-    else
-        -- No SnapMap data: settle tile onto board surface so it doesn't float
-        local settlePos = Vector(buildPos.x, 1.05, buildPos.z)
-        tileObj.setPositionSmooth(settlePos, false, true)
+    -- Snap to position
+    local snapPos = SnapMap.getPositionForSlot(buildSlotId)
+    if snapPos then
+        ObjectManager.moveTo(tileObj, snapPos)
     end
 
     -- Lock after a short delay to let smooth movement finish
@@ -319,7 +319,6 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     end, 0.3)
 
     -- Brewery income on placement (breweries auto-flip and give income immediately)
-    local tile = slot and slot.tile or nil
     if industryType == Constants.Industry.BREWERY and tile then
         Actions.advanceIncome(state, playerColor, tile.incomeSpaces or 0)
     end
