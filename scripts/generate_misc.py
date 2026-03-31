@@ -1,16 +1,18 @@
 """
-generate_misc.py
-Generates miscellaneous asset images for the Brass: Birmingham TTS mod prototype.
+generate_misc.py  —  Premium miscellaneous assets for Brass: Birmingham TTS mod.
 Output: assets/misc/
 
-Assets generated:
-  - player_board_Red.png / _Yellow.png / _Blue.png / _Green.png
-  - canal_Red.png / rail_Red.png  (and for all 4 player colours)
-  - merchant_Shrewsbury.png (and for each merchant)
-  - help_card_en.png / help_card_zh.png
+Assets:
+  player_board_Red/Yellow/Blue/Green.png  (1024x768)
+  canal_Red/Yellow/Blue/Green.png         (200x80)
+  rail_Red/Yellow/Blue/Green.png          (200x80)
+  merchant_Shrewsbury/Gloucester/Oxford/Warrington/Nottingham.png  (200x150)
+  help_card_en.png / help_card_zh.png     (600x900)
 """
 
 import os
+import math
+import random
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
@@ -24,527 +26,603 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 # ---------------------------------------------------------------------------
 # Colour palette
 # ---------------------------------------------------------------------------
-BG_DARK   = (42,  31,  20)
-PANEL_BG  = (55,  42,  28)
-GOLD      = (220, 175, 40)
-WHITE     = (250, 245, 235)
-BLACK     = (10,  10,  10)
-LIGHT_TXT = (240, 230, 210)
-MID_TXT   = (180, 170, 150)
+BG_DARK    = (26,  16,   8)
+BG_PANEL   = (36,  24,  12)
+BG_SLOT    = (20,  13,   6)
+GOLD       = (220, 180,  60)
+GOLD_DIM   = (155, 122,  38)
+GOLD_BRITE = (255, 220, 100)
+CREAM      = (245, 235, 210)
+WHITE      = (252, 248, 240)
+BLACK      = (8,    6,   4)
+LIGHT_TXT  = (240, 228, 200)
+MID_TXT    = (172, 160, 136)
+DIM_TXT    = (110, 100,  82)
 
 PLAYER_COLORS = {
-    "Red":    (200,  50,  50),
-    "Yellow": (210, 175,  25),
-    "Blue":   (50,  100, 200),
-    "Green":  (45,  160,  65),
+    "Red":    (210,  52,  52),
+    "Yellow": (215, 178,  28),
+    "Blue":   (52,  105, 210),
+    "Green":  (48,  168,  68),
 }
 
 INDUSTRY_COLORS = {
-    "cotton":       (200, 200, 215),
-    "coal":         (50,  50,  55),
-    "iron":         (165, 85,  25),
-    "brewery":      (185, 145, 20),
-    "manufacturer": (100, 45,  135),
-    "pottery":      (175, 65,  35),
+    "cotton":       (192, 198, 218),
+    "coal":         (55,   55,  62),
+    "iron":         (170,  88,  28),
+    "brewery":      (188, 148,  22),
+    "manufacturer": (105,  48, 140),
+    "pottery":      (178,  68,  38),
 }
 
-MERCHANT_COLORS = {
-    "Shrewsbury": (80,  120, 80),
-    "Gloucester": (60,  100, 150),
-    "Oxford":     (120, 80,  140),
-    "Warrington": (140, 100, 40),
-    "Nottingham": (140, 50,  50),
+INDUSTRY_NAMES_ZH = {
+    "cotton":       "棉花",
+    "coal":         "煤炭",
+    "iron":         "鐵礦",
+    "brewery":      "釀酒廠",
+    "manufacturer": "製造商",
+    "pottery":      "陶瓷",
 }
 
 # ---------------------------------------------------------------------------
 # Font helpers
 # ---------------------------------------------------------------------------
 def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    candidates_bold = [
-        "C:/Windows/Fonts/arialbd.ttf",
-        "C:/Windows/Fonts/calibrib.ttf",
-        "C:/Windows/Fonts/verdanab.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    ]
-    candidates_regular = [
-        "C:/Windows/Fonts/arial.ttf",
-        "C:/Windows/Fonts/calibri.ttf",
-        "C:/Windows/Fonts/verdana.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    candidates = candidates_bold if bold else candidates_regular
-    for path in candidates:
-        if os.path.exists(path):
-            return ImageFont.truetype(path, size)
+    if bold:
+        candidates = [
+            "C:/Windows/Fonts/georgiab.ttf",
+            "C:/Windows/Fonts/timesbd.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/calibrib.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ]
+    else:
+        candidates = [
+            "C:/Windows/Fonts/georgia.ttf",
+            "C:/Windows/Fonts/times.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/calibri.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+    for p in candidates:
+        if os.path.exists(p):
+            return ImageFont.truetype(p, size)
     return ImageFont.load_default()
 
 
+def load_font_num(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    paths = (["C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/calibrib.ttf"]
+             if bold else
+             ["C:/Windows/Fonts/arial.ttf",   "C:/Windows/Fonts/calibri.ttf"])
+    for p in paths:
+        if os.path.exists(p):
+            return ImageFont.truetype(p, size)
+    return load_font(size, bold)
+
+
 def load_font_cjk(size: int) -> ImageFont.FreeTypeFont:
-    """Try to load a CJK font for Traditional Chinese text."""
     candidates = [
-        "C:/Windows/Fonts/msjh.ttc",      # Microsoft JhengHei (TC)
+        "C:/Windows/Fonts/msjh.ttc",
         "C:/Windows/Fonts/msjhbd.ttc",
-        "C:/Windows/Fonts/mingliu.ttc",    # MingLiU
-        "C:/Windows/Fonts/msgothic.ttc",   # MS Gothic (JP fallback)
+        "C:/Windows/Fonts/mingliu.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJKtc-Regular.otf",
     ]
-    for path in candidates:
-        if os.path.exists(path):
-            return ImageFont.truetype(path, size)
-    return load_font(size)   # fall back to Latin font
+    for p in candidates:
+        if os.path.exists(p):
+            return ImageFont.truetype(p, size)
+    return load_font(size)
 
 
-def center_text(draw, cx, cy, text, font, fill):
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    draw.text((cx - tw // 2 - bbox[0], cy - th // 2 - bbox[1]),
-              text, font=font, fill=fill)
+def center_text(draw, cx, cy, text, font, fill, shadow=None):
+    bb = draw.textbbox((0, 0), text, font=font)
+    tw = bb[2] - bb[0]
+    th = bb[3] - bb[1]
+    x = cx - tw // 2 - bb[0]
+    y = cy - th // 2 - bb[1]
+    if shadow:
+        draw.text((x + 1, y + 1), text, font=font, fill=shadow)
+    draw.text((x, y), text, font=font, fill=fill)
 
 
-def draw_rounded_rect(draw, xy, radius, fill=None, outline=None, width=1):
-    draw.rounded_rectangle(list(xy), radius=radius,
+def draw_rrect(draw, xy, r, fill=None, outline=None, width=1):
+    draw.rounded_rectangle(list(xy), radius=r,
                            fill=fill, outline=outline, width=width)
 
 
+def parchment_bg(img: Image.Image, rng: random.Random, alpha: float = 0.18):
+    """Blend a subtle noise layer over img in-place."""
+    W, H = img.size
+    noise = Image.new("RGB", (W, H))
+    np = noise.load()
+    pp = img.load()
+    for y in range(H):
+        for x in range(W):
+            v = rng.randint(-12, 12)
+            base = pp[x, y]
+            np[x, y] = (
+                max(0, min(255, base[0] + v)),
+                max(0, min(255, base[1] + v // 2)),
+                max(0, min(255, base[2] + v // 4)),
+            )
+    return Image.blend(img, noise, alpha)
+
+
+def gold_panel_border(draw, W, H, pcolor=None):
+    """Draw stacked border lines: player color -> dark gold -> bright gold -> dark gold."""
+    if pcolor:
+        for t in range(5):
+            draw.rectangle([t, t, W - 1 - t, H - 1 - t], outline=pcolor)
+    for inset, clr, lw in [(6, (90, 68, 28), 2), (10, GOLD, 2), (14, GOLD_DIM, 1)]:
+        draw.rectangle([inset, inset, W - 1 - inset, H - 1 - inset],
+                       outline=clr, width=lw)
+
+
 # ---------------------------------------------------------------------------
-# 1. Player Boards
+# 1. Player Boards  (1024 x 768)
 # ---------------------------------------------------------------------------
 PB_W, PB_H = 1024, 768
 
-# Industry columns: name, number of levels, colour
 INDUSTRY_COLUMNS = [
-    ("Cotton",       4, INDUSTRY_COLORS["cotton"]),
-    ("Coal",         4, INDUSTRY_COLORS["coal"]),
-    ("Iron",         4, INDUSTRY_COLORS["iron"]),
-    ("Brewery",      4, INDUSTRY_COLORS["brewery"]),
-    ("Manufacturer", 8, INDUSTRY_COLORS["manufacturer"]),
-    ("Pottery",      5, INDUSTRY_COLORS["pottery"]),
+    ("Cotton",       "cotton",       4),
+    ("Coal",         "coal",         4),
+    ("Iron",         "iron",         4),
+    ("Brewery",      "brewery",      4),
+    ("Manufacturer", "manufacturer", 8),
+    ("Pottery",      "pottery",      5),
 ]
 
 
-def make_player_board(player_color_name: str) -> Image.Image:
-    pcolor = PLAYER_COLORS[player_color_name]
-    border_clr = pcolor
+def _is_dark(c):
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2] < 128
+
+
+def make_player_board(color_name: str) -> Image.Image:
+    pcolor = PLAYER_COLORS[color_name]
+    rng    = random.Random(hash(color_name) & 0xFFFF)
 
     img  = Image.new("RGB", (PB_W, PB_H), BG_DARK)
+    img  = parchment_bg(img, rng, 0.22)
     draw = ImageDraw.Draw(img)
 
-    # Outer border (player colour accent)
-    for t in range(6):
-        draw.rectangle([t, t, PB_W - 1 - t, PB_H - 1 - t], outline=border_clr)
-    draw.rectangle([10, 10, PB_W - 11, PB_H - 11], outline=GOLD, width=2)
+    # Panel background inset
+    draw_rrect(draw, (16, 16, PB_W - 17, PB_H - 17),
+               r=14, fill=BG_PANEL)
 
-    # Background panel
-    draw_rounded_rect(draw, (14, 14, PB_W - 15, PB_H - 15),
-                      radius=12, fill=PANEL_BG)
+    # Player color accent stripe at top
+    draw.rectangle([16, 16, PB_W - 17, 62], fill=pcolor)
+    # Fade stripe to panel
+    for i in range(10):
+        a = int(pcolor[0] * (1 - i / 10) + BG_PANEL[0] * (i / 10))
+        b_ = int(pcolor[1] * (1 - i / 10) + BG_PANEL[1] * (i / 10))
+        c_ = int(pcolor[2] * (1 - i / 10) + BG_PANEL[2] * (i / 10))
+        draw.rectangle([16, 52 + i, PB_W - 17, 54 + i], fill=(a, b_, c_))
 
-    # Title
-    f_title  = load_font(42, bold=True)
-    f_sub    = load_font(26)
-    f_col    = load_font(20, bold=True)
-    f_slot   = load_font(16)
+    gold_panel_border(draw, PB_W, PB_H, pcolor)
 
-    center_text(draw, PB_W // 2, 42, "PLAYER BOARD", f_title, GOLD)
-    center_text(draw, PB_W // 2, 80, f"— {player_color_name} —", f_sub, pcolor)
+    f_title  = load_font(38, bold=True)
+    f_color  = load_font(22, bold=True)
+    f_col    = load_font(17, bold=True)
+    f_zh_hd  = load_font_cjk(15)
+    f_slot   = load_font_num(15)
+    f_zh_sl  = load_font_cjk(13)
 
-    # ---- Industry columns ----
-    n_cols     = len(INDUSTRY_COLUMNS)
-    col_area_x = 30
-    col_area_y = 110
-    col_area_w = PB_W - 60
-    col_area_h = PB_H - 140
+    # Title (over accent stripe)
+    center_text(draw, PB_W // 2, 39, "PLAYER BOARD", f_title, WHITE,
+                shadow=(20, 10, 4))
+    center_text(draw, PB_W - 90, 39, f"— {color_name} —", f_color, WHITE,
+                shadow=(20, 10, 4))
 
-    col_w_total = col_area_w // n_cols
+    # Industry columns
+    n_cols    = len(INDUSTRY_COLUMNS)
+    area_x    = 28
+    area_y    = 76
+    area_w    = PB_W - 56
+    area_h    = PB_H - area_y - 30
+    col_w     = area_w // n_cols
 
-    for ci, (ind_name, n_levels, ind_color) in enumerate(INDUSTRY_COLUMNS):
-        cx_left  = col_area_x + ci * col_w_total
-        cx_right = cx_left + col_w_total - 6
+    for ci, (ind_en, ind_key, n_levels) in enumerate(INDUSTRY_COLUMNS):
+        ind_color = INDUSTRY_COLORS[ind_key]
+        ind_zh    = INDUSTRY_NAMES_ZH[ind_key]
+        cx_l = area_x + ci * col_w
+        cx_r = cx_l + col_w - 5
 
-        # Column header band
-        header_h = 32
-        draw_rounded_rect(draw,
-                          (cx_left, col_area_y, cx_right, col_area_y + header_h),
-                          radius=6, fill=ind_color)
-        center_text(draw, (cx_left + cx_right) // 2, col_area_y + 16,
-                    ind_name, f_col, WHITE if _is_dark(ind_color) else BLACK)
+        # Column header
+        hdr_y0 = area_y
+        hdr_y1 = area_y + 50
+        draw_rrect(draw, (cx_l, hdr_y0, cx_r, hdr_y1),
+                   r=7, fill=ind_color)
+        hdr_cx = (cx_l + cx_r) // 2
+        txt_clr = WHITE if _is_dark(ind_color) else BLACK
+        draw.text((hdr_cx - draw.textbbox((0,0), ind_en, font=f_col)[2] // 2,
+                   hdr_y0 + 6),
+                  ind_en, font=f_col, fill=txt_clr)
+        # Chinese sub-header
+        zh_bb = draw.textbbox((0, 0), ind_zh, font=f_zh_hd)
+        draw.text((hdr_cx - (zh_bb[2] - zh_bb[0]) // 2, hdr_y0 + 28),
+                  ind_zh, font=f_zh_hd, fill=txt_clr)
 
-        # Tile slots (empty rectangles)
-        slot_margin = 6
-        slot_h      = min(70, (col_area_h - header_h - 20) // n_levels)
-        slot_w      = col_w_total - 2 * slot_margin - 6
+        # Tile slots
+        slot_margin = 5
+        avail_h     = area_h - 55
+        slot_h      = min(66, (avail_h - (n_levels - 1) * 5) // n_levels)
+        slot_w_px   = col_w - 2 * slot_margin - 5
 
         for li in range(n_levels):
-            sy0 = col_area_y + header_h + 8 + li * (slot_h + 6)
+            sy0 = area_y + 56 + li * (slot_h + 5)
             sy1 = sy0 + slot_h
-            sx0 = cx_left + slot_margin
-            sx1 = sx0 + slot_w
+            sx0 = cx_l + slot_margin
+            sx1 = sx0 + slot_w_px
 
-            # Slot background
-            draw_rounded_rect(draw, (sx0, sy0, sx1, sy1),
-                              radius=5,
-                              fill=(int(ind_color[0] * 0.18),
-                                    int(ind_color[1] * 0.18),
-                                    int(ind_color[2] * 0.18)),
-                              outline=ind_color, width=2)
+            dark = tuple(max(0, int(c * 0.16)) for c in ind_color)
+            draw_rrect(draw, (sx0, sy0, sx1, sy1),
+                       r=5, fill=dark, outline=ind_color, width=2)
 
-            # Level number
+            # Level number (big)
             lv_str = f"Lv{li + 1}"
-            center_text(draw, (sx0 + sx1) // 2, (sy0 + sy1) // 2,
-                        lv_str, f_slot, ind_color)
+            lv_bb  = draw.textbbox((0, 0), lv_str, font=f_slot)
+            lv_cx  = (sx0 + sx1) // 2
+            lv_cy  = (sy0 + sy1) // 2 - 6
+            center_text(draw, lv_cx, lv_cy, lv_str, f_slot, ind_color)
 
-    # Player colour swatch bottom-right
-    sw_size = 60
-    sw_x = PB_W - 30 - sw_size
-    sw_y = PB_H - 30 - sw_size
-    draw_rounded_rect(draw, (sw_x, sw_y, sw_x + sw_size, sw_y + sw_size),
-                      radius=10, fill=pcolor, outline=GOLD, width=2)
+    # Player color swatch bottom-right
+    sw = 48
+    sw_x = PB_W - 26 - sw
+    sw_y = PB_H - 26 - sw
+    draw_rrect(draw, (sw_x, sw_y, sw_x + sw, sw_y + sw),
+               r=9, fill=pcolor, outline=GOLD, width=2)
 
     return img
 
 
-def _is_dark(color):
-    r, g, b = color
-    luminance = 0.299 * r + 0.587 * g + 0.114 * b
-    return luminance < 128
-
-
 # ---------------------------------------------------------------------------
-# 2. Link tiles
+# 2. Link tiles  (200 x 80)
 # ---------------------------------------------------------------------------
 LINK_W, LINK_H = 200, 80
 
-def make_link_tile(player_color_name: str, link_type: str) -> Image.Image:
-    """link_type: 'canal' or 'rail'"""
-    pcolor = PLAYER_COLORS[player_color_name]
+
+def make_link_tile(color_name: str, link_type: str) -> Image.Image:
+    pcolor = PLAYER_COLORS[color_name]
+    rng    = random.Random(hash((color_name, link_type)) & 0xFFFF)
 
     if link_type == "canal":
-        base_bg = (30, 70, 130)
-        accent  = (80, 160, 220)
-        label   = "CANAL"
-        symbol  = "≋"
+        base_bg  = (22, 52, 105)
+        grad_hi  = (38, 80, 148)
+        accent   = (80, 155, 220)
+        label_en = "CANAL"
+        label_zh = "運河"
+        symbol   = "≋  ≋  ≋"
     else:
-        base_bg = (60, 60, 65)
-        accent  = (160, 160, 165)
-        label   = "RAIL"
-        symbol  = "▬▬"
+        base_bg  = (44, 44, 50)
+        grad_hi  = (68, 68, 75)
+        accent   = (160, 160, 168)
+        label_en = "RAIL"
+        label_zh = "鐵路"
+        symbol   = "— — —"
 
     img  = Image.new("RGB", (LINK_W, LINK_H), base_bg)
     draw = ImageDraw.Draw(img)
 
-    # Border (player colour)
-    draw.rectangle([0, 0, LINK_W - 1, LINK_H - 1], outline=pcolor, width=4)
+    # Simple horizontal gradient
+    for x in range(LINK_W):
+        t = x / LINK_W
+        c = tuple(int(base_bg[i] + (grad_hi[i] - base_bg[i]) * math.sin(t * math.pi))
+                  for i in range(3))
+        draw.line([(x, 0), (x, LINK_H)], fill=c)
 
-    # Inner accent line
-    draw.rectangle([5, 5, LINK_W - 6, LINK_H - 6], outline=accent, width=1)
+    img  = parchment_bg(img, rng, 0.12)
+    draw = ImageDraw.Draw(img)
 
-    f_label  = load_font(20, bold=True)
-    f_symbol = load_font(22)
-    f_player = load_font(14)
+    # Player color stripe on left edge
+    stripe_w = 6
+    draw.rectangle([0, 0, stripe_w, LINK_H], fill=pcolor)
 
-    center_text(draw, LINK_W // 2, 28, label,  f_label,  WHITE)
-    center_text(draw, LINK_W // 2, 52, symbol, f_symbol, accent)
+    # Decorative border
+    draw.rectangle([0, 0, LINK_W - 1, LINK_H - 1], outline=pcolor, width=3)
+    draw.rectangle([4, 4, LINK_W - 5, LINK_H - 5], outline=accent, width=1)
 
-    # Player name in bottom-right corner
-    draw.text((LINK_W - 4, LINK_H - 16), player_color_name,
-              font=f_player, fill=pcolor, anchor="rs")
+    f_en     = load_font(18, bold=True)
+    f_zh     = load_font_cjk(15)
+    f_sym    = load_font_num(16)
+    f_player = load_font(11)
+
+    # English label
+    center_text(draw, LINK_W // 2 + 3, 20, label_en, f_en, WHITE, shadow=BLACK)
+    # Chinese label
+    center_text(draw, LINK_W // 2 + 3, 40, label_zh, f_zh, accent, shadow=BLACK)
+    # Symbol/decoration
+    center_text(draw, LINK_W // 2 + 3, 60, symbol, f_sym, accent)
+
+    # Player color name (small, bottom-right)
+    bb = draw.textbbox((0, 0), color_name, font=f_player)
+    draw.text((LINK_W - 6 - (bb[2] - bb[0]), LINK_H - 5 - (bb[3] - bb[1])),
+              color_name, font=f_player, fill=pcolor)
 
     return img
 
 
 # ---------------------------------------------------------------------------
-# 3. Merchant tiles
+# 3. Merchant tiles  (200 x 150)
 # ---------------------------------------------------------------------------
 MERCH_W, MERCH_H = 200, 150
 
 MERCHANT_DATA = [
-    {
-        "name":      "Shrewsbury",
-        "accepts":   ["cotton", "manufacturer"],
-        "bonus":     "+4 VP",
-        "slots":     1,
-    },
-    {
-        "name":      "Gloucester",
-        "accepts":   ["pottery", "cotton"],
-        "bonus":     "Free Develop",
-        "slots":     2,
-    },
-    {
-        "name":      "Oxford",
-        "accepts":   ["cotton", "manufacturer"],
-        "bonus":     "+2 Income",
-        "slots":     2,
-    },
-    {
-        "name":      "Warrington",
-        "accepts":   ["brewery", "manufacturer"],
-        "bonus":     "+£5",
-        "slots":     2,
-    },
-    {
-        "name":      "Nottingham",
-        "accepts":   ["coal", "iron"],
-        "bonus":     "+3 VP",
-        "slots":     2,
-    },
+    {"name": "Shrewsbury", "name_zh": "什魯斯伯里",
+     "accepts": ["cotton", "manufacturer"],  "bonus": "+4 VP",       "slots": 1},
+    {"name": "Gloucester", "name_zh": "格洛斯特",
+     "accepts": ["pottery", "cotton"],       "bonus": "Free Develop", "slots": 2},
+    {"name": "Oxford",     "name_zh": "牛津",
+     "accepts": ["cotton", "manufacturer"],  "bonus": "+2 Income",    "slots": 2},
+    {"name": "Warrington", "name_zh": "沃靈頓",
+     "accepts": ["brewery", "manufacturer"], "bonus": "+£5",          "slots": 2},
+    {"name": "Nottingham", "name_zh": "諾丁漢",
+     "accepts": ["coal", "iron"],            "bonus": "+3 VP",        "slots": 2},
 ]
+
+MERCHANT_BASE_COLORS = {
+    "Shrewsbury": (28, 54, 28),
+    "Gloucester": (22, 38, 62),
+    "Oxford":     (44, 24, 54),
+    "Warrington": (54, 38, 14),
+    "Nottingham": (54, 18, 18),
+}
 
 
 def make_merchant_tile(data: dict) -> Image.Image:
     name   = data["name"]
+    name_zh = data["name_zh"]
     bonus  = data["bonus"]
-    slots  = data["slots"]
+    bg_c   = MERCHANT_BASE_COLORS.get(name, (30, 22, 14))
+    rng    = random.Random(hash(name) & 0xFFFF)
 
-    bg_color = MERCHANT_COLORS.get(name, (70, 60, 40))
-    border   = tuple(min(255, int(c * 1.6)) for c in bg_color)
-
-    img  = Image.new("RGB", (MERCH_W, MERCH_H), bg_color)
+    img  = Image.new("RGB", (MERCH_W, MERCH_H), bg_c)
+    img  = parchment_bg(img, rng, 0.20)
     draw = ImageDraw.Draw(img)
 
-    # Border
+    # Outer gold border + inner line
     draw.rectangle([0, 0, MERCH_W - 1, MERCH_H - 1], outline=GOLD, width=3)
+    draw.rectangle([5, 5, MERCH_W - 6, MERCH_H - 6], outline=GOLD_DIM, width=1)
 
-    f_name   = load_font(16, bold=True)
-    f_bonus  = load_font(14, bold=True)
-    f_small  = load_font(12)
-    f_ind    = load_font(11)
+    f_name  = load_font(14, bold=True)
+    f_zh    = load_font_cjk(13)
+    f_bonus = load_font(13, bold=True)
+    f_small = load_font(11)
+    f_ind   = load_font_num(10)
 
-    # Name header
-    draw_rounded_rect(draw, (3, 3, MERCH_W - 4, 30),
-                      radius=5, fill=(20, 15, 8))
-    center_text(draw, MERCH_W // 2, 17, name.upper(), f_name, GOLD)
+    # Name header bar
+    draw_rrect(draw, (3, 3, MERCH_W - 4, 32), r=5, fill=(14, 9, 4))
+    center_text(draw, MERCH_W // 2, 12, name.upper(), f_name, GOLD,
+                shadow=(4, 3, 1))
 
-    # Bonus
-    center_text(draw, MERCH_W // 2, 52, bonus, f_bonus, (160, 220, 140))
+    # Chinese name
+    center_text(draw, MERCH_W // 2, 30, name_zh, f_zh, GOLD_DIM)
 
-    # Accepted industry dots
-    accepts = data.get("accepts", [])
-    slot_y  = 80
-    dot_r   = 8
-    total_w = len(accepts) * (dot_r * 2 + 4) - 4
-    dot_x   = (MERCH_W - total_w) // 2
+    # Separator
+    draw.line([(10, 38), (MERCH_W - 10, 38)], fill=GOLD_DIM, width=1)
 
-    for ind in accepts:
-        color = INDUSTRY_COLORS.get(ind, (120, 120, 120))
-        draw.ellipse([(dot_x, slot_y - dot_r),
-                      (dot_x + dot_r * 2, slot_y + dot_r)],
-                     fill=color, outline=WHITE, width=1)
-        # Industry label
-        lbl = ind[:3].title()
-        center_text(draw, dot_x + dot_r, slot_y + dot_r + 10, lbl, f_ind, MID_TXT)
-        dot_x += dot_r * 2 + 12
+    # Bonus text
+    center_text(draw, MERCH_W // 2, 54, bonus, f_bonus, (155, 220, 135),
+                shadow=(8, 5, 2))
 
-    # Slot count indicator
-    center_text(draw, MERCH_W // 2, MERCH_H - 22,
-                f"Slots: {slots}", f_small, MID_TXT)
+    # Accepted industry dots + labels
+    accepts  = data.get("accepts", [])
+    dot_r    = 9
+    dot_y    = 82
+    n_dots   = len(accepts)
+    total_dw = n_dots * (dot_r * 2 + 6) - 6
+    dot_x0   = (MERCH_W - total_dw) // 2
+
+    for j, ind in enumerate(accepts):
+        ind_c = INDUSTRY_COLORS.get(ind, (120, 120, 120))
+        dx = dot_x0 + j * (dot_r * 2 + 6) + dot_r
+        draw.ellipse([(dx - dot_r, dot_y - dot_r),
+                      (dx + dot_r, dot_y + dot_r)],
+                     fill=ind_c, outline=CREAM, width=1)
+        # Industry label below dot
+        lbl_en = ind[:3].title()
+        lbl_zh = INDUSTRY_NAMES_ZH.get(ind, "")[:2]
+        center_text(draw, dx, dot_y + dot_r + 10, lbl_en, f_ind, MID_TXT)
+        center_text(draw, dx, dot_y + dot_r + 22, lbl_zh, load_font_cjk(9), DIM_TXT)
+
+    # "Accepts" label
+    center_text(draw, MERCH_W // 2, 68, "ACCEPTS:", f_small, DIM_TXT)
+
+    # Slot count
+    slot_y = MERCH_H - 20
+    center_text(draw, MERCH_W // 2, slot_y,
+                f"[ {data['slots']} tile slot{'s' if data['slots'] > 1 else ''} ]",
+                f_small, MID_TXT)
+
+    # Star decoration
+    f_star = load_font_num(16, bold=True)
+    draw.text((8,  8),            "★", font=f_star, fill=GOLD_DIM)
+    draw.text((MERCH_W - 22, 8),  "★", font=f_star, fill=GOLD_DIM)
 
     return img
 
 
 # ---------------------------------------------------------------------------
-# 4. Help cards
+# 4. Help Cards  (600 x 900)
 # ---------------------------------------------------------------------------
 HELP_W, HELP_H = 600, 900
 
 ACTIONS_EN = [
-    {
-        "name":  "BUILD",
-        "icon":  "\u25a0",
-        "lines": [
-            "Pay cost (£ + coal/iron).",
-            "Place industry tile on your",
-            "city or connected city.",
-            "Must be lowest level first.",
-        ],
-    },
-    {
-        "name":  "NETWORK",
-        "icon":  "\u25c6",
-        "lines": [
-            "Pay 3£ (canal) or 5£+beer (rail).",
-            "Place link tile on a route",
-            "connected to your network.",
-            "Canal: 1 link.  Rail: 2 links.",
-        ],
-    },
-    {
-        "name":  "DEVELOP",
-        "icon":  "\u25b2",
-        "lines": [
-            "Pay 1 iron per tile removed.",
-            "Remove top tile from your",
-            "player board to skip a level.",
-        ],
-    },
-    {
-        "name":  "SELL",
-        "icon":  "\u25cf",
-        "lines": [
-            "Sell cotton/pottery/manufacturer",
-            "tiles to a connected merchant.",
-            "Each tile needs 1 beer to sell",
-            "(except in Canal era).",
-        ],
-    },
-    {
-        "name":  "LOAN",
-        "icon":  "\u00a3",
-        "lines": [
-            "Take £30 from the bank.",
-            "Move income track down 3 spaces.",
-            "No interest, but less income.",
-        ],
-    },
-    {
-        "name":  "SCOUT",
-        "icon":  "\u2605",
-        "lines": [
-            "Discard 3 cards from your hand.",
-            "Take 2 wild cards:",
-            "  1 Wild Location",
-            "  1 Wild Industry",
-        ],
-    },
+    {"name": "BUILD",
+     "icon": "■",
+     "color": (165, 58, 58),
+     "lines": ["Pay cost (£ + coal / iron).",
+               "Place industry tile on your city",
+               "or a connected city.",
+               "Must start from lowest level."]},
+    {"name": "NETWORK",
+     "icon": "◆",
+     "color": (48, 88, 172),
+     "lines": ["Canal era: pay £3.",
+               "Rail era: pay £5 + 1 beer.",
+               "Place link tile on any route",
+               "connected to your network.",
+               "Canal: 1 link.   Rail: 2 links."]},
+    {"name": "DEVELOP",
+     "icon": "▲",
+     "color": (55, 148, 62),
+     "lines": ["Pay 1 iron per tile removed.",
+               "Remove top tile from your",
+               "player board to skip a level."]},
+    {"name": "SELL",
+     "icon": "●",
+     "color": (172, 102, 28),
+     "lines": ["Sell cotton / pottery / manufacturer",
+               "tiles to a connected merchant.",
+               "Rail era: each tile needs 1 beer.",
+               "(Canal era: no beer required.)"]},
+    {"name": "LOAN",
+     "icon": "£",
+     "color": (48, 130, 122),
+     "lines": ["Take £30 from the bank.",
+               "Move income track down 3 spaces.",
+               "No interest, but reduced income."]},
+    {"name": "SCOUT",
+     "icon": "★",
+     "color": (130, 58, 152),
+     "lines": ["Discard 3 cards from your hand.",
+               "Receive 2 wild cards:",
+               "  • 1 Wild Location card",
+               "  • 1 Wild Industry card"]},
 ]
 
 ACTIONS_ZH = [
-    {
-        "name":  "建造 BUILD",
-        "icon":  "\u25a0",
-        "lines": [
-            "支付費用（金錢＋煤炭/鐵礦）",
-            "在自己城市或連接城市",
-            "放置工業瓦片",
-            "必須從最低等級開始建造",
-        ],
-    },
-    {
-        "name":  "聯絡 NETWORK",
-        "icon":  "\u25c6",
-        "lines": [
-            "運河時代：支付 £3",
-            "鐵路時代：支付 £5 ＋ 啤酒",
-            "在已連接路線上放置連絡瓦片",
-            "運河：1條　鐵路：2條",
-        ],
-    },
-    {
-        "name":  "發展 DEVELOP",
-        "icon":  "\u25b2",
-        "lines": [
-            "每移除一張瓦片需支付 1 鐵礦",
-            "從玩家板移除頂部瓦片",
-            "跳過一個等級",
-        ],
-    },
-    {
-        "name":  "販賣 SELL",
-        "icon":  "\u25cf",
-        "lines": [
-            "賣出棉花/陶瓷/製造商瓦片",
-            "至相連商人城市",
-            "每張需要 1 啤酒",
-            "（運河時代不需要）",
-        ],
-    },
-    {
-        "name":  "貸款 LOAN",
-        "icon":  "\u00a3",
-        "lines": [
-            "從銀行取得 £30",
-            "收入軌跡下降 3 格",
-            "無利息但收入減少",
-        ],
-    },
-    {
-        "name":  "偵查 SCOUT",
-        "icon":  "\u2605",
-        "lines": [
-            "棄掉手牌中 3 張卡",
-            "取得 2 張萬用牌：",
-            "  1 張萬用地點",
-            "  1 張萬用工業",
-        ],
-    },
+    {"name": "建造 BUILD",
+     "icon": "■",
+     "color": (165, 58, 58),
+     "lines": ["支付費用（金錢＋煤炭/鐵礦）",
+               "在自己城市或連接城市",
+               "放置工業瓦片",
+               "必須從最低等級開始建造"]},
+    {"name": "聯絡 NETWORK",
+     "icon": "◆",
+     "color": (48, 88, 172),
+     "lines": ["運河時代：支付 £3",
+               "鐵路時代：支付 £5 ＋ 啤酒",
+               "在已連接路線上放置連絡瓦片",
+               "運河：1條　鐵路：2條"]},
+    {"name": "發展 DEVELOP",
+     "icon": "▲",
+     "color": (55, 148, 62),
+     "lines": ["每移除一張瓦片需支付 1 鐵礦",
+               "從玩家板移除頂部瓦片",
+               "跳過一個等級"]},
+    {"name": "販賣 SELL",
+     "icon": "●",
+     "color": (172, 102, 28),
+     "lines": ["賣出棉花/陶瓷/製造商瓦片",
+               "至相連商人城市",
+               "鐵路時代：每張需要 1 啤酒",
+               "（運河時代不需要啤酒）"]},
+    {"name": "貸款 LOAN",
+     "icon": "£",
+     "color": (48, 130, 122),
+     "lines": ["從銀行取得 £30",
+               "收入軌跡下降 3 格",
+               "無利息但收入減少"]},
+    {"name": "偵查 SCOUT",
+     "icon": "★",
+     "color": (130, 58, 152),
+     "lines": ["棄掉手牌中 3 張卡",
+               "取得 2 張萬用牌：",
+               "  • 1 張萬用地點",
+               "  • 1 張萬用工業"]},
 ]
 
 
 def make_help_card(actions: list, lang: str) -> Image.Image:
+    is_zh = (lang == "zh")
+    rng   = random.Random(42 + (1 if is_zh else 0))
+
     img  = Image.new("RGB", (HELP_W, HELP_H), BG_DARK)
+    img  = parchment_bg(img, rng, 0.20)
     draw = ImageDraw.Draw(img)
 
-    # Background panels (alternating)
-    for t in range(5):
+    # Inner panel
+    draw_rrect(draw, (12, 12, HELP_W - 13, HELP_H - 13),
+               r=14, fill=BG_PANEL)
+
+    # Border layers
+    for t, clr, lw in [(4, (80, 60, 26), 2), (8, GOLD, 2), (12, GOLD_DIM, 1)]:
         draw.rectangle([t, t, HELP_W - 1 - t, HELP_H - 1 - t],
-                       outline=(90, 70, 40))
-    draw.rectangle([10, 10, HELP_W - 11, HELP_H - 11], outline=GOLD, width=2)
+                       outline=clr, width=lw)
 
-    is_zh = (lang == "zh")
-    f_cjk = load_font_cjk(18) if is_zh else None
-
-    f_title  = load_font(36, bold=True)
-    f_action = load_font(20, bold=True)
-    f_body   = load_font(16)
-    f_icon   = load_font(22, bold=True)
+    f_title_en  = load_font(30, bold=True)
+    f_title_zh  = load_font_cjk(28)
+    f_era       = load_font(18)
+    f_era_zh    = load_font_cjk(16)
+    f_action_en = load_font(18, bold=True)
+    f_action_zh = load_font_cjk(18)
+    f_body_en   = load_font(15)
+    f_body_zh   = load_font_cjk(15)
 
     # Title
-    title_str = ("行動摘要 — Brass: Birmingham" if is_zh
-                 else "ACTION SUMMARY — Brass: Birmingham")
-    center_text(draw, HELP_W // 2, 36, title_str, f_title, GOLD)
+    if is_zh:
+        center_text(draw, HELP_W // 2, 34,
+                    "行動摘要", f_title_zh, GOLD, shadow=BLACK)
+        center_text(draw, HELP_W // 2, 60,
+                    "Brass: Birmingham", f_title_en, GOLD_DIM, shadow=BLACK)
+    else:
+        center_text(draw, HELP_W // 2, 34,
+                    "ACTION SUMMARY", f_title_en, GOLD, shadow=BLACK)
+        center_text(draw, HELP_W // 2, 58,
+                    "Brass: Birmingham", f_era, GOLD_DIM)
 
-    # Era note
-    era_str = ("運河時代 → 鐵路時代" if is_zh
-               else "Canal Era  →  Rail Era")
-    center_text(draw, HELP_W // 2, 72, era_str, f_body, (160, 145, 120))
+    # Era subtitle
+    if is_zh:
+        center_text(draw, HELP_W // 2, 82,
+                    "運河時代  →  鐵路時代", f_era_zh, MID_TXT)
+    else:
+        center_text(draw, HELP_W // 2, 82,
+                    "Canal Era  →  Rail Era", f_era, MID_TXT)
 
-    sep_y = 90
-    draw.line([(20, sep_y), (HELP_W - 20, sep_y)], fill=GOLD, width=1)
+    # Separator
+    draw.line([(22, 96), (HELP_W - 22, 96)], fill=GOLD_DIM, width=1)
+    draw.ellipse([(HELP_W // 2 - 4, 93), (HELP_W // 2 + 4, 101)],
+                 fill=GOLD)
 
     # Action blocks
-    ACTION_COLORS = [
-        (160, 60,  60),
-        (50,  90, 170),
-        (60, 150,  60),
-        (170, 100, 30),
-        (50, 130, 120),
-        (130, 60, 150),
-    ]
-
-    block_y  = 106
-    block_h  = (HELP_H - block_y - 20) // len(actions)
+    block_y   = 104
+    block_h   = (HELP_H - block_y - 26) // len(actions)
+    f_act     = f_action_zh if is_zh else f_action_en
+    f_bdy     = f_body_zh   if is_zh else f_body_en
 
     for i, action in enumerate(actions):
         by  = block_y + i * block_h
-        clr = ACTION_COLORS[i % len(ACTION_COLORS)]
+        clr = action["color"]
 
-        # Block background (subtle)
-        shade = (int(clr[0] * 0.12), int(clr[1] * 0.12), int(clr[2] * 0.12))
-        draw_rounded_rect(draw, (18, by + 3, HELP_W - 19, by + block_h - 3),
-                          radius=8, fill=shade, outline=clr, width=2)
+        # Block background
+        shade = tuple(max(0, int(c * 0.14)) for c in clr)
+        draw_rrect(draw, (18, by + 4, HELP_W - 19, by + block_h - 4),
+                   r=8, fill=shade, outline=clr, width=2)
 
-        # Icon
-        center_text(draw, 44, by + 22, action["icon"], f_icon, clr)
+        # Icon circle
+        ic_cx, ic_cy = 40, by + 22
+        draw.ellipse([(ic_cx - 14, ic_cy - 14), (ic_cx + 14, ic_cy + 14)],
+                     fill=clr, outline=None)
+        f_icon = load_font_num(18, bold=True)
+        center_text(draw, ic_cx, ic_cy, action["icon"], f_icon, WHITE)
 
         # Action name
-        f_nm = f_cjk if is_zh and f_cjk else f_action
-        draw.text((62, by + 10), action["name"], font=f_nm, fill=clr)
+        draw.text((60, by + 9), action["name"], font=f_act, fill=clr)
 
         # Body lines
-        line_y = by + 36
-        f_ln = f_cjk if is_zh and f_cjk else f_body
+        line_y = by + 34
         for line in action["lines"]:
-            draw.text((66, line_y), line, font=f_ln, fill=LIGHT_TXT)
-            bbox = draw.textbbox((0, 0), line, font=f_ln)
-            line_y += (bbox[3] - bbox[1]) + 4
+            draw.text((62, line_y), line, font=f_bdy, fill=LIGHT_TXT)
+            bb = draw.textbbox((0, 0), line, font=f_bdy)
+            line_y += (bb[3] - bb[1]) + 3
 
     # Footer
-    footer_str = ("©版權所有  原著：Roxley Games" if is_zh
-                  else "Prototype Only — Based on Brass: Birmingham by Roxley Games")
-    f_footer = load_font(13)
-    center_text(draw, HELP_W // 2, HELP_H - 16, footer_str, f_footer,
-                (110, 100, 85))
+    f_foot = load_font(11)
+    foot_str = ("©版權所有  原著：Roxley Games" if is_zh
+                else "Prototype Only — Based on Brass: Birmingham by Roxley Games")
+    bb = draw.textbbox((0, 0), foot_str, font=f_foot)
+    draw.text(((HELP_W - (bb[2] - bb[0])) // 2, HELP_H - 19),
+              foot_str, font=f_foot, fill=DIM_TXT)
 
     return img
 
@@ -555,26 +633,23 @@ def make_help_card(actions: list, lang: str) -> Image.Image:
 def main():
     total = 0
 
-    # ---- 1. Player boards ----
     print("Generating player boards...")
-    for color_name in PLAYER_COLORS:
-        pb = make_player_board(color_name)
-        fname = f"player_board_{color_name}.png"
+    for cname in PLAYER_COLORS:
+        pb = make_player_board(cname)
+        fname = f"player_board_{cname}.png"
         pb.save(OUT_DIR / fname)
         print(f"  Saved {fname}")
         total += 1
 
-    # ---- 2. Link tiles ----
     print("\nGenerating link tiles...")
-    for color_name in PLAYER_COLORS:
-        for link_type in ("canal", "rail"):
-            lt = make_link_tile(color_name, link_type)
-            fname = f"{link_type}_{color_name}.png"
+    for cname in PLAYER_COLORS:
+        for ltype in ("canal", "rail"):
+            lt = make_link_tile(cname, ltype)
+            fname = f"{ltype}_{cname}.png"
             lt.save(OUT_DIR / fname)
             print(f"  Saved {fname}")
             total += 1
 
-    # ---- 3. Merchant tiles ----
     print("\nGenerating merchant tiles...")
     for mdata in MERCHANT_DATA:
         mt = make_merchant_tile(mdata)
@@ -583,15 +658,14 @@ def main():
         print(f"  Saved {fname}")
         total += 1
 
-    # ---- 4. Help cards ----
     print("\nGenerating help cards...")
-    en_card = make_help_card(ACTIONS_EN, "en")
-    en_card.save(OUT_DIR / "help_card_en.png")
+    en = make_help_card(ACTIONS_EN, "en")
+    en.save(OUT_DIR / "help_card_en.png")
     print("  Saved help_card_en.png")
     total += 1
 
-    zh_card = make_help_card(ACTIONS_ZH, "zh")
-    zh_card.save(OUT_DIR / "help_card_zh.png")
+    zh = make_help_card(ACTIONS_ZH, "zh")
+    zh.save(OUT_DIR / "help_card_zh.png")
     print("  Saved help_card_zh.png")
     total += 1
 

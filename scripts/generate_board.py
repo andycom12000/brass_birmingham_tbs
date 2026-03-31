@@ -1,12 +1,13 @@
 """
-generate_board.py
-Generates the main board image for the Brass: Birmingham TTS mod prototype.
+generate_board.py  —  Premium board image for Brass: Birmingham TTS mod.
 Output: assets/board/main_board.png  (4096 x 3072)
 """
 
 import os
+import math
+import random
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -23,204 +24,336 @@ W, H = 4096, 3072
 # ---------------------------------------------------------------------------
 # Colour palette
 # ---------------------------------------------------------------------------
-BG            = (42,  31,  20)      # dark warm brown
-PANEL_BG      = (55,  42,  28)      # slightly lighter panel
-PANEL_BORDER  = (90,  70,  40)      # panel outline
-CITY_FILL     = (72,  56,  35)      # city circle fill
-CITY_OUTLINE  = (195, 160, 90)      # city circle outline
-CITY_TEXT     = (240, 230, 210)     # city name text
-CANAL_COLOR   = (60,  130, 200)     # blue for canal routes
-RAIL_COLOR    = (150, 150, 155)     # gray for rail-only routes
-BOTH_COLOR    = (80,  160, 215)     # lighter blue for both-era routes
-ROUTE_DASH    = 18                  # dash length in pixels
-TITLE_COLOR   = (225, 185, 80)      # gold title
-GOLD          = (220, 175, 40)
-WHITE         = (250, 245, 235)
-BLACK         = (10,  10,  10)
-MARKET_BG     = (38,  28,  16)
-MARKET_BORDER = (110, 85,  45)
-COAL_MARKET   = (50,  50,  55)
-IRON_MARKET   = (160, 80,  25)
-VP_TRACK_BG   = (35,  25,  14)
-VP_TRACK_FG   = (195, 160, 90)
+BG_DEEP       = (26,  16,   8)     # #1A1008
+BG_MID        = (38,  26,  14)
+BG_LIGHT      = (50,  38,  22)
+PANEL_BG      = (32,  22,  12)
+PANEL_BORDER  = (80,  62,  32)
+GOLD          = (220, 180,  60)
+GOLD_DIM      = (160, 128,  40)
+GOLD_BRIGHT   = (255, 220, 100)
+CREAM         = (245, 235, 210)
+WHITE         = (252, 248, 240)
+BLACK         = (8,    6,   4)
 
-# Industry slot colours
+CITY_FILL     = (52,  38,  20)
+CITY_OUTLINE  = (210, 170,  70)
+CITY_TEXT     = (240, 228, 200)
+MERCHANT_FILL = (42,  28,  14)
+MERCHANT_RING = (240, 200,  80)
+
+CANAL_COLOR   = (59, 107, 155)     # #3B6B9B
+RAIL_COLOR    = (128, 128, 128)    # #808080
+ROUTE_GLOW    = (80, 140, 200)
+
+MARKET_BG     = (22,  14,   6)
+MARKET_BORDER = (100,  76,  36)
+VP_BG         = (18,  12,   5)
+VP_FG         = (200, 162,  72)
+
 IND_COLORS = {
-    "cotton":       (200, 200, 215),
-    "coal":         (50,  50,  55),
-    "iron":         (165, 85,  25),
-    "brewery":      (185, 145, 20),
-    "manufacturer": (100, 45,  135),
-    "pottery":      (175, 65,  35),
+    "cotton":       (190, 195, 215),
+    "coal":         (55,   55,  62),
+    "iron":         (170,  88,  28),
+    "brewery":      (188, 148,  22),
+    "manufacturer": (105,  48, 140),
+    "pottery":      (178,  68,  38),
+}
+
+IND_NAMES_ZH = {
+    "cotton":       "棉花",
+    "coal":         "煤炭",
+    "iron":         "鐵礦",
+    "brewery":      "釀酒廠",
+    "manufacturer": "製造商",
+    "pottery":      "陶瓷",
+}
+
+# ---------------------------------------------------------------------------
+# Chinese city names
+# ---------------------------------------------------------------------------
+CITY_NAMES_ZH = {
+    "Birmingham":     "伯明翰",
+    "Coventry":       "考文垂",
+    "Dudley":         "達德利",
+    "Kidderminster":  "基德明斯特",
+    "Wolverhampton":  "伍爾弗漢普頓",
+    "Coalbrookdale":  "煤溪谷",
+    "Nuneaton":       "納尼頓",
+    "Worcester":      "伍斯特",
+    "Tamworth":       "塔姆沃思",
+    "Walsall":        "沃爾索爾",
+    "Cannock":        "坎諾克",
+    "Burton-on-Trent":"伯頓",
+    "Stafford":       "斯塔福德",
+    "Stoke-on-Trent": "斯托克",
+    "Leek":           "利克",
+    "Stone":          "斯通",
+    "Uttoxeter":      "厄托克塞特",
+    "Belper":         "貝爾珀",
+    "Derby":          "德比",
+    "Redditch":       "雷迪奇",
+    "Shrewsbury":     "什魯斯伯里",
+    "Gloucester":     "格洛斯特",
+    "Oxford":         "牛津",
+    "Warrington":     "沃靈頓",
+    "Nottingham":     "諾丁漢",
 }
 
 # ---------------------------------------------------------------------------
 # Font helpers
 # ---------------------------------------------------------------------------
 def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    candidates_bold = [
-        "C:/Windows/Fonts/arialbd.ttf",
-        "C:/Windows/Fonts/calibrib.ttf",
-        "C:/Windows/Fonts/verdanab.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    ]
-    candidates_regular = [
-        "C:/Windows/Fonts/arial.ttf",
-        "C:/Windows/Fonts/calibri.ttf",
-        "C:/Windows/Fonts/verdana.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    candidates = candidates_bold if bold else candidates_regular
+    if bold:
+        candidates = [
+            "C:/Windows/Fonts/georgiab.ttf",
+            "C:/Windows/Fonts/timesbd.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/calibrib.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ]
+    else:
+        candidates = [
+            "C:/Windows/Fonts/georgia.ttf",
+            "C:/Windows/Fonts/times.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/calibri.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
     for path in candidates:
         if os.path.exists(path):
             return ImageFont.truetype(path, size)
     return ImageFont.load_default()
 
 
-def center_text(draw, cx, cy, text, font, fill):
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    draw.text((cx - tw // 2 - bbox[0], cy - th // 2 - bbox[1]),
-              text, font=font, fill=fill)
+def load_font_num(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    candidates = (
+        ["C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/calibrib.ttf"]
+        if bold else
+        ["C:/Windows/Fonts/arial.ttf",   "C:/Windows/Fonts/calibri.ttf"]
+    )
+    for path in candidates:
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    return load_font(size, bold)
+
+
+def load_font_cjk(size: int) -> ImageFont.FreeTypeFont:
+    candidates = [
+        "C:/Windows/Fonts/msjh.ttc",
+        "C:/Windows/Fonts/msjhbd.ttc",
+        "C:/Windows/Fonts/mingliu.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    return load_font(size)
+
+
+def text_size(draw, text, font):
+    bb = draw.textbbox((0, 0), text, font=font)
+    return bb[2] - bb[0], bb[3] - bb[1]
+
+
+def center_text(draw, cx, cy, text, font, fill, shadow=None):
+    bb = draw.textbbox((0, 0), text, font=font)
+    tw = bb[2] - bb[0]
+    th = bb[3] - bb[1]
+    x = cx - tw // 2 - bb[0]
+    y = cy - th // 2 - bb[1]
+    if shadow:
+        draw.text((x + 2, y + 2), text, font=font, fill=shadow)
+    draw.text((x, y), text, font=font, fill=fill)
 
 
 # ---------------------------------------------------------------------------
-# City data: (x, y) positions on 4096x3072 canvas
-# These positions approximate the real Brass: Birmingham geography.
+# Background: gradient + parchment noise
+# ---------------------------------------------------------------------------
+def make_background() -> Image.Image:
+    img = Image.new("RGB", (W, H))
+    pix = img.load()
+
+    # Radial gradient from center (slightly warm) to dark corners
+    cx, cy = W // 2, H // 2
+    max_dist = math.hypot(cx, cy)
+    for y in range(H):
+        for x in range(0, W, 4):   # step=4 for speed, fill in below
+            dist = math.hypot(x - cx, y - cy) / max_dist
+            t = dist * dist   # quadratic falloff
+            r = int(BG_DEEP[0] + (BG_MID[0] - BG_DEEP[0]) * (1 - t))
+            g = int(BG_DEEP[1] + (BG_MID[1] - BG_DEEP[1]) * (1 - t))
+            b = int(BG_DEEP[2] + (BG_MID[2] - BG_DEEP[2]) * (1 - t))
+            for dx in range(4):
+                if x + dx < W:
+                    pix[x + dx, y] = (r, g, b)
+
+    # Parchment/canvas noise overlay
+    rng = random.Random(42)
+    noise = Image.new("RGB", (W, H))
+    np = noise.load()
+    for y in range(0, H, 2):
+        for x in range(0, W, 2):
+            v = rng.randint(-10, 10)
+            base = pix[x, y]
+            nr = max(0, min(255, base[0] + v))
+            ng = max(0, min(255, base[1] + v // 2))
+            nb = max(0, min(255, base[2] + v // 4))
+            for dx in range(2):
+                for dy in range(2):
+                    if x + dx < W and y + dy < H:
+                        np[x + dx, y + dy] = (nr, ng, nb)
+
+    # Blend noise at 30%
+    out = Image.blend(img, noise, 0.30)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Gold decorative border
+# ---------------------------------------------------------------------------
+def draw_gold_border(draw):
+    # Outermost thick gold line
+    for t in range(4):
+        clr = (int(GOLD[0] * (0.6 + 0.1 * t)),
+               int(GOLD[1] * (0.6 + 0.1 * t)),
+               int(GOLD[2] * (0.4 + 0.1 * t)))
+        draw.rectangle([t, t, W - 1 - t, H - 1 - t], outline=clr)
+
+    # Inner inset lines
+    for t, clr in [(8, GOLD_DIM), (14, GOLD), (18, GOLD_DIM)]:
+        draw.rectangle([t, t, W - 1 - t, H - 1 - t], outline=clr, width=2)
+
+    # Corner ornament squares
+    corner_size = 32
+    corners = [(20, 20), (W - 20 - corner_size, 20),
+               (20, H - 20 - corner_size), (W - 20 - corner_size, H - 20 - corner_size)]
+    for cx, cy in corners:
+        draw.rectangle([cx, cy, cx + corner_size, cy + corner_size],
+                       fill=BG_DEEP, outline=GOLD_BRIGHT, width=2)
+        # diagonal cross in corner
+        draw.line([(cx, cy), (cx + corner_size, cy + corner_size)], fill=GOLD, width=1)
+        draw.line([(cx + corner_size, cy), (cx, cy + corner_size)], fill=GOLD, width=1)
+
+
+# ---------------------------------------------------------------------------
+# Title
+# ---------------------------------------------------------------------------
+def draw_title(draw):
+    f_title_en  = load_font(96, bold=True)
+    f_title_zh  = load_font_cjk(52)
+    f_subtitle  = load_font(34)
+    shadow_clr  = (8, 5, 2)
+
+    title_y = 72
+    center_text(draw, W // 2, title_y, "BRASS: BIRMINGHAM",
+                f_title_en, GOLD, shadow=shadow_clr)
+
+    zh_y = title_y + 68
+    center_text(draw, W // 2, zh_y, "工業革命：伯明翰",
+                f_title_zh, GOLD_DIM, shadow=shadow_clr)
+
+    sub_y = zh_y + 44
+    center_text(draw, W // 2, sub_y, "Tabletop Simulator Mod",
+                f_subtitle, (140, 118, 78))
+
+    # Decorative rule under title
+    rule_y = sub_y + 28
+    rule_x0 = W // 2 - 600
+    rule_x1 = W // 2 + 600
+    draw.line([(rule_x0, rule_y), (rule_x1, rule_y)], fill=GOLD_DIM, width=2)
+    draw.ellipse([(W // 2 - 6, rule_y - 5), (W // 2 + 6, rule_y + 5)],
+                 fill=GOLD, outline=None)
+
+
+# ---------------------------------------------------------------------------
+# City data  (x, y) on 4096×3072
 # ---------------------------------------------------------------------------
 CITIES = {
-    # ---- Left column ----
-    "Shrewsbury":     (300,  620),
-    "Coalbrookdale":  (370,  870),
-    "Kidderminster":  (430, 1220),
-    "Worcester":      (420, 1520),
-    "Gloucester":     (390, 1830),
+    "Shrewsbury":     ( 310,  640),
+    "Coalbrookdale":  ( 390,  890),
+    "Kidderminster":  ( 445, 1240),
+    "Worcester":      ( 430, 1540),
+    "Gloucester":     ( 400, 1850),
 
-    # ---- Center-left ----
-    "Wolverhampton":  (680,  920),
-    "Dudley":         (720, 1150),
-    "Birmingham":     (800, 1380),
-    "Redditch":       (780, 1640),
+    "Wolverhampton":  ( 700,  940),
+    "Dudley":         ( 740, 1170),
+    "Birmingham":     ( 820, 1400),
+    "Redditch":       ( 800, 1660),
 
-    # ---- Center ----
-    "Walsall":        (920,  960),
-    "Cannock":        (960,  750),
-    "Tamworth":       (1120, 1160),
+    "Walsall":        ( 940,  980),
+    "Cannock":        ( 980,  770),
+    "Tamworth":       (1140, 1180),
 
-    # ---- Center-right ----
-    "Stafford":       (1100,  580),
-    "Stone":          (1200,  800),
-    "Burton-on-Trent":(1320, 1020),
-    "Nuneaton":       (1280, 1280),
-    "Coventry":       (1300, 1520),
+    "Stafford":       (1120,  600),
+    "Stone":          (1220,  820),
+    "Burton-on-Trent":(1340, 1040),
+    "Nuneaton":       (1300, 1300),
+    "Coventry":       (1320, 1540),
 
-    # ---- Right column ----
-    "Stoke-on-Trent": (1380,  540),
-    "Leek":           (1620,  560),
-    "Uttoxeter":      (1560,  840),
-    "Derby":          (1760,  980),
-    "Belper":         (1800,  770),
-    "Nottingham":     (1980, 1100),
+    "Stoke-on-Trent": (1400,  560),
+    "Leek":           (1640,  580),
+    "Uttoxeter":      (1580,  860),
+    "Derby":          (1780, 1000),
+    "Belper":         (1820,  790),
+    "Nottingham":     (2000, 1120),
 
-    # ---- Merchant cities ----
-    "Warrington":     (800,  280),
-    "Oxford":         (1060, 1840),
+    "Warrington":     ( 820,  300),
+    "Oxford":         (1080, 1860),
 }
 
 # ---------------------------------------------------------------------------
-# Route data (from BoardData.lua)
-# Each entry: (cityA, cityB, era_types)
-#   era_types: "both" | "canal" | "rail"
+# Routes
 # ---------------------------------------------------------------------------
 ROUTES = [
-    # Birmingham connections
-    ("Birmingham",  "Coventry",         "both"),
-    ("Birmingham",  "Dudley",           "both"),
-    ("Birmingham",  "Redditch",         "both"),
-    ("Birmingham",  "Tamworth",         "both"),
-    ("Birmingham",  "Walsall",          "both"),
-    ("Birmingham",  "Wolverhampton",    "both"),
-    ("Birmingham",  "Worcester",        "both"),
-    ("Birmingham",  "Cannock",          "rail"),
-
-    # Coventry
-    ("Coventry",    "Nuneaton",         "both"),
-    ("Coventry",    "Oxford",           "both"),
-
-    # Dudley
-    ("Dudley",      "Kidderminster",    "both"),
-    ("Dudley",      "Wolverhampton",    "both"),
-    ("Dudley",      "Walsall",          "rail"),
-
-    # Kidderminster
-    ("Kidderminster", "Worcester",      "both"),
-    ("Coalbrookdale", "Kidderminster",  "both"),
-
-    # Wolverhampton
-    ("Cannock",     "Wolverhampton",    "both"),
-    ("Shrewsbury",  "Wolverhampton",    "both"),
-    ("Coalbrookdale","Wolverhampton",   "both"),
-
-    # Coalbrookdale
-    ("Coalbrookdale","Shrewsbury",      "both"),
-
-    # Cannock
-    ("Cannock",     "Walsall",          "both"),
-    ("Cannock",     "Stafford",         "both"),
-
-    # Burton-on-Trent
-    ("Burton-on-Trent","Tamworth",      "both"),
-    ("Burton-on-Trent","Cannock",       "rail"),
-    ("Burton-on-Trent","Uttoxeter",     "both"),
-
-    # Tamworth
-    ("Nuneaton",    "Tamworth",         "both"),
-
-    # Nuneaton
-    ("Nottingham",  "Nuneaton",         "rail"),
-
-    # Stafford
-    ("Stafford",    "Stone",            "both"),
-    ("Stafford",    "Uttoxeter",        "rail"),
-
-    # Stoke-on-Trent
-    ("Leek",        "Stoke-on-Trent",   "both"),
-    ("Stone",       "Stoke-on-Trent",   "both"),
-    ("Stoke-on-Trent","Warrington",     "both"),
-    ("Shrewsbury",  "Warrington",       "both"),
-
-    # Leek
-    ("Leek",        "Uttoxeter",        "rail"),
-
-    # Stone
-    ("Stone",       "Uttoxeter",        "both"),
-
-    # Uttoxeter
-    ("Derby",       "Uttoxeter",        "both"),
-
-    # Belper
-    ("Belper",      "Derby",            "both"),
-    ("Belper",      "Leek",             "rail"),
-
-    # Derby
-    ("Derby",       "Nottingham",       "both"),
-    ("Burton-on-Trent","Derby",         "rail"),
-
-    # Redditch
-    ("Gloucester",  "Redditch",         "both"),
-    ("Oxford",      "Redditch",         "both"),
-    ("Redditch",    "Worcester",        "both"),
-
-    # Worcester
-    ("Gloucester",  "Worcester",        "both"),
-
-    # Walsall
-    ("Walsall",     "Wolverhampton",    "rail"),
+    ("Birmingham",     "Coventry",        "both"),
+    ("Birmingham",     "Dudley",          "both"),
+    ("Birmingham",     "Redditch",        "both"),
+    ("Birmingham",     "Tamworth",        "both"),
+    ("Birmingham",     "Walsall",         "both"),
+    ("Birmingham",     "Wolverhampton",   "both"),
+    ("Birmingham",     "Worcester",       "both"),
+    ("Birmingham",     "Cannock",         "rail"),
+    ("Coventry",       "Nuneaton",        "both"),
+    ("Coventry",       "Oxford",          "both"),
+    ("Dudley",         "Kidderminster",   "both"),
+    ("Dudley",         "Wolverhampton",   "both"),
+    ("Dudley",         "Walsall",         "rail"),
+    ("Kidderminster",  "Worcester",       "both"),
+    ("Coalbrookdale",  "Kidderminster",   "both"),
+    ("Cannock",        "Wolverhampton",   "both"),
+    ("Shrewsbury",     "Wolverhampton",   "both"),
+    ("Coalbrookdale",  "Wolverhampton",   "both"),
+    ("Coalbrookdale",  "Shrewsbury",      "both"),
+    ("Cannock",        "Walsall",         "both"),
+    ("Cannock",        "Stafford",        "both"),
+    ("Burton-on-Trent","Tamworth",        "both"),
+    ("Burton-on-Trent","Cannock",         "rail"),
+    ("Burton-on-Trent","Uttoxeter",       "both"),
+    ("Nuneaton",       "Tamworth",        "both"),
+    ("Nottingham",     "Nuneaton",        "rail"),
+    ("Stafford",       "Stone",           "both"),
+    ("Stafford",       "Uttoxeter",       "rail"),
+    ("Leek",           "Stoke-on-Trent",  "both"),
+    ("Stone",          "Stoke-on-Trent",  "both"),
+    ("Stoke-on-Trent", "Warrington",      "both"),
+    ("Shrewsbury",     "Warrington",      "both"),
+    ("Leek",           "Uttoxeter",       "rail"),
+    ("Stone",          "Uttoxeter",       "both"),
+    ("Derby",          "Uttoxeter",       "both"),
+    ("Belper",         "Derby",           "both"),
+    ("Belper",         "Leek",            "rail"),
+    ("Derby",          "Nottingham",      "both"),
+    ("Burton-on-Trent","Derby",           "rail"),
+    ("Gloucester",     "Redditch",        "both"),
+    ("Oxford",         "Redditch",        "both"),
+    ("Redditch",       "Worcester",       "both"),
+    ("Gloucester",     "Worcester",       "both"),
+    ("Walsall",        "Wolverhampton",   "rail"),
 ]
 
 # ---------------------------------------------------------------------------
-# Industry slots per city (from BoardData.lua)
+# City slots
 # ---------------------------------------------------------------------------
 CITY_SLOTS = {
     "Birmingham":     ["cotton", "manufacturer", "iron", "manufacturer"],
@@ -243,7 +376,6 @@ CITY_SLOTS = {
     "Belper":         ["cotton", "manufacturer", "pottery"],
     "Derby":          ["cotton", "brewery", "manufacturer"],
     "Redditch":       ["coal", "iron"],
-    # Merchant-only (no industry slots)
     "Shrewsbury":     [],
     "Gloucester":     [],
     "Oxford":         [],
@@ -251,23 +383,21 @@ CITY_SLOTS = {
     "Nottingham":     [],
 }
 
-# Merchants with bonus text
 MERCHANTS = [
-    {"name": "Shrewsbury", "bonus": "+4 VP"},
-    {"name": "Gloucester", "bonus": "Free Dev"},
-    {"name": "Oxford",     "bonus": "+2 Income"},
-    {"name": "Warrington", "bonus": "+£5"},
-    {"name": "Nottingham", "bonus": "+3 VP"},
+    {"name": "Shrewsbury", "name_zh": "什魯斯伯里", "bonus": "+4 VP"},
+    {"name": "Gloucester", "name_zh": "格洛斯特",   "bonus": "Free Develop"},
+    {"name": "Oxford",     "name_zh": "牛津",       "bonus": "+2 Income"},
+    {"name": "Warrington", "name_zh": "沃靈頓",     "bonus": "+£5"},
+    {"name": "Nottingham", "name_zh": "諾丁漢",     "bonus": "+3 VP"},
 ]
+MERCHANT_NAMES = {m["name"] for m in MERCHANTS}
 
 # ---------------------------------------------------------------------------
 # Drawing helpers
 # ---------------------------------------------------------------------------
-def draw_dashed_line(draw, x0, y0, x1, y1, fill, width, dash=18, gap=10):
-    """Draw a dashed line from (x0,y0) to (x1,y1)."""
-    import math
+def draw_dashed_line(draw, x0, y0, x1, y1, fill, width, dash=20, gap=10):
     length = math.hypot(x1 - x0, y1 - y0)
-    if length == 0:
+    if length < 1:
         return
     dx = (x1 - x0) / length
     dy = (y1 - y0) / length
@@ -277,11 +407,11 @@ def draw_dashed_line(draw, x0, y0, x1, y1, fill, width, dash=18, gap=10):
         seg = dash if drawing else gap
         end = min(pos + seg, length)
         if drawing:
-            sx0 = x0 + dx * pos
-            sy0 = y0 + dy * pos
-            sx1 = x0 + dx * end
-            sy1 = y0 + dy * end
-            draw.line([(sx0, sy0), (sx1, sy1)], fill=fill, width=width)
+            draw.line(
+                [(x0 + dx * pos, y0 + dy * pos),
+                 (x0 + dx * end, y0 + dy * end)],
+                fill=fill, width=width,
+            )
         pos = end
         drawing = not drawing
 
@@ -291,440 +421,506 @@ def draw_rounded_rect(draw, xy, radius, fill=None, outline=None, width=1):
                            fill=fill, outline=outline, width=width)
 
 
-# ---------------------------------------------------------------------------
-# Section: VP Track (bottom strip)
-# ---------------------------------------------------------------------------
-def draw_vp_track(img, draw):
-    """Draw a 0-30+ VP track as a strip across the bottom of the board."""
-    strip_y  = H - 140
-    strip_h  = 110
-    cell_w   = 96
-    n_cells  = 40   # 0..39 shown (wraps at 30+)
-
-    total_w  = n_cells * cell_w
-    start_x  = (W - total_w) // 2
-    strip_x  = start_x - 12
-
-    # Background strip
-    draw_rounded_rect(draw,
-                      (strip_x, strip_y - 10,
-                       strip_x + total_w + 24, strip_y + strip_h + 10),
-                      radius=12, fill=VP_TRACK_BG, outline=VP_TRACK_FG, width=3)
-
-    f_label = load_font(22, bold=True)
-    f_num   = load_font(26, bold=True)
-
-    for i in range(n_cells):
-        cx = start_x + i * cell_w + cell_w // 2
-        cy = strip_y + strip_h // 2
-
-        # Alternating cell shading
-        shade = (48, 36, 20) if i % 2 == 0 else (38, 28, 14)
-        cell_x0 = start_x + i * cell_w
-        draw.rectangle([cell_x0, strip_y, cell_x0 + cell_w - 2, strip_y + strip_h],
-                       fill=shade)
-
-        # Milestone marks at multiples of 5
-        if i % 5 == 0:
-            draw.line([(cx, strip_y), (cx, strip_y + strip_h)],
-                      fill=VP_TRACK_FG, width=2)
-
-        # Number
-        center_text(draw, cx, cy, str(i), f_num, VP_TRACK_FG)
-
-    # Outer border again on top
-    draw_rounded_rect(draw,
-                      (strip_x, strip_y - 10,
-                       strip_x + total_w + 24, strip_y + strip_h + 10),
-                      radius=12, fill=None, outline=VP_TRACK_FG, width=3)
-
-    # Label
-    lbl = load_font(30, bold=True)
-    draw.text((strip_x - 120, strip_y + strip_h // 2 - 16), "VP", font=lbl, fill=GOLD)
+def city_edge_point(cx, cy, tx, ty, radius):
+    """Return the point on the circle boundary of (cx,cy,r) towards (tx,ty)."""
+    dx = tx - cx
+    dy = ty - cy
+    dist = math.hypot(dx, dy) or 1
+    return cx + dx / dist * radius, cy + dy / dist * radius
 
 
 # ---------------------------------------------------------------------------
-# Section: Market panel (right side)
+# Routes
 # ---------------------------------------------------------------------------
-MARKET_PANEL_X  = 2300
-MARKET_PANEL_Y  = 200
-MARKET_PANEL_W  = 1680
-MARKET_PANEL_H  = 1000
+CITY_R = 44   # city circle radius (used in routes + cities drawing)
 
-def draw_market_panel(draw):
-    """Draw coal and iron market tracks."""
-    px, py, pw, ph = (MARKET_PANEL_X, MARKET_PANEL_Y,
-                      MARKET_PANEL_W, MARKET_PANEL_H)
-
-    draw_rounded_rect(draw, (px, py, px + pw, py + ph),
-                      radius=20, fill=MARKET_BG, outline=MARKET_BORDER, width=4)
-
-    f_title  = load_font(44, bold=True)
-    f_header = load_font(34, bold=True)
-    f_price  = load_font(36, bold=True)
-    f_small  = load_font(24)
-
-    center_text(draw, px + pw // 2, py + 44, "MARKET", f_title, GOLD)
-
-    COAL_PRICES = [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8]
-    IRON_PRICES = [1, 1, 2, 2, 3, 3, 4, 5, 6, 6]
-
-    def draw_market_row(label, prices, color, row_y):
-        n = len(prices)
-        cell_w = min(pw - 80, n * 110) // n
-        total_w = n * cell_w
-        row_x = px + (pw - total_w) // 2
-
-        # Row label
-        center_text(draw, px + pw // 2, row_y - 30, label, f_header, color)
-
-        for i, price in enumerate(prices):
-            cx = row_x + i * cell_w + cell_w // 2
-            # Cell box
-            bx0 = row_x + i * cell_w + 4
-            bx1 = bx0 + cell_w - 8
-            draw_rounded_rect(draw, (bx0, row_y, bx1, row_y + 80),
-                              radius=8,
-                              fill=(int(color[0] * 0.25),
-                                    int(color[1] * 0.25),
-                                    int(color[2] * 0.25)),
-                              outline=color, width=2)
-            # Price number
-            center_text(draw, cx, row_y + 40, f"£{price}", f_price, color)
-            # Space index (last filled = most expensive)
-            center_text(draw, cx, row_y + 70, str(n - i), f_small,
-                        (140, 130, 115))
-
-    draw_market_row("COAL MARKET", COAL_PRICES, (180, 180, 185), py + 120)
-    draw_market_row("IRON MARKET", IRON_PRICES, (200, 110, 40),  py + 320)
-
-    # Current price arrow indicator note
-    note_y = py + 500
-    center_text(draw, px + pw // 2, note_y,
-                "← prices drop as cubes are placed →",
-                f_small, (160, 145, 120))
-
-
-# ---------------------------------------------------------------------------
-# Section: Merchant panel (right side, below market)
-# ---------------------------------------------------------------------------
-MERCH_PANEL_X = 2300
-MERCH_PANEL_Y = 1240
-MERCH_PANEL_W = 1680
-MERCH_PANEL_H = 700
-
-def draw_merchant_panel(draw):
-    px, py, pw, ph = (MERCH_PANEL_X, MERCH_PANEL_Y,
-                      MERCH_PANEL_W, MERCH_PANEL_H)
-
-    draw_rounded_rect(draw, (px, py, px + pw, py + ph),
-                      radius=20, fill=MARKET_BG, outline=MARKET_BORDER, width=4)
-
-    f_title  = load_font(44, bold=True)
-    f_name   = load_font(30, bold=True)
-    f_bonus  = load_font(26)
-    f_small  = load_font(22)
-
-    center_text(draw, px + pw // 2, py + 44, "MERCHANTS", f_title, GOLD)
-
-    slot_w = pw // len(MERCHANTS)
-    for i, m in enumerate(MERCHANTS):
-        cx = px + i * slot_w + slot_w // 2
-        cy = py + 160
-
-        # Merchant circle
-        r = 60
-        draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)],
-                     fill=PANEL_BG, outline=GOLD, width=3)
-
-        # Initials inside circle
-        initial = m["name"][0]
-        f_init = load_font(48, bold=True)
-        center_text(draw, cx, cy, initial, f_init, GOLD)
-
-        # Name below
-        center_text(draw, cx, cy + r + 24, m["name"], f_name, CITY_TEXT)
-        # Bonus
-        center_text(draw, cx, cy + r + 56, m["bonus"], f_bonus, (180, 210, 140))
-        # Slots
-        center_text(draw, cx, cy + r + 84, "Slot", f_small, (150, 140, 120))
-
-
-# ---------------------------------------------------------------------------
-# Section: Income track (right side, below merchants)
-# ---------------------------------------------------------------------------
-INCOME_PANEL_X = 2300
-INCOME_PANEL_Y = 1980
-INCOME_PANEL_W = 1680
-INCOME_PANEL_H = 900
-
-def draw_income_track(draw):
-    px, py, pw, ph = (INCOME_PANEL_X, INCOME_PANEL_Y,
-                      INCOME_PANEL_W, INCOME_PANEL_H)
-
-    draw_rounded_rect(draw, (px, py, px + pw, py + ph),
-                      radius=20, fill=MARKET_BG, outline=MARKET_BORDER, width=4)
-
-    f_title  = load_font(44, bold=True)
-    f_val    = load_font(28, bold=True)
-    f_small  = load_font(20)
-
-    center_text(draw, px + pw // 2, py + 44, "INCOME TRACK", f_title, GOLD)
-
-    # Income steps: spaces 0-30, with income values
-    # Official income track: positions 0-30+ map to specific £/turn values
-    income_table = [
-        (0,  -3), (1, -2), (2, -1), (3,  0), (4,  1),
-        (5,   1), (6,  2), (7,  2), (8,  3), (9,  3),
-        (10,  4), (11, 4), (12, 5), (13, 5), (14, 6),
-        (15,  6), (16, 7), (17, 7), (18, 8), (19, 8),
-        (20,  9), (21, 9), (22,10), (23,10), (24,11),
-        (25, 11), (26,12), (27,12), (28,13), (29,13),
-        (30, 14), (31,15), (32,16), (33,17),
-    ]
-
-    n      = len(income_table)
-    cols   = 17
-    rows   = (n + cols - 1) // cols
-    cell_w = (pw - 60) // cols
-    cell_h = 80
-    start_x = px + 30
-    start_y = py + 100
-
-    for idx, (space, income) in enumerate(income_table):
-        col = idx % cols
-        row = idx // cols
-        cx  = start_x + col * cell_w + cell_w // 2
-        cy  = start_y + row * (cell_h + 10) + cell_h // 2
-        bx0 = start_x + col * cell_w + 3
-        bx1 = bx0 + cell_w - 6
-
-        # Color based on income tier
-        if income < 0:
-            clr = (160, 40,  40)
-        elif income == 0:
-            clr = (90,  90,  90)
-        elif income <= 5:
-            clr = (40,  130, 60)
-        elif income <= 10:
-            clr = (40,  90, 170)
-        else:
-            clr = (160, 40, 160)
-
-        draw_rounded_rect(draw, (bx0, cy - cell_h // 2, bx1, cy + cell_h // 2),
-                          radius=6,
-                          fill=(max(0, clr[0] - 30),
-                                max(0, clr[1] - 30),
-                                max(0, clr[2] - 30)),
-                          outline=clr, width=2)
-        center_text(draw, cx, cy - 12, str(space), f_small, (180, 170, 155))
-        income_str = f"£{income}" if income >= 0 else f"-£{abs(income)}"
-        center_text(draw, cx, cy + 14, income_str, f_val, clr)
-
-
-# ---------------------------------------------------------------------------
-# Main board drawing
-# ---------------------------------------------------------------------------
-def draw_routes(draw, cities):
-    """Draw all route connections."""
-    f_none = None
-    for (city_a, city_b, era) in ROUTES:
-        if city_a not in cities or city_b not in cities:
+def draw_routes(draw):
+    for city_a, city_b, era in ROUTES:
+        if city_a not in CITIES or city_b not in CITIES:
             continue
-        x0, y0 = cities[city_a]
-        x1, y1 = cities[city_b]
+        ax, ay = CITIES[city_a]
+        bx, by = CITIES[city_b]
+
+        # Start/end at circle edges
+        ex0, ey0 = city_edge_point(ax, ay, bx, by, CITY_R + 4)
+        ex1, ey1 = city_edge_point(bx, by, ax, ay, CITY_R + 4)
 
         if era == "canal":
-            color = CANAL_COLOR
-            width = 6
-            draw_dashed_line(draw, x0, y0, x1, y1, color, width, dash=20, gap=8)
+            draw_dashed_line(draw, ex0, ey0, ex1, ey1,
+                             CANAL_COLOR, 7, dash=22, gap=9)
         elif era == "rail":
-            color = RAIL_COLOR
-            width = 5
-            draw_dashed_line(draw, x0, y0, x1, y1, color, width, dash=12, gap=10)
-        else:  # "both"
-            # Draw a slightly offset pair: canal on top, rail below
-            import math
-            length = math.hypot(x1 - x0, y1 - y0) or 1
-            perp_x = -(y1 - y0) / length * 4
-            perp_y =  (x1 - x0) / length * 4
+            draw_dashed_line(draw, ex0, ey0, ex1, ey1,
+                             RAIL_COLOR, 6, dash=14, gap=11)
+        else:  # both — parallel canal + rail lines
+            length = math.hypot(ex1 - ex0, ey1 - ey0) or 1
+            px = -(ey1 - ey0) / length * 5
+            py =  (ex1 - ex0) / length * 5
 
-            # Canal line (blue, offset +perp)
+            # Canal (blue, offset one side)
             draw_dashed_line(draw,
-                             x0 + perp_x, y0 + perp_y,
-                             x1 + perp_x, y1 + perp_y,
-                             CANAL_COLOR, 5, dash=20, gap=8)
-            # Rail line (gray, offset -perp)
+                             ex0 + px, ey0 + py, ex1 + px, ey1 + py,
+                             CANAL_COLOR, 5, dash=22, gap=9)
+            # Rail (gray, opposite side)
             draw_dashed_line(draw,
-                             x0 - perp_x, y0 - perp_y,
-                             x1 - perp_x, y1 - perp_y,
-                             RAIL_COLOR, 4, dash=12, gap=10)
+                             ex0 - px, ey0 - py, ex1 - px, ey1 - py,
+                             RAIL_COLOR, 4, dash=14, gap=11)
 
 
-def draw_cities(draw, cities):
-    """Draw city nodes (circles + name + industry slots)."""
-    CITY_R    = 46   # city circle radius
-    SLOT_SIZE = 14   # industry slot square size
-    SLOT_GAP  = 5
+# ---------------------------------------------------------------------------
+# Cities
+# ---------------------------------------------------------------------------
+def draw_cities(draw):
+    SLOT_DOT_R = 7
+    SLOT_GAP   = 5
 
-    f_city    = load_font(24, bold=True)
-    f_merch   = load_font(20)
+    f_en  = load_font(22, bold=True)
+    f_zh  = load_font_cjk(18)
+    f_bon = load_font(19)
+    shadow_c = (8, 5, 2)
 
-    merchant_names = {m["name"] for m in MERCHANTS}
+    for name, (cx, cy) in CITIES.items():
+        is_merchant = (name in MERCHANT_NAMES)
 
-    for name, (cx, cy) in cities.items():
-        # Shadow
-        draw.ellipse([(cx - CITY_R + 3, cy - CITY_R + 3),
-                      (cx + CITY_R + 3, cy + CITY_R + 3)],
-                     fill=(15, 10, 5))
+        # Drop shadow
+        draw.ellipse([(cx - CITY_R + 4, cy - CITY_R + 4),
+                      (cx + CITY_R + 4, cy + CITY_R + 4)],
+                     fill=(10, 6, 2))
 
-        # Main circle
-        is_merchant = name in merchant_names and not CITY_SLOTS.get(name)
-        fill_color = (55, 40, 20) if is_merchant else CITY_FILL
-        outline_color = (175, 140, 75) if is_merchant else CITY_OUTLINE
+        # Outer glow ring for merchant cities
+        if is_merchant:
+            for r_off, alpha in [(CITY_R + 8, 60), (CITY_R + 5, 100)]:
+                glow_c = (int(MERCHANT_RING[0] * alpha / 255),
+                          int(MERCHANT_RING[1] * alpha / 255),
+                          int(MERCHANT_RING[2] * alpha / 255))
+                draw.ellipse([(cx - r_off, cy - r_off),
+                              (cx + r_off, cy + r_off)],
+                             outline=glow_c, width=2)
+
+        # Fill circle
+        fill_c   = MERCHANT_FILL  if is_merchant else CITY_FILL
+        ring_c   = MERCHANT_RING  if is_merchant else CITY_OUTLINE
+
         draw.ellipse([(cx - CITY_R, cy - CITY_R),
                       (cx + CITY_R, cy + CITY_R)],
-                     fill=fill_color, outline=outline_color, width=3)
+                     fill=fill_c, outline=ring_c, width=4)
 
-        # City name (below circle)
-        name_y = cy + CITY_R + 18
-        center_text(draw, cx, name_y, name, f_city, CITY_TEXT)
+        # Inner highlight ring
+        inner_r = CITY_R - 8
+        inner_c = tuple(min(255, c + 30) for c in ring_c)
+        draw.ellipse([(cx - inner_r, cy - inner_r),
+                      (cx + inner_r, cy + inner_r)],
+                     fill=None, outline=inner_c, width=1)
 
-        # Industry slot indicators (small colored squares above/to the side)
+        # Crown/star for merchant city (★ above circle)
+        if is_merchant:
+            star_y = cy - CITY_R - 18
+            f_star = load_font_num(26, bold=True)
+            center_text(draw, cx, star_y, "★", f_star, GOLD)
+
+        # City name in cream (above circle)
+        name_y = cy - CITY_R - 26
+        if is_merchant:
+            name_y = cy - CITY_R - 46  # pushed up to make room for star
+        center_text(draw, cx, name_y, name, f_en, CREAM, shadow=shadow_c)
+
+        # Chinese name below English
+        zh = CITY_NAMES_ZH.get(name, "")
+        if zh:
+            center_text(draw, cx, name_y + 24, zh, f_zh,
+                        (190, 175, 140), shadow=shadow_c)
+
+        # Industry slot dots below circle
         slots = CITY_SLOTS.get(name, [])
         if slots:
-            n_slots = len(slots)
-            total_w = n_slots * (SLOT_SIZE + SLOT_GAP) - SLOT_GAP
-            slot_x0 = cx - total_w // 2
-            slot_y  = cy - CITY_R - SLOT_SIZE - 8
+            n = len(slots)
+            total_w = n * (SLOT_DOT_R * 2 + SLOT_GAP) - SLOT_GAP
+            sx0 = cx - total_w // 2
+            dot_y = cy + CITY_R + 14
             for j, ind in enumerate(slots):
-                sx = slot_x0 + j * (SLOT_SIZE + SLOT_GAP)
-                sy = slot_y
+                dx = sx0 + j * (SLOT_DOT_R * 2 + SLOT_GAP) + SLOT_DOT_R
                 color = IND_COLORS.get(ind, (120, 120, 120))
-                draw.rectangle([sx, sy, sx + SLOT_SIZE, sy + SLOT_SIZE],
-                               fill=color, outline=(200, 190, 170), width=1)
+                # dot fill
+                draw.ellipse([(dx - SLOT_DOT_R, dot_y - SLOT_DOT_R),
+                              (dx + SLOT_DOT_R, dot_y + SLOT_DOT_R)],
+                             fill=color, outline=(220, 200, 170), width=1)
 
-        # Merchant label
+        # Merchant bonus text
         if is_merchant:
             for m in MERCHANTS:
                 if m["name"] == name:
-                    bonus_y = cy + CITY_R + 42
-                    center_text(draw, cx, bonus_y, m["bonus"], f_merch,
-                                (160, 210, 130))
+                    center_text(draw, cx, cy + CITY_R + 22, m["bonus"],
+                                f_bon, (160, 215, 130), shadow=shadow_c)
                     break
+
+
+# ---------------------------------------------------------------------------
+# Map area frame
+# ---------------------------------------------------------------------------
+MAP_X = 76
+MAP_Y = 196
+MAP_W = 2180
+MAP_H = H - 380
+
+def draw_map_frame(draw):
+    # Subtle panel tint
+    draw_rounded_rect(draw,
+                      (MAP_X, MAP_Y, MAP_X + MAP_W, MAP_Y + MAP_H),
+                      radius=18, fill=(28, 18, 9), outline=None)
+    # Gold frame lines
+    for inset, clr, lw in [
+        (0,  PANEL_BORDER, 3),
+        (5,  GOLD_DIM,     1),
+        (10, PANEL_BORDER, 1),
+    ]:
+        draw_rounded_rect(draw,
+                          (MAP_X + inset, MAP_Y + inset,
+                           MAP_X + MAP_W - inset, MAP_Y + MAP_H - inset),
+                          radius=max(4, 18 - inset),
+                          fill=None, outline=clr, width=lw)
+
+
+# ---------------------------------------------------------------------------
+# Market panel  (right side)
+# ---------------------------------------------------------------------------
+MP_X = 2300
+MP_Y = 196
+MP_W = 1740
+MP_H = 1020
+
+COAL_PRICES = [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 8]
+IRON_PRICES = [1, 1, 2, 2, 3, 3, 4, 5, 6, 6]
+
+
+def draw_market_panel(draw):
+    px, py, pw, ph = MP_X, MP_Y, MP_W, MP_H
+
+    # Panel background
+    draw_rounded_rect(draw, (px, py, px + pw, py + ph),
+                      radius=22, fill=MARKET_BG, outline=MARKET_BORDER, width=3)
+    draw_rounded_rect(draw, (px + 6, py + 6, px + pw - 6, py + ph - 6),
+                      radius=16, fill=None, outline=GOLD_DIM, width=1)
+
+    f_title  = load_font(46, bold=True)
+    f_header = load_font(30, bold=True)
+    f_price  = load_font_num(32, bold=True)
+    f_idx    = load_font_num(18)
+
+    center_text(draw, px + pw // 2, py + 46, "MARKET", f_title, GOLD)
+    draw.line([(px + 40, py + 72), (px + pw - 40, py + 72)],
+              fill=GOLD_DIM, width=1)
+
+    def draw_market_row(label, prices, row_color, row_y):
+        n = len(prices)
+        cell_w = min((pw - 80) // n, 108)
+        total_w = n * cell_w
+        row_x = px + (pw - total_w) // 2
+
+        center_text(draw, px + pw // 2, row_y - 28, label, f_header, row_color)
+
+        for i, price in enumerate(prices):
+            bx0 = row_x + i * cell_w + 4
+            bx1 = bx0 + cell_w - 8
+            cell_cx = bx0 + (bx1 - bx0) // 2
+            cell_cy = row_y + 44
+
+            dark = tuple(max(0, int(c * 0.22)) for c in row_color)
+            draw_rounded_rect(draw, (bx0, row_y, bx1, row_y + 88),
+                              radius=9, fill=dark, outline=row_color, width=2)
+
+            # Price number
+            center_text(draw, cell_cx, cell_cy, f"£{price}", f_price, row_color)
+            # Space index (right-to-left: last space = cheapest remaining)
+            center_text(draw, cell_cx, row_y + 78, str(n - i), f_idx,
+                        (110, 100, 85))
+
+    draw_market_row("COAL MARKET  /  煤炭市場", COAL_PRICES,
+                    (185, 185, 195), py + 102)
+    draw_market_row("IRON MARKET  /  鐵礦市場", IRON_PRICES,
+                    (205, 115, 45),  py + 322)
+
+    # Note
+    f_note = load_font(22)
+    center_text(draw, px + pw // 2, py + 520,
+                "← cubes placed here drop price →",
+                f_note, (130, 118, 95))
+
+
+# ---------------------------------------------------------------------------
+# Merchant panel  (right side)
+# ---------------------------------------------------------------------------
+MERCH_X = 2300
+MERCH_Y = 1256
+MERCH_W = 1740
+MERCH_H = 740
+
+def draw_merchant_panel(draw):
+    px, py, pw, ph = MERCH_X, MERCH_Y, MERCH_W, MERCH_H
+
+    draw_rounded_rect(draw, (px, py, px + pw, py + ph),
+                      radius=22, fill=MARKET_BG, outline=MARKET_BORDER, width=3)
+    draw_rounded_rect(draw, (px + 6, py + 6, px + pw - 6, py + ph - 6),
+                      radius=16, fill=None, outline=GOLD_DIM, width=1)
+
+    f_title = load_font(46, bold=True)
+    f_name  = load_font(26, bold=True)
+    f_zh    = load_font_cjk(20)
+    f_bonus = load_font(22)
+    f_slots = load_font(18)
+
+    center_text(draw, px + pw // 2, py + 46, "MERCHANTS  /  商人", f_title, GOLD)
+    draw.line([(px + 40, py + 72), (px + pw - 40, py + 72)],
+              fill=GOLD_DIM, width=1)
+
+    n = len(MERCHANTS)
+    slot_w = pw // n
+    circle_r = 58
+
+    for i, m in enumerate(MERCHANTS):
+        cx = px + i * slot_w + slot_w // 2
+        cy = py + 180
+
+        # Slot box background
+        bx0 = px + i * slot_w + 8
+        bx1 = bx0 + slot_w - 16
+        draw_rounded_rect(draw, (bx0, py + 90, bx1, py + ph - 20),
+                          radius=12, fill=(28, 18, 9), outline=GOLD_DIM, width=1)
+
+        # Glow ring
+        draw.ellipse([(cx - circle_r - 4, cy - circle_r - 4),
+                      (cx + circle_r + 4, cy + circle_r + 4)],
+                     outline=GOLD_DIM, width=2)
+        # Circle
+        draw.ellipse([(cx - circle_r, cy - circle_r),
+                      (cx + circle_r, cy + circle_r)],
+                     fill=MERCHANT_FILL, outline=GOLD, width=3)
+        # Star
+        f_star = load_font_num(38, bold=True)
+        center_text(draw, cx, cy, "★", f_star, GOLD)
+
+        # Name (EN)
+        center_text(draw, cx, cy + circle_r + 22, m["name"], f_name, CREAM)
+        # Name (ZH)
+        center_text(draw, cx, cy + circle_r + 50, m["name_zh"], f_zh,
+                    (190, 175, 140))
+        # Bonus
+        center_text(draw, cx, cy + circle_r + 80, m["bonus"], f_bonus,
+                    (155, 215, 130))
+        # Slot label
+        center_text(draw, cx, cy + circle_r + 108, "[ Tile Slot ]", f_slots,
+                    (100, 90, 72))
+
+
+# ---------------------------------------------------------------------------
+# Income track
+# ---------------------------------------------------------------------------
+INC_X = 2300
+INC_Y = 2040
+INC_W = 1740
+INC_H = 910
+
+INCOME_TABLE = [
+    (0, -3), (1,-2), (2,-1), (3,  0), (4,  1),
+    (5,  1), (6, 2), (7, 2), (8,  3), (9,  3),
+    (10, 4), (11,4), (12,5), (13, 5), (14, 6),
+    (15, 6), (16,7), (17,7), (18, 8), (19, 8),
+    (20, 9), (21,9), (22,10),(23,10), (24,11),
+    (25,11), (26,12),(27,12),(28,13), (29,13),
+    (30,14), (31,15),(32,16),(33,17),
+]
+
+
+def draw_income_track(draw):
+    px, py, pw, ph = INC_X, INC_Y, INC_W, INC_H
+
+    draw_rounded_rect(draw, (px, py, px + pw, py + ph),
+                      radius=22, fill=MARKET_BG, outline=MARKET_BORDER, width=3)
+    draw_rounded_rect(draw, (px + 6, py + 6, px + pw - 6, py + ph - 6),
+                      radius=16, fill=None, outline=GOLD_DIM, width=1)
+
+    f_title = load_font(46, bold=True)
+    f_val   = load_font_num(24, bold=True)
+    f_space = load_font_num(16)
+
+    center_text(draw, px + pw // 2, py + 46, "INCOME TRACK  /  收入軌跡",
+                f_title, GOLD)
+    draw.line([(px + 40, py + 72), (px + pw - 40, py + 72)],
+              fill=GOLD_DIM, width=1)
+
+    n    = len(INCOME_TABLE)
+    cols = 17
+    cw   = (pw - 60) // cols
+    ch   = 82
+    sx   = px + 30
+    sy   = py + 88
+
+    def income_color(income):
+        if income < 0:   return (160, 40, 40)
+        if income == 0:  return (90, 90, 90)
+        if income <= 5:  return (45, 135, 65)
+        if income <= 10: return (45, 95, 175)
+        return (165, 45, 165)
+
+    for idx, (space, income) in enumerate(INCOME_TABLE):
+        col = idx % cols
+        row = idx // cols
+        cx  = sx + col * cw + cw // 2
+        cy  = sy + row * (ch + 8) + ch // 2
+        bx0 = sx + col * cw + 3
+        bx1 = bx0 + cw - 6
+
+        clr  = income_color(income)
+        dark = tuple(max(0, int(c * 0.24)) for c in clr)
+        draw_rounded_rect(draw,
+                          (bx0, cy - ch // 2, bx1, cy + ch // 2),
+                          radius=7, fill=dark, outline=clr, width=2)
+
+        # Space number (small, top)
+        center_text(draw, cx, cy - 18, str(space), f_space, (160, 150, 132))
+        # Income value (large, center)
+        istr = f"£{income}" if income >= 0 else f"-£{abs(income)}"
+        center_text(draw, cx, cy + 12, istr, f_val, clr)
+
+
+# ---------------------------------------------------------------------------
+# VP Track  (bottom strip, 0-100)
+# ---------------------------------------------------------------------------
+def draw_vp_track(draw):
+    strip_y = H - 152
+    strip_h = 118
+    n_cells = 101       # 0..100
+    cell_w  = max(36, (W - 200) // n_cells)
+    total_w = n_cells * cell_w
+    start_x = (W - total_w) // 2
+
+    # Background
+    draw_rounded_rect(draw,
+                      (start_x - 14, strip_y - 12,
+                       start_x + total_w + 14, strip_y + strip_h + 12),
+                      radius=14, fill=VP_BG, outline=VP_FG, width=3)
+
+    f_num = load_font_num(20, bold=True)
+    f_lbl = load_font(32, bold=True)
+
+    for i in range(n_cells):
+        cx   = start_x + i * cell_w + cell_w // 2
+        cy   = strip_y + strip_h // 2
+        bx0  = start_x + i * cell_w
+        bx1  = bx0 + cell_w - 1
+
+        # Alternating shading; every-10 distinctly brighter
+        if i % 10 == 0:
+            shade = (58, 44, 24)
+            num_c = GOLD_BRIGHT
+        elif i % 5 == 0:
+            shade = (46, 34, 18)
+            num_c = GOLD
+        else:
+            shade = (32, 22, 10) if i % 2 == 0 else (28, 18, 8)
+            num_c = VP_FG
+
+        draw.rectangle([bx0, strip_y, bx1, strip_y + strip_h], fill=shade)
+
+        # Milestone dividers
+        if i % 10 == 0 and i > 0:
+            draw.line([(bx0, strip_y), (bx0, strip_y + strip_h)],
+                      fill=GOLD_BRIGHT, width=2)
+        elif i % 5 == 0 and i > 0:
+            draw.line([(bx0, strip_y), (bx0, strip_y + strip_h)],
+                      fill=GOLD_DIM, width=1)
+
+        center_text(draw, cx, cy, str(i), f_num, num_c)
+
+    # Redraw border on top
+    draw_rounded_rect(draw,
+                      (start_x - 14, strip_y - 12,
+                       start_x + total_w + 14, strip_y + strip_h + 12),
+                      radius=14, fill=None, outline=VP_FG, width=3)
+
+    # Label
+    draw.text((start_x - 80, strip_y + strip_h // 2 - 18),
+              "VP", font=f_lbl, fill=GOLD)
 
 
 # ---------------------------------------------------------------------------
 # Legend
 # ---------------------------------------------------------------------------
 def draw_legend(draw):
-    lx, ly = 80, H - 300
-    f_lbl = load_font(26, bold=True)
-    f_sm  = load_font(22)
+    lx = MAP_X + 20
+    ly = MAP_Y + MAP_H + 14
+    f_lbl = load_font(22, bold=True)
+    f_sm  = load_font(20)
 
     items = [
-        ("Canal + Rail route",  CANAL_COLOR,  "both"),
-        ("Rail-only route",     RAIL_COLOR,   "rail"),
-        ("Canal-only route",    CANAL_COLOR,  "canal"),
+        ("Canal + Rail", CANAL_COLOR, "both"),
+        ("Rail only",    RAIL_COLOR,  "rail"),
+        ("Canal only",   CANAL_COLOR, "canal"),
     ]
-
-    for i, (label, color, style) in enumerate(items):
-        x0 = lx
-        y  = ly + i * 44
+    for i, (lbl, clr, style) in enumerate(items):
+        x0 = lx + i * 360
+        y  = ly + 18
         x1 = x0 + 80
         if style == "both":
-            draw.line([(x0, y), (x1, y)], fill=CANAL_COLOR, width=4)
-            draw.line([(x0, y + 8), (x1, y + 8)], fill=RAIL_COLOR, width=3)
+            draw.line([(x0, y),     (x1, y)    ], fill=CANAL_COLOR, width=4)
+            draw.line([(x0, y + 9), (x1, y + 9)], fill=RAIL_COLOR,  width=3)
         elif style == "rail":
             draw_dashed_line(draw, x0, y, x1, y, RAIL_COLOR, 3, dash=10, gap=8)
         else:
             draw_dashed_line(draw, x0, y, x1, y, CANAL_COLOR, 4, dash=16, gap=6)
-        draw.text((x1 + 16, y - 12), label, font=f_sm, fill=(180, 170, 150))
+        draw.text((x1 + 12, y - 10), lbl, font=f_sm, fill=(170, 158, 132))
 
-    # Industry colour legend
-    ind_lx = lx + 500
-    f_ind  = load_font(22)
+    # Industry colour swatch row
+    ind_x = lx + 1200
     for i, (ind, color) in enumerate(IND_COLORS.items()):
-        ix = ind_lx + (i % 3) * 260
-        iy = ly + (i // 3) * 44
-        draw.rectangle([ix, iy - 10, ix + 20, iy + 10],
-                       fill=color, outline=(200, 190, 170), width=1)
-        draw.text((ix + 28, iy - 12), ind.title(), font=f_ind,
-                  fill=(180, 170, 150))
+        ix = ind_x + i * 220
+        iy = ly + 8
+        draw.ellipse([(ix, iy), (ix + 18, iy + 18)],
+                     fill=color, outline=(200, 190, 170), width=1)
+        draw.text((ix + 24, iy), ind.title(), font=f_sm, fill=(165, 152, 125))
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    print("Generating main_board.png ...")
-    img  = Image.new("RGB", (W, H), BG)
+    print("Generating premium main_board.png ...")
+
+    print("  Rendering background gradient + noise...")
+    img  = make_background()
     draw = ImageDraw.Draw(img)
 
-    # ---- Background texture lines ----
-    for y in range(0, H, 60):
-        draw.line([(0, y), (W, y)], fill=(46, 34, 22), width=1)
-    for x in range(0, W, 60):
-        draw.line([(x, 0), (x, H)], fill=(46, 34, 22), width=1)
+    print("  Drawing gold border...")
+    draw_gold_border(draw)
 
-    # ---- Outer border ----
-    border_clr = (120, 90, 45)
-    for t in range(6):
-        draw.rectangle([t, t, W - 1 - t, H - 1 - t], outline=border_clr)
-    draw.rectangle([14, 14, W - 15, H - 15], outline=GOLD, width=3)
+    print("  Drawing title...")
+    draw_title(draw)
 
-    # ---- Title ----
-    f_title    = load_font(110, bold=True)
-    f_subtitle = load_font(46)
-    center_text(draw, W // 2, 90, "BRASS: BIRMINGHAM", f_title, TITLE_COLOR)
-    center_text(draw, W // 2, 165, "Tabletop Simulator Prototype", f_subtitle,
-                (160, 140, 100))
+    print("  Drawing map frame...")
+    draw_map_frame(draw)
 
-    # ---- Map area label ----
-    map_x = 80
-    map_y = 200
-    map_w = 2160
-    map_h = H - 360
-    draw_rounded_rect(draw, (map_x, map_y, map_x + map_w, map_y + map_h),
-                      radius=16, fill=None, outline=PANEL_BORDER, width=2)
-
-    # ---- Routes (draw first, under cities) ----
     print("  Drawing routes...")
-    draw_routes(draw, CITIES)
+    draw_routes(draw)
 
-    # ---- Cities ----
     print("  Drawing cities...")
-    draw_cities(draw, CITIES)
+    draw_cities(draw)
 
-    # ---- Market panel ----
     print("  Drawing market panel...")
     draw_market_panel(draw)
 
-    # ---- Merchant panel ----
     print("  Drawing merchant panel...")
     draw_merchant_panel(draw)
 
-    # ---- Income track ----
     print("  Drawing income track...")
     draw_income_track(draw)
 
-    # ---- VP track ----
-    print("  Drawing VP track...")
-    draw_vp_track(img, draw)
+    print("  Drawing VP track (0-100)...")
+    draw_vp_track(draw)
 
-    # ---- Legend ----
     print("  Drawing legend...")
     draw_legend(draw)
 
-    # ---- Route type key labels ----
-    f_key = load_font(28, bold=True)
-    draw.text((2340, H - 200),
-              "Blue dashes = Canal   Gray dashes = Rail",
-              font=f_key, fill=(160, 150, 130))
-
-    # ---- Save ----
     out_path = OUT_DIR / "main_board.png"
-    img.save(out_path)
+    print(f"  Saving {out_path} ...")
+    img.save(str(out_path), optimize=False)
     print(f"\nDone. Saved to {out_path}")
 
 
