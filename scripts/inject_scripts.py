@@ -756,11 +756,8 @@ def main():
     n_cubes = lock_resource_cubes(mod_data)
     print(f"  Locked {n_cubes} resource cube(s).")
 
-    # 4g. Tag save-level snap points with city slot IDs
-    print()
-    print("Tagging snap points with city slot IDs...")
-    n_snaps = tag_snap_points(mod_data)
-    print(f"  Tagged {n_snaps} snap point(s).")
+    # NOTE: Snap point city mapping is hardcoded in SnapMap.lua, NOT via TTS Tags.
+    # TTS Tags restrict snapping to tagged objects only, breaking free snap behavior.
 
     # 5. Write output JSON
     print()
