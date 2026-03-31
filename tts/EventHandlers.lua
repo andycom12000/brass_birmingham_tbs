@@ -229,7 +229,7 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj)
             ObjectManager.moveTo(linkObj, SnapMap.getPositionForLink(snapInfo.id))
             ObjectManager.lock(linkObj)
 
-            local linkData = require("src/BoardData").links[snapInfo.id]
+            local linkData = BoardData.links[snapInfo.id]
             local cities   = linkData and linkData.cities or {"?", "?"}
 
             printToAll(Lang.format("player_linked", state.lang, {
