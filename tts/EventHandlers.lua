@@ -763,21 +763,21 @@ function rejectTile(obj, playerColor)
     _recentlyRejected[guid] = true
     Wait.time(function() _recentlyRejected[guid] = nil end, 2.0)
 
-    -- Try to return to player board
+    -- Return to player board (using GUID mapping)
+    local boardGUID = COLOR_TO_BOARD_GUID and COLOR_TO_BOARD_GUID[playerColor]
+    if boardGUID then
+        local board = getObjectFromGUID(boardGUID)
+        if board then
+            obj.setPositionSmooth(board.getPosition() + Vector(0, 2, 0))
+            return
+        end
+    end
+
+    -- Fallback: use ObjectManager player board
     local board = ObjectManager.getPlayerBoard(playerColor)
     if board then
         obj.setPositionSmooth(board.getPosition() + Vector(0, 2, 0))
         return
-    end
-
-    -- Fallback: use TTS Player hand zone
-    local ttsPlayer = Player[playerColor]
-    if ttsPlayer then
-        local handTransform = ttsPlayer.getHandTransform()
-        if handTransform then
-            obj.setPositionSmooth(handTransform.position + Vector(0, 2, 0))
-            return
-        end
     end
 
     -- Last resort: just lift it above where it was dropped

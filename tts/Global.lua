@@ -354,6 +354,14 @@ SPEND_TO_MONEY_MAP = {
     ["719019"] = "4d732a",  -- White spend → White money
 }
 
+-- Maps TTS seat color to player board GUID
+COLOR_TO_BOARD_GUID = {
+    ["Orange"] = "57ef3a",
+    ["Purple"] = "018be6",
+    ["Yellow"] = "535035",
+    ["White"]  = "fcfae7",
+}
+
 -- Maps TTS seat color to spend tracker GUID
 -- TTS seat colors in reference mod: White, Purple, Orange, Yellow
 COLOR_TO_SPEND_GUID = {
