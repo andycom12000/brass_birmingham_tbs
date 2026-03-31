@@ -1,0 +1,171 @@
+<h2>第二部分：元件系統設計（v3）</h2>
+<p class="subtitle">新增：每位玩家區域放置一張幫助卡（Reference Card）</p>
+
+<!-- ===== New: Reference Card ===== -->
+<div class="section">
+  <h3>新增元件：幫助卡（Reference Card）</h3>
+
+  <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+    <!-- Card mockup -->
+    <div style="width:220px; min-height:300px; background:linear-gradient(135deg, #2a1a0a, #3a2a1a); border:3px solid #8b7355; border-radius:8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); padding:12px; display:flex; flex-direction:column; gap:8px;">
+      <div style="text-align:center; font-size:13px; font-weight:bold; color:#d4c5a0; border-bottom:1px solid #5a4a3a; padding-bottom:6px;">📖 幫助卡 Reference Card</div>
+
+      <!-- Actions section -->
+      <div style="background:rgba(255,255,255,0.05); border-radius:4px; padding:8px;">
+        <div style="font-size:9px; font-weight:bold; color:#f0d060; margin-bottom:4px;">行動一覽 ACTIONS</div>
+        <div style="font-size:8px; color:#ccc; line-height:1.6;">
+          🏗️ <strong>Build</strong> — 建造建築<br>
+          🔗 <strong>Network</strong> — 建立連結<br>
+          🔧 <strong>Develop</strong> — 升級科技<br>
+          💰 <strong>Sell</strong> — 銷售產品<br>
+          🏦 <strong>Loan</strong> — 貸款 £30<br>
+          🔍 <strong>Scout</strong> — 偵查（棄牌換牌）
+        </div>
+      </div>
+
+      <!-- Build costs section -->
+      <div style="background:rgba(255,255,255,0.05); border-radius:4px; padding:8px;">
+        <div style="font-size:9px; font-weight:bold; color:#4ade80; margin-bottom:4px;">建造需求 BUILD</div>
+        <div style="font-size:8px; color:#ccc; line-height:1.6;">
+          打出地點卡或產業卡<br>
+          支付金錢 + 煤炭/鐵礦需求<br>
+          放置建築 Tile 至地圖
+        </div>
+      </div>
+
+      <!-- Sell section -->
+      <div style="background:rgba(255,255,255,0.05); border-radius:4px; padding:8px;">
+        <div style="font-size:9px; font-weight:bold; color:#3b82f6; margin-bottom:4px;">銷售 SELL</div>
+        <div style="font-size:8px; color:#ccc; line-height:1.6;">
+          需連結至商人 + 🍺 啤酒<br>
+          翻面建築 → 獲得收入/VP
+        </div>
+      </div>
+
+      <!-- Scoring section -->
+      <div style="background:rgba(255,255,255,0.05); border-radius:4px; padding:8px;">
+        <div style="font-size:9px; font-weight:bold; color:#e74c3c; margin-bottom:4px;">計分 SCORING</div>
+        <div style="font-size:8px; color:#ccc; line-height:1.6;">
+          已翻面建築 VP<br>
+          連結 VP（相鄰已翻面建築）
+        </div>
+      </div>
+
+      <!-- Turn structure -->
+      <div style="background:rgba(255,255,255,0.05); border-radius:4px; padding:8px;">
+        <div style="font-size:9px; font-weight:bold; color:#e8d0e8; margin-bottom:4px;">回合結構 TURN</div>
+        <div style="font-size:8px; color:#ccc; line-height:1.6;">
+          每回合執行 2 個行動<br>
+          每個行動打出 1 張牌<br>
+          回合結束補牌至手牌上限
+        </div>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div style="flex:1; min-width:250px;">
+      <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+        <div style="font-size:13px; font-weight:bold; color:#e8d0e8; margin-bottom:8px;">設計細節</div>
+        <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+          <li>每位玩家區域放置 <strong>1 張幫助卡</strong>，共 4 張</li>
+          <li>使用 TTS <strong>Custom Tile</strong>（2D 平面），鎖定位置</li>
+          <li>內容摘要：
+            <ul style="margin-top:4px;">
+              <li>6 種行動說明（Build / Network / Develop / Sell / Loan / Scout）</li>
+              <li>建造需求與費用</li>
+              <li>銷售流程</li>
+              <li>計分規則</li>
+              <li>回合結構</li>
+            </ul>
+          </li>
+          <li>支援<strong>中/英文切換</strong> — 腳本控制翻面顯示不同語言版本（正面英文、背面中文，或透過按鈕切換貼圖）</li>
+          <li>放置於玩家板旁邊，不干擾遊戲操作</li>
+        </ul>
+      </div>
+
+      <div style="background:#1a2a1a; border:1px solid #2a5a2a; border-radius:8px; padding:16px; margin-top:12px;">
+        <div style="font-size:13px; font-weight:bold; color:#4ade80; margin-bottom:8px;">多語言切換方式</div>
+        <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+          <li><strong>方案：正/背面雙語</strong> — 翻面（Flip）即可切換語言</li>
+          <li>正面 = 英文版、背面 = 繁體中文版</li>
+          <li>簡單直覺，不需額外腳本</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Updated Component Summary ===== -->
+<div class="section">
+  <h3>元件總覽（最終版）</h3>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <table style="width:100%; color:#ccc; font-size:12px; border-collapse:collapse;">
+      <tr style="border-bottom:1px solid #333;">
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">元件</th>
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">TTS 類型</th>
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">數量</th>
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">說明</th>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">主地圖板</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">1</td>
+        <td style="padding:6px;">含市場、商人區、計分軌、Snap Points</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">工業建築 Tiles</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">每人 ~20</td>
+        <td style="padding:6px;">6 種產業，可翻面</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">連結 Tiles</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">每人 14</td>
+        <td style="padding:6px;">運河(藍) / 鐵路(灰)</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">資源 Token</td>
+        <td style="padding:6px;">Custom Model (3D)</td>
+        <td style="padding:6px;">大量</td>
+        <td style="padding:6px;">煤炭球/鐵礦方塊/啤酒桶</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">卡牌</td>
+        <td style="padding:6px;">Deck / Card</td>
+        <td style="padding:6px;">~60</td>
+        <td style="padding:6px;">地點卡/產業卡/萬用卡</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">金錢</td>
+        <td style="padding:6px;">Custom Model (3D)</td>
+        <td style="padding:6px;">大量</td>
+        <td style="padding:6px;">£1 銅幣 / £5 銀幣 / £15 金幣</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">商人 Tiles</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">~12</td>
+        <td style="padding:6px;">依人數隨機設置</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">玩家板</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">4</td>
+        <td style="padding:6px;">各產業建築槽位 + Snap Points</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">計數器</td>
+        <td style="padding:6px;">XML UI Button</td>
+        <td style="padding:6px;">4</td>
+        <td style="padding:6px;">本回合花費 £，點按 +1/+5/+10</td>
+      </tr>
+      <tr style="background:#1a2a1a;">
+        <td style="padding:6px; color:#4ade80; font-weight:bold;">📖 幫助卡</td>
+        <td style="padding:6px; color:#4ade80;">Custom Tile (2D)</td>
+        <td style="padding:6px; color:#4ade80;">4</td>
+        <td style="padding:6px; color:#4ade80;">正面英文/背面中文，翻面切換語言</td>
+      </tr>
+    </table>
+  </div>
+</div>

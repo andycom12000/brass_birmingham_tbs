@@ -1,0 +1,208 @@
+<h2>第二部分：元件系統設計（Components）</h2>
+<p class="subtitle">Brass: Birmingham 所有遊戲元件的 TTS 呈現方式</p>
+
+<!-- ===== Section 1: Main Board ===== -->
+<div class="section">
+  <h3>1. 主地圖板（Main Board）</h3>
+  <div style="display:flex; gap:20px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:280px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+      <div style="font-size:13px; font-weight:bold; color:#e8d0e8; margin-bottom:8px;">呈現方式</div>
+      <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+        <li>單一 <strong>Custom Tile</strong>（大型平面物件）</li>
+        <li>正面貼圖：高解析度主地圖圖片（含城市、路線、市場、商人區、計分軌）</li>
+        <li>固定於桌面中央，鎖定位置（Locked）</li>
+        <li>使用 <strong>Snap Points</strong> 定義所有放置位置（城市建築格、連結路線、市場格）</li>
+      </ul>
+    </div>
+    <div style="flex:1; min-width:280px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+      <div style="font-size:13px; font-weight:bold; color:#e8d0e8; margin-bottom:8px;">Snap Points 配置</div>
+      <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+        <li><strong>城市建築格</strong> — 每個城市的每個建築槽位一個 Snap Point，附帶 tag 標記城市名和產業類型</li>
+        <li><strong>連結路線</strong> — 運河/鐵路路線放置點，tag 標記兩端城市</li>
+        <li><strong>煤炭/鐵礦市場格</strong> — 價格軌道上的每個位置</li>
+        <li><strong>商人 Tile 格</strong> — 商人區的放置位置</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Section 2: Industry Tiles ===== -->
+<div class="section">
+  <h3>2. 工業建築 Tiles</h3>
+  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+    <!-- Cotton -->
+    <div style="width:100px; height:70px; background:#e8e8e8; border:2px solid #aaa; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="font-size:10px; font-weight:bold; color:#333;">🏭 棉花廠</div>
+      <div style="font-size:8px; color:#666;">Cotton Mill</div>
+      <div style="font-size:7px; color:#999; margin-top:2px;">Lv 1-4</div>
+    </div>
+    <!-- Iron -->
+    <div style="width:100px; height:70px; background:#d4a574; border:2px solid #a0522d; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="font-size:10px; font-weight:bold; color:#3a2a1a;">⚒️ 鐵工廠</div>
+      <div style="font-size:8px; color:#5a4a3a;">Iron Works</div>
+      <div style="font-size:7px; color:#7a6a5a; margin-top:2px;">Lv 1-4</div>
+    </div>
+    <!-- Coal -->
+    <div style="width:100px; height:70px; background:#4a4a4a; border:2px solid #666; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="font-size:10px; font-weight:bold; color:#eee;">⛏️ 煤礦</div>
+      <div style="font-size:8px; color:#aaa;">Coal Mine</div>
+      <div style="font-size:7px; color:#888; margin-top:2px;">Lv 1-4</div>
+    </div>
+    <!-- Brewery -->
+    <div style="width:100px; height:70px; background:#d4a017; border:2px solid #b8860b; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="font-size:10px; font-weight:bold; color:#fff;">🍺 釀酒廠</div>
+      <div style="font-size:8px; color:#ffe0a0;">Brewery</div>
+      <div style="font-size:7px; color:#ffe0a0; margin-top:2px;">Lv 1-4</div>
+    </div>
+    <!-- Manufacturer -->
+    <div style="width:100px; height:70px; background:#8b5cf6; border:2px solid #7c3aed; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="font-size:10px; font-weight:bold; color:#fff;">🔧 製造廠</div>
+      <div style="font-size:8px; color:#ddd0ff;">Manufacturer</div>
+      <div style="font-size:7px; color:#ddd0ff; margin-top:2px;">Lv 1-8</div>
+    </div>
+    <!-- Pottery -->
+    <div style="width:100px; height:70px; background:#dc7b3b; border:2px solid #c0652a; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="font-size:10px; font-weight:bold; color:#fff;">🏺 陶瓷廠</div>
+      <div style="font-size:8px; color:#ffe0c0;">Pottery</div>
+      <div style="font-size:7px; color:#ffe0c0; margin-top:2px;">Lv 1-5</div>
+    </div>
+  </div>
+
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <div style="font-size:13px; font-weight:bold; color:#e8d0e8; margin-bottom:8px;">呈現方式</div>
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li>每個 Tile 用 <strong>Custom Tile</strong>（2D 平面），正面為建築圖片，背面為未翻面狀態</li>
+      <li>翻面（Flip）代表建築已售出/已消耗完資源</li>
+      <li>每位玩家的建築 Tile 堆放在各自的玩家區域，依產業類型分疊</li>
+      <li>腳本追蹤每個 Tile 的 <strong>等級（Level）、產業類型、擁有者、是否已翻面</strong></li>
+      <li>Tile 上的資源方塊（煤炭/鐵礦/啤酒）用 3D 小物件放在 Tile 上方</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== Section 3: Link Tiles ===== -->
+<div class="section">
+  <h3>3. 連結 Tiles（Canal / Rail）</h3>
+  <div style="display:flex; gap:12px; margin-bottom:16px;">
+    <div style="width:120px; height:50px; background:#3b82f6; border:2px solid #2563eb; border-radius:20px; display:flex; align-items:center; justify-content:center;">
+      <div style="font-size:11px; font-weight:bold; color:#fff;">🚢 運河 Canal</div>
+    </div>
+    <div style="width:120px; height:50px; background:#6b7280; border:2px solid #4b5563; border-radius:20px; display:flex; align-items:center; justify-content:center;">
+      <div style="font-size:11px; font-weight:bold; color:#fff;">🚂 鐵路 Rail</div>
+    </div>
+  </div>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li>2D Custom Tile，橢圓或長條形，分運河（藍）和鐵路（灰）兩種</li>
+      <li>放置於地圖上兩城市之間的連結 Snap Point</li>
+      <li>每位玩家各有 14 個連結 Tile（對應玩家顏色）</li>
+      <li>時代轉換時，腳本自動移除所有運河 Tile</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== Section 4: Resource Tokens (3D) ===== -->
+<div class="section">
+  <h3>4. 資源 Token（3D 元素）</h3>
+  <div style="display:flex; gap:16px; margin-bottom:16px;">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+      <div style="width:30px; height:30px; background:#222; border-radius:50%; border:2px solid #555; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>
+      <div style="font-size:10px; color:#ccc; font-weight:bold;">煤炭</div>
+      <div style="font-size:8px; color:#999;">3D 球體</div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+      <div style="width:28px; height:28px; background:#d4740e; border-radius:4px; border:2px solid #e8a050; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>
+      <div style="font-size:10px; color:#ccc; font-weight:bold;">鐵礦</div>
+      <div style="font-size:8px; color:#999;">3D 方塊</div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+      <div style="width:20px; height:32px; background:#d4a017; border-radius:4px 4px 2px 2px; border:2px solid #b8860b; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>
+      <div style="font-size:10px; color:#ccc; font-weight:bold;">啤酒</div>
+      <div style="font-size:8px; color:#999;">3D 酒桶</div>
+    </div>
+  </div>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li><strong>煤炭</strong>：黑色 3D 球體（TTS 內建 Custom Model 或 Figurine）</li>
+      <li><strong>鐵礦</strong>：橘色 3D 方塊</li>
+      <li><strong>啤酒</strong>：金色 3D 小酒桶</li>
+      <li>放在建築 Tile 上方代表該建築的產出</li>
+      <li>從建築消耗時移至市場或移除</li>
+      <li>公共資源區為溢出的備用池</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== Section 5: Cards ===== -->
+<div class="section">
+  <h3>5. 卡牌（Cards）</h3>
+  <div style="display:flex; gap:12px; margin-bottom:16px;">
+    <div style="width:70px; height:100px; background:#2a1a0a; border:2px solid #8b7355; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">
+      <div style="font-size:9px; font-weight:bold; color:#d4c5a0;">🏙️</div>
+      <div style="font-size:8px; color:#d4c5a0; font-weight:bold;">地點卡</div>
+      <div style="font-size:7px; color:#a89870;">Location</div>
+    </div>
+    <div style="width:70px; height:100px; background:#1a0a2a; border:2px solid #8b5a8b; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">
+      <div style="font-size:9px; font-weight:bold; color:#e8d0e8;">🏭</div>
+      <div style="font-size:8px; color:#e8d0e8; font-weight:bold;">產業卡</div>
+      <div style="font-size:7px; color:#d0b8d0;">Industry</div>
+    </div>
+    <div style="width:70px; height:100px; background:#0a1a2a; border:2px solid #3498db; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">
+      <div style="font-size:9px; font-weight:bold; color:#ddeeff;">🃏</div>
+      <div style="font-size:8px; color:#ddeeff; font-weight:bold;">萬用卡</div>
+      <div style="font-size:7px; color:#99bbdd;">Wild</div>
+    </div>
+  </div>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li>使用 TTS 內建 <strong>Deck / Card</strong> 物件</li>
+      <li>正面貼圖顯示卡牌內容，背面統一花紋</li>
+      <li>抽牌區放在主地圖板上，手牌區在各玩家區域</li>
+      <li>支援自動洗牌、自動發牌（遊戲設置時）</li>
+      <li>棄牌堆在抽牌區旁</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== Section 6: Money ===== -->
+<div class="section">
+  <h3>6. 金錢（Money）</h3>
+  <div style="display:flex; gap:10px; margin-bottom:16px;">
+    <div style="width:45px; height:45px; background:linear-gradient(135deg,#c9a84c,#f0d78c); border:2px solid #a08030; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; color:#5a4000; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">£1</div>
+    <div style="width:45px; height:45px; background:linear-gradient(135deg,#b8b8b8,#e8e8e8); border:2px solid #888; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; color:#444; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">£5</div>
+    <div style="width:45px; height:45px; background:linear-gradient(135deg,#d4740e,#f0a050); border:2px solid #b05a00; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; color:#fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">£10</div>
+    <div style="width:45px; height:45px; background:linear-gradient(135deg,#6b3aaa,#9b6aff); border:2px solid #5a2a8a; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; color:#fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">£50</div>
+  </div>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li>2D Custom Token（圓形硬幣），面額：£1、£5、£10、£50</li>
+      <li>可堆疊，放在各玩家區域</li>
+      <li>腳本在貸款/收入階段自動發放對應金額</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== Section 7: Merchant Tiles ===== -->
+<div class="section">
+  <h3>7. 商人 Tiles（Merchant Tiles）</h3>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li>2D Custom Tile，放置於主地圖商人區</li>
+      <li>遊戲設置時依人數隨機抽取並放置</li>
+      <li>顯示可接受的產業類型和啤酒需求</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== Section 8: Player Board ===== -->
+<div class="section">
+  <h3>8. 玩家板（Player Board）</h3>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li>每位玩家一塊 <strong>Custom Tile</strong>，上面印有各產業的建築槽位</li>
+      <li>建築 Tile 從玩家板上取出放到地圖上（代表建造）</li>
+      <li>使用 Snap Points 讓 Tile 整齊排列</li>
+      <li>玩家板鎖定在各自角落位置</li>
+    </ul>
+  </div>
+</div>

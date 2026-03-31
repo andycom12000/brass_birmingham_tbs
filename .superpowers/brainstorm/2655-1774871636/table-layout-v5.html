@@ -1,0 +1,131 @@
+<h2>第一部分：遊戲桌面佈局（v5）</h2>
+<p class="subtitle">每位玩家區域旁增設個人計數器</p>
+
+<div class="mockup">
+  <div class="mockup-header">桌面俯視圖 — Brass: Birmingham（v5）</div>
+  <div class="mockup-body" style="background:#2a3a2a; padding:30px; min-height:580px; position:relative; font-family:sans-serif;">
+
+    <!-- Center group: Main Board + Public Resources -->
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:flex; gap:12px; align-items:center;">
+
+      <!-- Main Board -->
+      <div style="width:440px; height:360px; background:#d4c5a0; border:3px solid #8b7355; border-radius:8px; box-shadow: 0 6px 16px rgba(0,0,0,0.5); overflow:hidden; position:relative;">
+        <div style="position:absolute; top:6px; left:50%; transform:translateX(-50%); font-size:14px; font-weight:bold; color:#3a2a1a; letter-spacing:1px;">BRASS: BIRMINGHAM</div>
+
+        <!-- Map Area -->
+        <div style="position:absolute; top:28px; left:12px; width:265px; height:285px; background:#c8b890; border:2px solid #a89870; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+          <div style="font-size:14px; font-weight:bold; color:#3a2a1a;">🗺️ 地圖網路區</div>
+          <div style="font-size:10px; color:#5a4a3a; margin-top:4px;">城市 · 連結路線 · 建築位置</div>
+        </div>
+
+        <!-- Right side of board -->
+        <div style="position:absolute; top:28px; right:10px; width:140px; height:285px; display:flex; flex-direction:column; gap:4px;">
+          <div style="flex:1; background:#4a4a4a; border:2px solid #666; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+            <div style="font-size:10px; font-weight:bold; color:#eee;">⚫ 煤炭市場</div>
+            <div style="font-size:7px; color:#aaa;">Coal Market</div>
+          </div>
+          <div style="flex:1; background:#8b4513; border:2px solid #a0522d; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+            <div style="font-size:10px; font-weight:bold; color:#ffe0b2;">🟠 鐵礦市場</div>
+            <div style="font-size:7px; color:#ddd;">Iron Market</div>
+          </div>
+          <div style="flex:1; background:#6b3a6b; border:2px solid #8b5a8b; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+            <div style="font-size:10px; font-weight:bold; color:#e8d0e8;">🏪 商人區</div>
+            <div style="font-size:7px; color:#d0b8d0;">Merchant Tiles</div>
+          </div>
+          <div style="flex:0.5; display:flex; gap:4px;">
+            <div style="flex:1; background:#1a1a2e; border:2px solid #444; border-radius:4px; display:flex; align-items:center; justify-content:center;">
+              <div style="font-size:7px; font-weight:bold; color:#ccc;">🃏 抽牌</div>
+            </div>
+            <div style="flex:1.5; background:rgba(26,26,46,0.7); border:2px solid #444; border-radius:4px; display:flex; align-items:center; justify-content:center;">
+              <div style="font-size:7px; font-weight:bold; color:#ccc;">📊 計分軌</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Public Resources -->
+      <div style="display:flex; flex-direction:column; gap:8px; align-items:center;">
+        <div style="font-size:9px; font-weight:bold; color:#ccc; letter-spacing:1px;">公共資源區</div>
+        <div style="width:75px; height:78px; background:#d4a017; border:2px solid #b8860b; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+          <div style="font-size:20px;">🍺</div>
+          <div style="font-size:9px; color:#fff; font-weight:bold;">啤酒</div>
+        </div>
+        <div style="width:75px; height:78px; background:#3a3a3a; border:2px solid #555; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+          <div style="font-size:20px;">⚫</div>
+          <div style="font-size:9px; color:#eee; font-weight:bold;">煤炭</div>
+        </div>
+        <div style="width:75px; height:78px; background:#8b4513; border:2px solid #a0522d; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+          <div style="font-size:20px;">🟠</div>
+          <div style="font-size:9px; color:#ffe0b2; font-weight:bold;">鐵礦</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Player 1 (bottom-left) + Counter ===== -->
+    <div style="position:absolute; bottom:2%; left:2%; display:flex; gap:8px; align-items:flex-end;">
+      <div style="width:170px; height:82px; background:#c0392b; border:2px solid #e74c3c; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.95; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:12px; font-weight:bold; color:#fff;">🔴 玩家 1</div>
+        <div style="font-size:8px; color:#fdd; margin-top:2px;">玩家板 · 建築堆 · 手牌 · £</div>
+      </div>
+      <div style="width:70px; height:82px; background:#1a1a1a; border:2px solid #e74c3c; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:7px; color:#e74c3c; font-weight:bold; letter-spacing:0.5px;">計數器</div>
+        <div style="font-size:8px; color:#fdd;">💰 <span style="color:#fff; font-weight:bold;">£30</span></div>
+        <div style="font-size:8px; color:#fdd;">📈 <span style="color:#fff; font-weight:bold;">Lv 10</span></div>
+        <div style="font-size:8px; color:#fdd;">⭐ <span style="color:#fff; font-weight:bold;">0 VP</span></div>
+      </div>
+    </div>
+
+    <!-- ===== Player 2 (bottom-right) + Counter ===== -->
+    <div style="position:absolute; bottom:2%; right:2%; display:flex; gap:8px; align-items:flex-end; flex-direction:row-reverse;">
+      <div style="width:170px; height:82px; background:#2980b9; border:2px solid #3498db; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.95; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:12px; font-weight:bold; color:#fff;">🔵 玩家 2</div>
+        <div style="font-size:8px; color:#ddeeff; margin-top:2px;">玩家板 · 建築堆 · 手牌 · £</div>
+      </div>
+      <div style="width:70px; height:82px; background:#1a1a1a; border:2px solid #3498db; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:7px; color:#3498db; font-weight:bold; letter-spacing:0.5px;">計數器</div>
+        <div style="font-size:8px; color:#ddeeff;">💰 <span style="color:#fff; font-weight:bold;">£30</span></div>
+        <div style="font-size:8px; color:#ddeeff;">📈 <span style="color:#fff; font-weight:bold;">Lv 10</span></div>
+        <div style="font-size:8px; color:#ddeeff;">⭐ <span style="color:#fff; font-weight:bold;">0 VP</span></div>
+      </div>
+    </div>
+
+    <!-- ===== Player 3 (top-left) + Counter ===== -->
+    <div style="position:absolute; top:2%; left:2%; display:flex; gap:8px; align-items:flex-start;">
+      <div style="width:170px; height:82px; background:#f39c12; border:2px solid #f1c40f; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.95; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:12px; font-weight:bold; color:#fff;">🟡 玩家 3</div>
+        <div style="font-size:8px; color:#fff8e0; margin-top:2px;">玩家板 · 建築堆 · 手牌 · £</div>
+      </div>
+      <div style="width:70px; height:82px; background:#1a1a1a; border:2px solid #f1c40f; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:7px; color:#f1c40f; font-weight:bold; letter-spacing:0.5px;">計數器</div>
+        <div style="font-size:8px; color:#fff8e0;">💰 <span style="color:#fff; font-weight:bold;">£30</span></div>
+        <div style="font-size:8px; color:#fff8e0;">📈 <span style="color:#fff; font-weight:bold;">Lv 10</span></div>
+        <div style="font-size:8px; color:#fff8e0;">⭐ <span style="color:#fff; font-weight:bold;">0 VP</span></div>
+      </div>
+    </div>
+
+    <!-- ===== Player 4 (top-right) + Counter ===== -->
+    <div style="position:absolute; top:2%; right:2%; display:flex; gap:8px; align-items:flex-start; flex-direction:row-reverse;">
+      <div style="width:170px; height:82px; background:#27ae60; border:2px solid #2ecc71; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.95; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:12px; font-weight:bold; color:#fff;">🟢 玩家 4</div>
+        <div style="font-size:8px; color:#e0ffe0; margin-top:2px;">玩家板 · 建築堆 · 手牌 · £</div>
+      </div>
+      <div style="width:70px; height:82px; background:#1a1a1a; border:2px solid #2ecc71; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size:7px; color:#2ecc71; font-weight:bold; letter-spacing:0.5px;">計數器</div>
+        <div style="font-size:8px; color:#e0ffe0;">💰 <span style="color:#fff; font-weight:bold;">£30</span></div>
+        <div style="font-size:8px; color:#e0ffe0;">📈 <span style="color:#fff; font-weight:bold;">Lv 10</span></div>
+        <div style="font-size:8px; color:#e0ffe0;">⭐ <span style="color:#fff; font-weight:bold;">0 VP</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <h3>計數器設計</h3>
+  <ul style="color:#ccc; font-size:14px; line-height:1.8;">
+    <li>每位玩家旁邊配置一個<strong>個人計數器面板</strong>，邊框顏色對應玩家色</li>
+    <li>顯示三項關鍵資訊：<strong>💰 金錢（£）</strong>、<strong>📈 收入等級（Income Level）</strong>、<strong>⭐ 勝利分數（VP）</strong></li>
+    <li>計數器由腳本自動更新，玩家不需手動調整</li>
+    <li>計數器位置：內側靠近地圖方向（左側玩家在右邊、右側玩家在左邊）</li>
+  </ul>
+</div>

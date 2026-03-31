@@ -1,0 +1,117 @@
+<h2>第一部分：遊戲桌面佈局（修正版）</h2>
+<p class="subtitle">忠於原版 — 市場、商人區、抽牌區、計分軌皆整合於主地圖板上</p>
+
+<div class="mockup">
+  <div class="mockup-header">桌面俯視圖 — Brass: Birmingham（修正版）</div>
+  <div class="mockup-body" style="background:#2a3a2a; padding:30px; min-height:550px; position:relative; font-family:sans-serif;">
+
+    <!-- Main Board (large, central, includes everything) -->
+    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:500px; height:380px; background:#d4c5a0; border:3px solid #8b7355; border-radius:8px; box-shadow: 0 6px 16px rgba(0,0,0,0.5); overflow:hidden;">
+
+      <!-- Board Title -->
+      <div style="position:absolute; top:6px; left:50%; transform:translateX(-50%); font-size:14px; font-weight:bold; color:#3a2a1a; letter-spacing:1px;">BRASS: BIRMINGHAM</div>
+
+      <!-- Map Area (center-left) -->
+      <div style="position:absolute; top:28px; left:12px; width:300px; height:300px; background:#c8b890; border:2px solid #a89870; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="font-size:15px; font-weight:bold; color:#3a2a1a;">🗺️ 地圖網路區</div>
+        <div style="font-size:10px; color:#5a4a3a; margin-top:4px;">城市 · 連結路線 · 建築位置</div>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; justify-content:center; padding:0 10px;">
+          <div style="background:#b8a878; padding:3px 8px; border-radius:3px; font-size:9px; color:#4a3a2a;">Birmingham</div>
+          <div style="background:#b8a878; padding:3px 8px; border-radius:3px; font-size:9px; color:#4a3a2a;">Coventry</div>
+          <div style="background:#b8a878; padding:3px 8px; border-radius:3px; font-size:9px; color:#4a3a2a;">Dudley</div>
+          <div style="background:#b8a878; padding:3px 8px; border-radius:3px; font-size:9px; color:#4a3a2a;">Walsall</div>
+          <div style="background:#b8a878; padding:3px 8px; border-radius:3px; font-size:9px; color:#4a3a2a;">Wolverhampton</div>
+          <div style="background:#b8a878; padding:3px 8px; border-radius:3px; font-size:9px; color:#4a3a2a;">Coalbrookdale</div>
+        </div>
+      </div>
+
+      <!-- Right side panel (markets, merchants, etc.) -->
+      <!-- Coal Market -->
+      <div style="position:absolute; top:28px; right:12px; width:160px; height:80px; background:#4a4a4a; border:2px solid #666; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="font-size:11px; font-weight:bold; color:#eee;">⚫ 煤炭市場</div>
+        <div style="font-size:8px; color:#aaa; margin-top:2px;">Coal Market · 價格 £1~£8</div>
+        <div style="display:flex; gap:3px; margin-top:4px;">
+          <div style="width:12px;height:12px;background:#222;border-radius:50%;border:1px solid #555;"></div>
+          <div style="width:12px;height:12px;background:#222;border-radius:50%;border:1px solid #555;"></div>
+          <div style="width:12px;height:12px;background:#333;border-radius:50%;border:1px solid #555;opacity:0.4;"></div>
+          <div style="width:12px;height:12px;background:#333;border-radius:50%;border:1px solid #555;opacity:0.4;"></div>
+        </div>
+      </div>
+
+      <!-- Iron Market -->
+      <div style="position:absolute; top:118px; right:12px; width:160px; height:80px; background:#8b4513; border:2px solid #a0522d; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="font-size:11px; font-weight:bold; color:#ffe0b2;">🟠 鐵礦市場</div>
+        <div style="font-size:8px; color:#ddd; margin-top:2px;">Iron Market · 價格 £1~£6</div>
+        <div style="display:flex; gap:3px; margin-top:4px;">
+          <div style="width:12px;height:12px;background:#d4740e;border-radius:2px;border:1px solid #e8a050;"></div>
+          <div style="width:12px;height:12px;background:#d4740e;border-radius:2px;border:1px solid #e8a050;"></div>
+          <div style="width:12px;height:12px;background:#d4740e;border-radius:2px;border:1px solid #e8a050;opacity:0.4;"></div>
+        </div>
+      </div>
+
+      <!-- Merchant Area -->
+      <div style="position:absolute; top:208px; right:12px; width:160px; height:70px; background:#6b3a6b; border:2px solid #8b5a8b; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="font-size:11px; font-weight:bold; color:#e8d0e8;">🏪 商人區</div>
+        <div style="font-size:8px; color:#d0b8d0; margin-top:2px;">Merchant Tiles</div>
+      </div>
+
+      <!-- Draw Deck + Discard -->
+      <div style="position:absolute; bottom:12px; right:100px; width:75px; height:48px; background:#1a1a2e; border:2px solid #444; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="font-size:9px; font-weight:bold; color:#ccc;">🃏 抽牌區</div>
+        <div style="font-size:7px; color:#999;">Draw Deck</div>
+      </div>
+
+      <!-- Score / Turn Track -->
+      <div style="position:absolute; bottom:12px; left:12px; width:230px; height:48px; background:rgba(26,26,46,0.7); border:2px solid #444; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="font-size:9px; font-weight:bold; color:#ccc;">📊 計分軌 · 回合順序 · 收入軌</div>
+        <div style="font-size:7px; color:#999;">VP Track · Turn Order · Income</div>
+      </div>
+
+    </div>
+
+    <!-- Player 1 (bottom-left) -->
+    <div style="position:absolute; bottom:3%; left:2%; width:180px; height:90px; background:#c0392b; border:2px solid #e74c3c; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.9; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+      <div style="font-size:12px; font-weight:bold; color:#fff;">🔴 玩家 1</div>
+      <div style="font-size:9px; color:#fdd; margin-top:2px;">玩家板 · 建築 Tile 堆</div>
+      <div style="font-size:9px; color:#fdd;">手牌 · £ 金錢</div>
+    </div>
+
+    <!-- Player 2 (bottom-right) -->
+    <div style="position:absolute; bottom:3%; right:2%; width:180px; height:90px; background:#2980b9; border:2px solid #3498db; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.9; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+      <div style="font-size:12px; font-weight:bold; color:#fff;">🔵 玩家 2</div>
+      <div style="font-size:9px; color:#ddeeff; margin-top:2px;">玩家板 · 建築 Tile 堆</div>
+      <div style="font-size:9px; color:#ddeeff;">手牌 · £ 金錢</div>
+    </div>
+
+    <!-- Player 3 (top-left) -->
+    <div style="position:absolute; top:3%; left:2%; width:180px; height:90px; background:#f39c12; border:2px solid #f1c40f; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.9; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+      <div style="font-size:12px; font-weight:bold; color:#fff;">🟡 玩家 3</div>
+      <div style="font-size:9px; color:#fff8e0; margin-top:2px;">玩家板 · 建築 Tile 堆</div>
+      <div style="font-size:9px; color:#fff8e0;">手牌 · £ 金錢</div>
+    </div>
+
+    <!-- Player 4 (top-right) -->
+    <div style="position:absolute; top:3%; right:2%; width:180px; height:90px; background:#27ae60; border:2px solid #2ecc71; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-direction:column; opacity:0.9; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+      <div style="font-size:12px; font-weight:bold; color:#fff;">🟢 玩家 4</div>
+      <div style="font-size:9px; color:#e0ffe0; margin-top:2px;">玩家板 · 建築 Tile 堆</div>
+      <div style="font-size:9px; color:#e0ffe0;">手牌 · £ 金錢</div>
+    </div>
+
+    <!-- Wild Beer Supply (near board) -->
+    <div style="position:absolute; top:50%; left:14%; transform:translateY(-50%); width:60px; height:50px; background:#d4a017; border:2px solid #b8860b; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-direction:column; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
+      <div style="font-size:16px;">🍺</div>
+      <div style="font-size:7px; color:#fff; font-weight:bold;">公共啤酒</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <h3>修正重點</h3>
+  <ul style="color:#ccc; font-size:14px; line-height:1.8;">
+    <li><strong>主地圖板整合所有公共元素</strong> — 煤炭市場、鐵礦市場、商人區、抽牌區、計分/回合軌全部在同一塊板上，忠於原版設計</li>
+    <li><strong>四角</strong>：玩家區域保持不變 — 各自的玩家板、建築 tile 堆、手牌、金錢</li>
+    <li><strong>公共啤酒供應</strong>：放置於主地圖旁（地圖板外的獨立小區域）</li>
+    <li>主地圖板使用一張完整的高解析度貼圖，包含所有印刷內容</li>
+  </ul>
+</div>

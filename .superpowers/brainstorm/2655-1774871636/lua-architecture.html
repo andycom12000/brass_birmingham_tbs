@@ -1,0 +1,235 @@
+<h2>第三部分：Lua 腳本架構與自動化功能</h2>
+<p class="subtitle">集中式 Global Script + require 模組化</p>
+
+<!-- ===== Module Architecture ===== -->
+<div class="section">
+  <h3>1. 模組架構</h3>
+  <div style="background:#0d1117; border:1px solid #333; border-radius:8px; padding:20px; font-family:monospace;">
+    <div style="font-size:11px; color:#7ee787; margin-bottom:12px;">-- Global Script 模組結構</div>
+    <div style="font-size:11px; color:#ccc; line-height:2.2;">
+      <div style="color:#ff7b72;">Global.lua</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── GameState.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 遊戲狀態管理（玩家資料、回合、時代、分數）</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── Setup.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 自動設置（依人數配置地圖、洗牌、發錢）</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── TurnManager.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 回合流程、行動順序、花費追蹤、順序排序</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── Actions.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 6 種行動邏輯（Build/Network/Develop/Sell/Loan/Scout）</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── Validation.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 合法行動判斷、高亮提示可用位置</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── Market.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 煤炭/鐵礦市場價格管理、資源購買</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── Scoring.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 中期計分（運河時代結束）、終局計分</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── EraTransition.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 時代轉換（清除運河/Lv1 建築、重新洗牌）</div>
+      <div style="padding-left:20px; color:#79c0ff;">├── SaveLoad.lua</div>
+      <div style="padding-left:40px; color:#888;">│&nbsp;&nbsp; 序列化/反序列化遊戲狀態</div>
+      <div style="padding-left:20px; color:#79c0ff;">└── Lang.lua</div>
+      <div style="padding-left:40px; color:#888;">&nbsp;&nbsp;&nbsp; 多語言文字管理（英文/繁體中文）</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GameState ===== -->
+<div class="section">
+  <h3>2. GameState 核心資料結構</h3>
+  <div style="background:#0d1117; border:1px solid #333; border-radius:8px; padding:20px; font-family:monospace; font-size:11px; color:#ccc; line-height:1.8;">
+    <div style="color:#7ee787;">-- GameState.lua 核心資料</div>
+    <div style="color:#ff7b72;">GameState</div> = {
+    <div style="padding-left:20px;">
+      <span style="color:#79c0ff;">era</span> = <span style="color:#a5d6ff;">"canal"</span>,&nbsp;&nbsp;<span style="color:#888;">-- "canal" | "rail"</span><br>
+      <span style="color:#79c0ff;">round</span> = <span style="color:#a5d6ff;">1</span>,<br>
+      <span style="color:#79c0ff;">currentPlayerIdx</span> = <span style="color:#a5d6ff;">1</span>,<br>
+      <span style="color:#79c0ff;">actionsRemaining</span> = <span style="color:#a5d6ff;">2</span>,&nbsp;&nbsp;<span style="color:#888;">-- 每回合 2 個行動</span><br>
+      <br>
+      <span style="color:#79c0ff;">players</span> = {<br>
+      <div style="padding-left:20px;">
+        [<span style="color:#a5d6ff;">"Red"</span>] = {<br>
+        <div style="padding-left:20px;">
+          <span style="color:#79c0ff;">money</span> = <span style="color:#a5d6ff;">30</span>,<br>
+          <span style="color:#79c0ff;">income</span> = <span style="color:#a5d6ff;">10</span>,<br>
+          <span style="color:#79c0ff;">vp</span> = <span style="color:#a5d6ff;">0</span>,<br>
+          <span style="color:#79c0ff;">spentThisRound</span> = <span style="color:#a5d6ff;">0</span>,<br>
+          <span style="color:#79c0ff;">links</span> = <span style="color:#a5d6ff;">14</span>,<br>
+          <span style="color:#79c0ff;">buildings</span> = { ... },<br>
+        </div>
+        },<br>
+      </div>
+      },<br>
+      <br>
+      <span style="color:#79c0ff;">turnOrder</span> = { <span style="color:#a5d6ff;">"Red"</span>, <span style="color:#a5d6ff;">"Blue"</span>, <span style="color:#a5d6ff;">"Yellow"</span>, <span style="color:#a5d6ff;">"Green"</span> },<br>
+      <br>
+      <span style="color:#79c0ff;">board</span> = {<br>
+      <div style="padding-left:20px;">
+        <span style="color:#79c0ff;">cities</span> = { ... },&nbsp;&nbsp;<span style="color:#888;">-- 城市建築格狀態</span><br>
+        <span style="color:#79c0ff;">links</span> = { ... },&nbsp;&nbsp;<span style="color:#888;">-- 連結路線狀態</span><br>
+      </div>
+      },<br>
+      <br>
+      <span style="color:#79c0ff;">coalMarket</span> = { <span style="color:#79c0ff;">supply</span> = <span style="color:#a5d6ff;">13</span> },<br>
+      <span style="color:#79c0ff;">ironMarket</span> = { <span style="color:#79c0ff;">supply</span> = <span style="color:#a5d6ff;">8</span> },<br>
+    </div>
+    }
+  </div>
+</div>
+
+<!-- ===== Automation Features ===== -->
+<div class="section">
+  <h3>3. 自動化功能</h3>
+
+  <div style="display:flex; gap:12px; flex-wrap:wrap;">
+
+    <!-- Auto Setup -->
+    <div style="flex:1; min-width:220px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:14px;">
+      <div style="font-size:12px; font-weight:bold; color:#4ade80; margin-bottom:8px;">🎲 自動設置 Setup</div>
+      <ul style="color:#ccc; font-size:11px; line-height:1.8; margin:0; padding-left:14px;">
+        <li>依玩家人數調整地圖（移除城市/連結）</li>
+        <li>隨機抽取商人 Tiles 並放置</li>
+        <li>洗牌並發牌（8 張/人）</li>
+        <li>發放起始金額 £30</li>
+        <li>放置煤炭/鐵礦至市場</li>
+        <li>隨機決定起始玩家順序</li>
+      </ul>
+    </div>
+
+    <!-- Turn Management -->
+    <div style="flex:1; min-width:220px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:14px;">
+      <div style="font-size:12px; font-weight:bold; color:#3b82f6; margin-bottom:8px;">🔄 回合管理 TurnManager</div>
+      <ul style="color:#ccc; font-size:11px; line-height:1.8; margin:0; padding-left:14px;">
+        <li>追蹤當前行動玩家</li>
+        <li>每回合 2 個行動，每個行動打 1 張牌</li>
+        <li>自動累計花費金額至計數器</li>
+        <li>回合結束自動補牌</li>
+        <li>全部玩家完成後依花費排序</li>
+        <li>計數器歸零，進入下回合</li>
+      </ul>
+    </div>
+
+    <!-- Validation & Highlights -->
+    <div style="flex:1; min-width:220px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:14px;">
+      <div style="font-size:12px; font-weight:bold; color:#f0d060; margin-bottom:8px;">✅ 合法行動提示 Validation</div>
+      <ul style="color:#ccc; font-size:11px; line-height:1.8; margin:0; padding-left:14px;">
+        <li>Build：高亮可建造的城市格位</li>
+        <li>Network：高亮可連結的路線</li>
+        <li>Sell：高亮可銷售的建築</li>
+        <li>Develop：高亮可升級的產業</li>
+        <li>使用 <strong>highlightOn()</strong> 物件發光提示</li>
+        <li>非法操作彈出提示訊息</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;">
+
+    <!-- Resource Auto-deduction -->
+    <div style="flex:1; min-width:220px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:14px;">
+      <div style="font-size:12px; font-weight:bold; color:#e74c3c; margin-bottom:8px;">⚡ 資源自動扣除 Market</div>
+      <ul style="color:#ccc; font-size:11px; line-height:1.8; margin:0; padding-left:14px;">
+        <li>建造時自動計算煤炭/鐵礦需求</li>
+        <li>優先從相連建築取得（免費）</li>
+        <li>不足時從市場購買（扣錢+移除 Token）</li>
+        <li>市場價格隨供給自動更新</li>
+        <li>啤酒需求自動從最近來源消耗</li>
+      </ul>
+    </div>
+
+    <!-- Era Transition -->
+    <div style="flex:1; min-width:220px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:14px;">
+      <div style="font-size:12px; font-weight:bold; color:#9b59b6; margin-bottom:8px;">🔀 時代轉換 EraTransition</div>
+      <ul style="color:#ccc; font-size:11px; line-height:1.8; margin:0; padding-left:14px;">
+        <li>偵測運河時代牌庫耗盡</li>
+        <li>自動執行中期計分</li>
+        <li>移除所有運河連結 Tile</li>
+        <li>移除所有 Level 1 建築 Tile</li>
+        <li>重新洗牌（鐵路時代牌庫）</li>
+        <li>發牌、重置市場</li>
+      </ul>
+    </div>
+
+    <!-- Scoring -->
+    <div style="flex:1; min-width:220px; background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:14px;">
+      <div style="font-size:12px; font-weight:bold; color:#e8d0e8; margin-bottom:8px;">🏆 計分 Scoring</div>
+      <ul style="color:#ccc; font-size:11px; line-height:1.8; margin:0; padding-left:14px;">
+        <li>已翻面建築的 VP</li>
+        <li>連結 VP（相鄰已翻面建築數量）</li>
+        <li>收入等級轉換為 VP（終局）</li>
+        <li>自動計算並更新計分軌</li>
+        <li>終局顯示最終排名</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== Event Flow ===== -->
+<div class="section">
+  <h3>4. 事件流程（以 Build 為例）</h3>
+  <div style="background:#0d1117; border:1px solid #333; border-radius:8px; padding:20px;">
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:28px; height:28px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; color:#fff; flex-shrink:0;">1</div>
+        <div style="font-size:11px; color:#ccc;">玩家從手牌中<strong>打出一張卡</strong>到棄牌堆</div>
+        <div style="font-size:9px; color:#666; margin-left:auto;">onObjectEnterZone(棄牌區)</div>
+      </div>
+      <div style="border-left:2px solid #333; height:8px; margin-left:14px;"></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:28px; height:28px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; color:#fff; flex-shrink:0;">2</div>
+        <div style="font-size:11px; color:#ccc;">腳本辨識卡牌類型，<strong>高亮合法建造位置</strong></div>
+        <div style="font-size:9px; color:#666; margin-left:auto;">Validation.getValidBuildSpots()</div>
+      </div>
+      <div style="border-left:2px solid #333; height:8px; margin-left:14px;"></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:28px; height:28px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; color:#fff; flex-shrink:0;">3</div>
+        <div style="font-size:11px; color:#ccc;">玩家將<strong>建築 Tile 放到高亮位置</strong></div>
+        <div style="font-size:9px; color:#666; margin-left:auto;">onObjectDropped(Snap Point)</div>
+      </div>
+      <div style="border-left:2px solid #333; height:8px; margin-left:14px;"></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:28px; height:28px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; color:#fff; flex-shrink:0;">4</div>
+        <div style="font-size:11px; color:#ccc;">腳本<strong>自動扣除金錢 + 資源</strong>（煤/鐵）</div>
+        <div style="font-size:9px; color:#666; margin-left:auto;">Market.consumeResources()</div>
+      </div>
+      <div style="border-left:2px solid #333; height:8px; margin-left:14px;"></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:28px; height:28px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; color:#fff; flex-shrink:0;">5</div>
+        <div style="font-size:11px; color:#ccc;">放置資源 Token 到建築上（如煤礦產煤）</div>
+        <div style="font-size:9px; color:#666; margin-left:auto;">Actions.placeResources()</div>
+      </div>
+      <div style="border-left:2px solid #333; height:8px; margin-left:14px;"></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:28px; height:28px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; color:#fff; flex-shrink:0;">6</div>
+        <div style="font-size:11px; color:#ccc;">更新 GameState、計數器花費、<strong>剩餘行動 -1</strong></div>
+        <div style="font-size:9px; color:#666; margin-left:auto;">TurnManager.endAction()</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Save/Load ===== -->
+<div class="section">
+  <h3>5. 存檔/讀檔</h3>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li><strong>onSave()</strong> — 將 GameState 序列化為 JSON 字串，TTS 自動保存</li>
+      <li><strong>onLoad(save_state)</strong> — 從 JSON 還原 GameState，重建所有 UI 狀態</li>
+      <li>物件位置由 TTS 自動保存，腳本只需保存邏輯狀態</li>
+      <li>載入後重新綁定所有物件參照（GUID mapping）</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== Language System ===== -->
+<div class="section">
+  <h3>6. 多語言系統</h3>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+      <li><strong>Lang.lua</strong> 管理所有 UI 文字的中英文對照表</li>
+      <li>腳本產生的提示訊息（如「輪到你的回合」/「Your turn」）依語言設定顯示</li>
+      <li>透過桌面上的<strong>語言切換按鈕</strong>（一個 Custom Tile）全局切換</li>
+      <li>幫助卡翻面切換語言、規則書準備 2 本</li>
+    </ul>
+  </div>
+</div>

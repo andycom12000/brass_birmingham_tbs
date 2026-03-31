@@ -1,0 +1,193 @@
+<h2>第二部分：元件系統設計（v4）</h2>
+<p class="subtitle">新增：規則說明書（Rulebook），使用 TTS 內建 Notebook 或 Custom PDF</p>
+
+<!-- ===== New: Rulebook ===== -->
+<div class="section">
+  <h3>新增元件：規則說明書（Rulebook）</h3>
+
+  <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+    <!-- Book mockup -->
+    <div style="width:240px; min-height:340px; background:linear-gradient(135deg, #1a0a00, #2a1a0a); border:4px solid #8b7355; border-radius:4px 12px 12px 4px; box-shadow: 6px 4px 16px rgba(0,0,0,0.6), inset -2px 0 4px rgba(139,115,85,0.3); padding:16px; display:flex; flex-direction:column; gap:10px; position:relative;">
+      <!-- Book spine effect -->
+      <div style="position:absolute; left:0; top:0; bottom:0; width:8px; background:linear-gradient(90deg, #5a4a3a, #8b7355, #5a4a3a); border-radius:4px 0 0 4px;"></div>
+
+      <div style="text-align:center; padding:10px 0; border-bottom:2px solid #5a4a3a; margin-left:4px;">
+        <div style="font-size:10px; color:#8b7355; letter-spacing:2px; margin-bottom:4px;">ROXLEY GAMES</div>
+        <div style="font-size:16px; font-weight:bold; color:#d4c5a0; letter-spacing:1px;">BRASS</div>
+        <div style="font-size:12px; color:#a89870; letter-spacing:3px;">BIRMINGHAM</div>
+        <div style="font-size:9px; color:#8b7355; margin-top:6px; letter-spacing:1px;">RULES OF PLAY</div>
+      </div>
+
+      <div style="margin-left:4px;">
+        <div style="font-size:9px; font-weight:bold; color:#d4a017; margin-bottom:6px;">📑 目錄 CONTENTS</div>
+        <div style="font-size:8px; color:#bbb; line-height:2;">
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>1. 遊戲概述 Overview</span><span style="color:#888;">p.1</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>2. 元件說明 Components</span><span style="color:#888;">p.2</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>3. 遊戲設置 Setup</span><span style="color:#888;">p.4</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>4. 遊戲流程 Gameplay</span><span style="color:#888;">p.6</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>5. 行動詳解 Actions</span><span style="color:#888;">p.8</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>&nbsp;&nbsp;5.1 Build 建造</span><span style="color:#888;">p.8</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>&nbsp;&nbsp;5.2 Network 連結</span><span style="color:#888;">p.10</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>&nbsp;&nbsp;5.3 Develop 升級</span><span style="color:#888;">p.11</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>&nbsp;&nbsp;5.4 Sell 銷售</span><span style="color:#888;">p.12</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>&nbsp;&nbsp;5.5 Loan 貸款</span><span style="color:#888;">p.13</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>&nbsp;&nbsp;5.6 Scout 偵查</span><span style="color:#888;">p.13</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>6. 時代轉換 Era Transition</span><span style="color:#888;">p.14</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>7. 計分 Scoring</span><span style="color:#888;">p.15</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; border-bottom:1px dotted #333; padding:0 2px;">
+            <span>8. 產業詳解 Industries</span><span style="color:#888;">p.16</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:0 2px;">
+            <span>9. 人數調整 Player Count</span><span style="color:#888;">p.18</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div style="flex:1; min-width:280px; display:flex; flex-direction:column; gap:12px;">
+
+      <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+        <div style="font-size:13px; font-weight:bold; color:#e8d0e8; margin-bottom:8px;">TTS 呈現方式</div>
+        <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+          <li>使用 TTS 內建 <strong>Custom PDF</strong> 物件</li>
+          <li>呈現為桌上可翻閱的實體書本</li>
+          <li>玩家可拿起、翻頁、放大閱讀</li>
+          <li>放置於桌面邊緣，不佔遊戲區空間</li>
+        </ul>
+      </div>
+
+      <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+        <div style="font-size:13px; font-weight:bold; color:#e8d0e8; margin-bottom:8px;">內容結構（依照原版）</div>
+        <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+          <li><strong>遊戲概述</strong> — 背景故事、勝利條件</li>
+          <li><strong>元件說明</strong> — 所有遊戲元件圖解</li>
+          <li><strong>遊戲設置</strong> — 依 2/3/4 人分別說明</li>
+          <li><strong>遊戲流程</strong> — 回合結構、行動順序</li>
+          <li><strong>行動詳解</strong> — 6 種行動完整規則</li>
+          <li><strong>時代轉換</strong> — 運河→鐵路的轉換流程</li>
+          <li><strong>計分</strong> — 中期/終局計分方式</li>
+          <li><strong>產業詳解</strong> — 6 種產業的特殊規則</li>
+          <li><strong>人數調整</strong> — 不同人數的地圖/牌組變化</li>
+        </ul>
+      </div>
+
+      <div style="background:#1a2a1a; border:1px solid #2a5a2a; border-radius:8px; padding:16px;">
+        <div style="font-size:13px; font-weight:bold; color:#4ade80; margin-bottom:8px;">多語言方案</div>
+        <ul style="color:#ccc; font-size:12px; line-height:1.8; margin:0; padding-left:16px;">
+          <li>準備 <strong>2 本 PDF</strong>：英文版 + 繁體中文版</li>
+          <li>兩本都放在桌面上，玩家自行選擇閱讀</li>
+          <li>美術風格統一還原原版排版設計</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== Updated Component Summary ===== -->
+<div class="section">
+  <h3>元件總覽（最終版）</h3>
+  <div style="background:#1a1a2e; border:1px solid #333; border-radius:8px; padding:16px;">
+    <table style="width:100%; color:#ccc; font-size:12px; border-collapse:collapse;">
+      <tr style="border-bottom:1px solid #333;">
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">元件</th>
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">TTS 類型</th>
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">數量</th>
+        <th style="text-align:left; padding:6px; color:#e8d0e8;">說明</th>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">主地圖板</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">1</td>
+        <td style="padding:6px;">含市場、商人區、計分軌、Snap Points</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">工業建築 Tiles</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">每人 ~20</td>
+        <td style="padding:6px;">6 種產業，可翻面</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">連結 Tiles</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">每人 14</td>
+        <td style="padding:6px;">運河(藍) / 鐵路(灰)</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">資源 Token</td>
+        <td style="padding:6px;">Custom Model (3D)</td>
+        <td style="padding:6px;">大量</td>
+        <td style="padding:6px;">煤炭球/鐵礦方塊/啤酒桶</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">卡牌</td>
+        <td style="padding:6px;">Deck / Card</td>
+        <td style="padding:6px;">~60</td>
+        <td style="padding:6px;">地點卡/產業卡/萬用卡</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">金錢</td>
+        <td style="padding:6px;">Custom Model (3D)</td>
+        <td style="padding:6px;">大量</td>
+        <td style="padding:6px;">£1 銅幣 / £5 銀幣 / £15 金幣</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">商人 Tiles</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">~12</td>
+        <td style="padding:6px;">依人數隨機設置</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">玩家板</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">4</td>
+        <td style="padding:6px;">各產業建築槽位 + Snap Points</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">計數器</td>
+        <td style="padding:6px;">XML UI Button</td>
+        <td style="padding:6px;">4</td>
+        <td style="padding:6px;">本回合花費 £，點按 +1/+5/+10</td>
+      </tr>
+      <tr style="border-bottom:1px solid #222;">
+        <td style="padding:6px;">幫助卡</td>
+        <td style="padding:6px;">Custom Tile (2D)</td>
+        <td style="padding:6px;">4</td>
+        <td style="padding:6px;">正面英文/背面中文，翻面切換</td>
+      </tr>
+      <tr style="background:#1a2a1a;">
+        <td style="padding:6px; color:#4ade80; font-weight:bold;">📖 規則說明書</td>
+        <td style="padding:6px; color:#4ade80;">Custom PDF</td>
+        <td style="padding:6px; color:#4ade80;">2 本</td>
+        <td style="padding:6px; color:#4ade80;">英文版 + 繁體中文版，原版排版風格</td>
+      </tr>
+    </table>
+  </div>
+</div>
