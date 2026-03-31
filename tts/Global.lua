@@ -170,11 +170,62 @@ function broadcastCurrentPlayer()
     local turnText = Lang.format("your_turn", state.lang, { player = color })
     local actionsText = Lang.format("actions_remaining", state.lang, { count = state.actionsRemaining })
     UIManager.showTurnIndicator(turnText .. " — " .. actionsText)
+    UIManager.showEndTurnButton()
     printToAll(turnText)
 end
 
+------------------------------------------------------
+-- END TURN BUTTON
+------------------------------------------------------
+
+function onEndTurn(player, value, id)
+    if not state then return end
+    local color = player.color
+    if not isCurrentPlayer(color) then
+        printToColor("Not your turn.", color, {1, 0.5, 0})
+        return
+    end
+
+    -- Clear any pending action
+    if state._pendingCard then
+        Highlights.clearAll()
+        state._pendingCard = nil
+    end
+
+    -- Update deck empty flag
+    state.deckEmpty = CardManager.isDeckEmpty()
+
+    -- Check era end
+    if EraTransition.isEraOver(state) then
+        UIManager.hideEndTurnButton()
+        if state.era == Constants.Era.CANAL then
+            printToAll(Lang.get("era_transition", state.lang))
+            EraTransition.transition(state)
+            CardManager.rebuildDeckForRailEra(state)
+            CardManager.dealToAll(state)
+            UIManager.resetAllCounters(state.turnOrder)
+            broadcastCurrentPlayer()
+            return
+        else
+            Scoring.scoreEndOfEra(state, true)
+            local ranking = Scoring.determineWinner(state)
+            announceResults(ranking)
+            return
+        end
+    end
+
+    -- Advance turn
+    TurnManager.endAction(state)
+    broadcastCurrentPlayer()
+end
+
+------------------------------------------------------
+-- RESULTS
+------------------------------------------------------
+
 function announceResults(ranking)
     UIManager.hideTurnIndicator()
+    UIManager.hideEndTurnButton()
     printToAll("═══════════════════════════")
     printToAll(Lang.get("scoring_start", state.lang))
     for i, entry in ipairs(ranking) do
