@@ -277,9 +277,18 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         if snapPos then
             ObjectManager.moveTo(tileObj, snapPos)
         end
+    else
+        -- No SnapMap data: settle tile onto board surface so it doesn't float
+        local settlePos = Vector(buildPos.x, 1.05, buildPos.z)
+        tileObj.setPositionSmooth(settlePos, false, true)
     end
 
-    ObjectManager.lock(tileObj)
+    -- Lock after a short delay to let smooth movement finish
+    Wait.time(function()
+        if tileObj and not tileObj.isDestroyed() then
+            tileObj.setLock(true)
+        end
+    end, 0.3)
 
     -- Brewery income on placement (breweries auto-flip and give income immediately)
     local tile = slot and slot.tile or nil
