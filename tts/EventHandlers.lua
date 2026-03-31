@@ -53,6 +53,7 @@ local INDUSTRY_LABELS = {
 function EventHandlers.onObjectDrop(playerColor, droppedObject)
     if not state then return end
     if state._animating then return end
+    if isRecentlyRejected(droppedObject) then return end
 
     local objType, meta = EventHandlers.identifyObject(droppedObject)
     if not objType then return end
@@ -207,7 +208,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         })
         if not v.valid then
             printToColor(v.reason, playerColor, {1, 0, 0})
-            returnToPlayerArea(tileObj, playerColor)
+            rejectTile(tileObj, playerColor)
             return
         end
     end
@@ -228,7 +229,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     if coalNeeded > 0 then
         if not cityName then
             printToColor("Cannot determine city for coal connection (SnapMap not available)", playerColor, {1, 0, 0})
-            returnToPlayerArea(tileObj, playerColor)
+            rejectTile(tileObj, playerColor)
             return
         end
         cachedCoalSources = Network.findNearestCoal(state, cityName) or {}
@@ -244,7 +245,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     if coalFromMarket > 0 then
         if not Network.hasMarketConnection(state, playerColor, cityName) then
             printToColor("Cannot buy coal: no connection to merchant", playerColor, {1, 0, 0})
-            returnToPlayerArea(tileObj, playerColor)
+            rejectTile(tileObj, playerColor)
             return
         end
     end
@@ -257,7 +258,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     local player = GameState.getPlayer(state, playerColor)
     if player.money < totalCost then
         printToColor("Not enough money: need $" .. totalCost .. ", have $" .. player.money, playerColor, {1, 0, 0})
-        returnToPlayerArea(tileObj, playerColor)
+        rejectTile(tileObj, playerColor)
         return
     end
 
@@ -662,7 +663,7 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj)
 
     if not state._pendingCard then
         printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        returnToPlayerArea(linkObj, playerColor)
+        rejectTile(linkObj, playerColor)
         return
     end
 
@@ -693,11 +694,11 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj)
             afterAction(playerColor)
         else
             printToColor(result.error, playerColor, {1, 0, 0})
-            returnToPlayerArea(linkObj, playerColor)
+            rejectTile(linkObj, playerColor)
         end
     else
         printToColor("Invalid link placement.", playerColor, {1, 0, 0})
-        returnToPlayerArea(linkObj, playerColor)
+        rejectTile(linkObj, playerColor)
     end
 end
 
@@ -753,11 +754,39 @@ end
 -- Used when an action validation fails to keep the table tidy.
 -- @param obj  TTS object to return
 -- @param playerColor  TTS seat color string
-function returnToPlayerArea(obj, playerColor)
+-- Track tiles that were just rejected to prevent re-triggering on manual return
+local _recentlyRejected = {}
+
+function rejectTile(obj, playerColor)
+    -- Mark as recently rejected (prevents re-processing for 2 seconds)
+    local guid = obj.getGUID()
+    _recentlyRejected[guid] = true
+    Wait.time(function() _recentlyRejected[guid] = nil end, 2.0)
+
+    -- Try to return to player board
     local board = ObjectManager.getPlayerBoard(playerColor)
     if board then
         obj.setPositionSmooth(board.getPosition() + Vector(0, 2, 0))
+        return
     end
+
+    -- Fallback: use TTS Player hand zone
+    local ttsPlayer = Player[playerColor]
+    if ttsPlayer then
+        local handTransform = ttsPlayer.getHandTransform()
+        if handTransform then
+            obj.setPositionSmooth(handTransform.position + Vector(0, 2, 0))
+            return
+        end
+    end
+
+    -- Last resort: just lift it above where it was dropped
+    local pos = obj.getPosition()
+    obj.setPositionSmooth(Vector(pos.x, pos.y + 3, pos.z))
+end
+
+function isRecentlyRejected(obj)
+    return _recentlyRejected[obj.getGUID()] == true
 end
 
 return EventHandlers
