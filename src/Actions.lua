@@ -204,6 +204,48 @@ end
 -- 1. Build
 -- ============================================================
 
+--- Auto-sell produced resources to market when building a coal mine or iron works.
+--- Mandatory rule: if market has empty slots, cubes must fill them.
+--- Returns { sold=number, kept=number } for the caller to animate.
+function Actions.autoSellToMarket(state, color, slot)
+    local tile = slot.tile
+    if not tile then return { sold = 0, kept = 0 } end
+
+    local resourceType = nil
+    if tile.type == Constants.Industry.COAL then
+        resourceType = Constants.Resource.COAL
+    elseif tile.type == Constants.Industry.IRON then
+        resourceType = Constants.Resource.IRON
+    else
+        return { sold = 0, kept = 0 }
+    end
+
+    local track = Market.getTrack(resourceType)
+    local trackMax = #track
+    local market = Market.getMarketSupply(state, resourceType)
+    if not market then return { sold = 0, kept = 0 } end
+
+    local emptySlots = trackMax - market.supply
+    local produced = #tile.resources
+    local sellCount = math.min(produced, emptySlots)
+
+    -- Sell cubes to market using existing Market.returnToMarket
+    if sellCount > 0 then
+        Market.returnToMarket(state, resourceType, sellCount)
+        -- Remove sold cubes from tile
+        for i = 1, sellCount do
+            table.remove(tile.resources, #tile.resources)
+        end
+        -- Builder gains $1 per cube sold
+        GameState.gainMoney(state, color, sellCount)
+    end
+
+    -- Auto-flip if all cubes sold
+    autoFlipIfEmpty(state, slot)
+
+    return { sold = sellCount, kept = produced - sellCount }
+end
+
 --- Execute the Build action.
 --- params: { cardType, location, industryType, level, slotId }
 function Actions.build(state, color, params)
@@ -270,6 +312,9 @@ function Actions.build(state, color, params)
     if industryType == Constants.Industry.BREWERY then
         advanceIncome(state, color, tile.incomeSpaces)
     end
+
+    -- Auto-sell for coal mines and iron works (mandatory rule)
+    local autoSellResult = Actions.autoSellToMarket(state, color, slot)
 
     -- Step 10: Update handSize (player played a card)
     GameState.playCard(state, color)
