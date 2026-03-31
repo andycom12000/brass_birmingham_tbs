@@ -311,9 +311,14 @@ def patch_spend_trackers(mod_data: dict) -> int:
     for obj in mod_data.get("ObjectStates", []):
         guid = obj.get("GUID")
         if guid in SPEND_TRACKER_GUIDS:
-            obj["LuaScript"] = SPEND_TRACKER_SCRIPT
-            obj["LuaScriptState"] = SPEND_TRACKER_STATE
+            # Clear any script — use TTS built-in Counter UI only
+            # (updated via Counter.setValue from Global script)
+            obj["LuaScript"] = ""
+            obj["LuaScriptState"] = ""
             obj["Nickname"] = "Spend Tracker"
+            # Reset counter value to 0
+            if "Counter" in obj:
+                obj["Counter"]["value"] = 0
             # Reposition below player board, centered
             if guid in SPEND_TRACKER_POSITIONS:
                 t = obj.get("Transform", {})
