@@ -76,6 +76,109 @@ SRC_MODULES = [
 GLOBAL_LUA = PROJECT_ROOT / "tts" / "Global.lua"
 XML_UI     = PROJECT_ROOT / "xml" / "UI.xml"
 
+# ---------------------------------------------------------------------------
+# Spend tracker configuration
+# ---------------------------------------------------------------------------
+
+# GUIDs of the board Counter objects to replace with spend trackers
+SPEND_TRACKER_GUIDS = {"9f808b", "b05299", "26e57c", "719019"}
+
+SPEND_TRACKER_SCRIPT = r"""-- Spend Tracker (modified MrStump counter)
+-- Syncs with money counter via Global script
+
+function onSave()
+    return JSON.encode({saved_count = count})
+end
+
+function onload(saved_data)
+    generateButtonParamiters()
+    if saved_data ~= '' then
+        count = JSON.decode(saved_data).saved_count
+    else
+        count = 0
+    end
+    b_display.label = tostring(count)
+    if count >= 100 then b_display.font_size = 360 else b_display.font_size = 500 end
+    self.createButton(b_display)
+    self.createButton(b_plus)
+    self.createButton(b_minus)
+    self.createButton(b_plus5)
+    self.createButton(b_minus5)
+end
+
+function increase()
+    count = count + 1
+    updateDisplay()
+    syncMoney()
+end
+
+function decrease()
+    if count > 0 then count = count - 1 end
+    updateDisplay()
+    syncMoney()
+end
+
+function increase5()
+    count = count + 5
+    updateDisplay()
+    syncMoney()
+end
+
+function decrease5()
+    if count > 4 then count = count - 5 else count = 0 end
+    updateDisplay()
+    syncMoney()
+end
+
+function customSet()
+    local desc = self.getDescription()
+    if desc ~= '' and type(tonumber(desc)) == 'number' then
+        self.setDescription('')
+        count = tonumber(desc)
+        updateDisplay()
+        syncMoney()
+    end
+end
+
+function syncMoney()
+    -- Call Global function to sync money counter
+    if Global and Global.call then
+        Global.call('onSpendChanged', {guid = self.getGUID(), spent = count})
+    end
+end
+
+function updateDisplay()
+    if count >= 100 then b_display.font_size = 360 else b_display.font_size = 500 end
+    b_display.label = tostring(count)
+    self.editButton(b_display)
+end
+
+function generateButtonParamiters()
+    b_display = {
+        index = 0, click_function = 'customSet', function_owner = self, label = '',
+        position = {0,0.1,0}, width = 800, height = 600, font_size = 500
+    }
+    b_plus = {
+        click_function = 'increase', function_owner = self, label = '+1',
+        position = {1.45,-0.1,0.6}, width = 600, height = 500, font_size = 500
+    }
+    b_minus = {
+        click_function = 'decrease', function_owner = self, label = '-1',
+        position = {-1.45,-0.1,0.6}, width = 600, height = 500, font_size = 500
+    }
+    b_plus5 = {
+        click_function = 'increase5', function_owner = self, label = '+5',
+        position = {1.45,-0.1,-0.6}, width = 600, height = 500, font_size = 500
+    }
+    b_minus5 = {
+        click_function = 'decrease5', function_owner = self, label = '-5',
+        position = {-1.45,-0.1,-0.6}, width = 600, height = 500, font_size = 500
+    }
+end
+"""
+
+SPEND_TRACKER_STATE = '{"saved_count":0}'
+
 
 # ---------------------------------------------------------------------------
 # Module processing helpers
@@ -169,6 +272,28 @@ def build_lua_bundle() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Spend tracker patcher
+# ---------------------------------------------------------------------------
+
+def patch_spend_trackers(mod_data: dict) -> int:
+    """
+    Walk ObjectStates and replace the 4 board Counter objects (by GUID) with
+    spend tracker versions: inject the spend tracker LuaScript, set
+    LuaScriptState to the initial saved state, and set Nickname.
+
+    Returns the number of objects patched.
+    """
+    patched = 0
+    for obj in mod_data.get("ObjectStates", []):
+        if obj.get("GUID") in SPEND_TRACKER_GUIDS:
+            obj["LuaScript"] = SPEND_TRACKER_SCRIPT
+            obj["LuaScriptState"] = SPEND_TRACKER_STATE
+            obj["Nickname"] = "Spend Tracker"
+            patched += 1
+    return patched
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -207,6 +332,18 @@ def main():
     mod_data["XmlUI"] = xml_content
     # Update save name so it's identifiable in TTS
     mod_data["SaveName"] = "Brass Birmingham (Scripted)"
+
+    # 4b. Patch board Counter objects → spend trackers
+    print()
+    print("Patching spend tracker Counter objects...")
+    n_patched = patch_spend_trackers(mod_data)
+    print(f"  Patched {n_patched} of {len(SPEND_TRACKER_GUIDS)} expected spend tracker(s).")
+    if n_patched != len(SPEND_TRACKER_GUIDS):
+        print(
+            f"  WARNING: Expected {len(SPEND_TRACKER_GUIDS)} objects but only found "
+            f"{n_patched}. Check GUIDs in SPEND_TRACKER_GUIDS.",
+            file=sys.stderr,
+        )
 
     # 5. Write output JSON
     print()

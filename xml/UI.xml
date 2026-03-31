@@ -1,40 +1,4 @@
 <Ui>
-    <Panel id="counterPanel_Red" position="-720 -220 0" width="160" height="45"
-           color="#1A1010E8">
-        <HorizontalLayout spacing="4" padding="6 6 4 4">
-            <Image width="14" height="14" color="#E74C3C"/>
-            <Text id="counterLabel_Red" text="Spent" fontSize="11" color="#CCCCCC"/>
-            <Text id="counterValue_Red" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
-        </HorizontalLayout>
-    </Panel>
-
-    <Panel id="counterPanel_Blue" position="-720 -268 0" width="160" height="45"
-           color="#1A1010E8">
-        <HorizontalLayout spacing="4" padding="6 6 4 4">
-            <Image width="14" height="14" color="#3498DB"/>
-            <Text id="counterLabel_Blue" text="Spent" fontSize="11" color="#CCCCCC"/>
-            <Text id="counterValue_Blue" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
-        </HorizontalLayout>
-    </Panel>
-
-    <Panel id="counterPanel_Yellow" position="-720 -316 0" width="160" height="45"
-           color="#1A1010E8">
-        <HorizontalLayout spacing="4" padding="6 6 4 4">
-            <Image width="14" height="14" color="#F1C40F"/>
-            <Text id="counterLabel_Yellow" text="Spent" fontSize="11" color="#CCCCCC"/>
-            <Text id="counterValue_Yellow" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
-        </HorizontalLayout>
-    </Panel>
-
-    <Panel id="counterPanel_Green" position="-720 -364 0" width="160" height="45"
-           color="#1A1010E8">
-        <HorizontalLayout spacing="4" padding="6 6 4 4">
-            <Image width="14" height="14" color="#2ECC71"/>
-            <Text id="counterLabel_Green" text="Spent" fontSize="11" color="#CCCCCC"/>
-            <Text id="counterValue_Green" text="$0" fontSize="20" color="#FFFFFF" fontStyle="Bold"/>
-        </HorizontalLayout>
-    </Panel>
-
     <Button id="endTurnBtn" onClick="onEndTurn" position="0 350 0"
             width="160" height="50" fontSize="18" fontStyle="Bold"
             color="#8B2500" textColor="#FFD700" active="false">End Turn</Button>

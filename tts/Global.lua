@@ -238,6 +238,41 @@ function announceResults(ranking)
 end
 
 ------------------------------------------------------
+-- SPEND COUNTER SYNC
+------------------------------------------------------
+
+-- Maps spend tracker GUIDs to money counter GUIDs
+SPEND_TO_MONEY_MAP = {
+    ["9f808b"] = "bfdaf2",  -- Orange board counter → Orange money counter
+    ["b05299"] = "4a0fce",  -- Purple board counter → Purple money counter
+    ["26e57c"] = "b56836",  -- Yellow board counter → Yellow money counter
+    ["719019"] = "4d732a",  -- White board counter → White money counter
+}
+
+-- Starting money
+STARTING_MONEY = 17
+
+-- Called by spend tracker objects when their value changes
+function onSpendChanged(params)
+    local spendGUID = params.guid
+    local spent = params.spent
+    local moneyGUID = SPEND_TO_MONEY_MAP[spendGUID]
+
+    if moneyGUID then
+        local moneyObj = getObjectFromGUID(moneyGUID)
+        if moneyObj then
+            -- Calculate remaining money: starting - spent
+            local remaining = STARTING_MONEY - spent
+            if remaining < 0 then remaining = 0 end
+            -- Set the money counter's description to trigger customSet
+            moneyObj.setDescription(tostring(remaining))
+            -- Call customSet on the money counter to update its display
+            moneyObj.call('customSet')
+        end
+    end
+end
+
+------------------------------------------------------
 -- LANGUAGE TOGGLE
 ------------------------------------------------------
 

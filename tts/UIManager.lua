@@ -1,7 +1,9 @@
 local UIManager = {}
 
+-- updateSpendCounter: no-op — spend tracking now handled by on-board Counter objects
+-- that sync to money counters via Global.onSpendChanged.
 function UIManager.updateSpendCounter(color, amount)
-    UI.setAttribute("counterValue_" .. color, "text", "$" .. amount)
+    -- Physical spend trackers on the board handle display; nothing to do here.
 end
 
 function UIManager.showTurnIndicator(text)
@@ -29,25 +31,18 @@ function UIManager.hideSetup()
     UI.setAttribute("setupPanel", "active", "false")
 end
 
+-- resetAllCounters: no-op — physical spend counters reset manually or via game logic.
 function UIManager.resetAllCounters(turnOrder)
-    for _, color in ipairs(turnOrder) do
-        UIManager.updateSpendCounter(color, 0)
-    end
+    -- Physical counters on the board; nothing to reset via XML UI.
 end
 
+-- configureForPlayerCount: no-op — counter panels removed from XML UI.
 function UIManager.configureForPlayerCount(playerCount)
-    local allColors = { "Red", "Blue", "Yellow", "Green" }
-    for i, color in ipairs(allColors) do
-        UI.setAttribute("counterPanel_" .. color, "active", tostring(i <= playerCount))
-    end
+    -- Counter panels removed; physical on-board counters are always visible.
 end
 
 function UIManager.updateLanguage(lang)
-    local label = (lang == "zh-TW") and "Spent" or "Spent"
     local btnText = (lang == "zh-TW") and "End Turn" or "End Turn"
-    for _, color in ipairs({"Red", "Blue", "Yellow", "Green"}) do
-        UI.setAttribute("counterLabel_" .. color, "text", label)
-    end
     UI.setAttribute("endTurnBtn", "text", btnText)
 end
 
