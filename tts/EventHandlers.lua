@@ -158,17 +158,11 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
 
     local buildPos = tileObj.getPosition()
     local snapInfo = SnapMap.findNearestPosition(buildPos, 2.0)
-    if not snapInfo or snapInfo.type ~= "slot" then
-        printToColor("Invalid placement.", playerColor, {1, 0, 0})
-        returnToPlayerArea(tileObj, playerColor)
-        return
-    end
+    local buildSlotId = snapInfo and snapInfo.id or nil
+    local cityName = buildSlotId and GameState.getCityForSlot(state, buildSlotId) or nil
 
-    local buildSlotId = snapInfo.id
-    local cityName = GameState.getCityForSlot(state, buildSlotId)
-
-    -- Full game-rule validation via Validation.canBuild (if pendingCard flow)
-    if state._pendingCard then
+    -- Full game-rule validation via Validation.canBuild (only when SnapMap + pendingCard active)
+    if buildSlotId and state._pendingCard then
         local v = Validation.canBuild(state, playerColor, {
             cardType     = state._pendingCard.cardType,
             location     = state._pendingCard.location or cityName,
@@ -202,8 +196,8 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     local ironFromMarket = math.max(0, ironNeeded - boardIron)
     local coalFromMarket = math.max(0, coalNeeded - boardCoal)
 
-    -- Coal market access check
-    if coalFromMarket > 0 then
+    -- Coal market access check (only when city is known via SnapMap)
+    if coalFromMarket > 0 and cityName then
         if not Network.hasMarketConnection(state, playerColor, cityName) then
             printToColor("Cannot buy coal: no connection to merchant", playerColor, {1, 0, 0})
             returnToPlayerArea(tileObj, playerColor)
@@ -250,44 +244,46 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         end
     end
 
-    -- Place tile on slot (manual state update -- not using Actions.build
-    -- because resource consumption is handled here with animations)
-    local slot = GameState.getSlot(state, buildSlotId)
-
-    -- Handle overbuilding
-    if slot.occupant then
-        slot.occupant = nil
-        slot.tile = nil
-    end
-
-    -- Remove tile from unbuilt stack
+    -- Place tile on slot (when SnapMap data available)
+    local slot = buildSlotId and GameState.getSlot(state, buildSlotId) or nil
     local industryType = meta.industry
     local level = meta.level
-    if player.unbuiltTiles and player.unbuiltTiles[industryType] then
-        local tileStack = player.unbuiltTiles[industryType]
-        for i, t in ipairs(tileStack) do
-            if t.level == level then
-                table.remove(tileStack, i)
-                break
+
+    if slot then
+        -- Handle overbuilding
+        if slot.occupant then
+            slot.occupant = nil
+            slot.tile = nil
+        end
+
+        -- Remove tile from unbuilt stack
+        if player.unbuiltTiles and player.unbuiltTiles[industryType] then
+            local tileStack = player.unbuiltTiles[industryType]
+            for i, t in ipairs(tileStack) do
+                if t.level == level then
+                    table.remove(tileStack, i)
+                    break
+                end
             end
+        end
+
+        -- Create tile and place on slot
+        local tile = Tile.newWithResources(industryType, level)
+        slot.occupant = playerColor
+        slot.tile = tile
+
+        -- Snap to position
+        local snapPos = SnapMap.getPositionForSlot(buildSlotId)
+        if snapPos then
+            ObjectManager.moveTo(tileObj, snapPos)
         end
     end
 
-    -- Create tile using Tile module and place on slot
-    local tile = Tile.newWithResources(industryType, level)
-
-    slot.occupant = playerColor
-    slot.tile = tile
-
-    -- Lock and position the TTS tile object
-    local snapPos = SnapMap.getPositionForSlot(buildSlotId)
-    if snapPos then
-        ObjectManager.moveTo(tileObj, snapPos)
-    end
     ObjectManager.lock(tileObj)
 
     -- Brewery income on placement (breweries auto-flip and give income immediately)
-    if industryType == Constants.Industry.BREWERY then
+    local tile = slot and slot.tile or nil
+    if industryType == Constants.Industry.BREWERY and tile then
         local advanceSpaces = tile.incomeSpaces or 0
         if advanceSpaces > 0 then
             local newLevel, newSpace = IncomeTrack.advanceSpaces(
