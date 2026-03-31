@@ -26,6 +26,8 @@
 #include tts/Highlights
 #include tts/UIManager
 #include tts/EventHandlers
+#include tts/MarketLayout
+#include tts/ResourceAnimation
 
 ------------------------------------------------------
 -- GAME STATE (global)
@@ -75,16 +77,19 @@ function onSave()
 end
 
 ------------------------------------------------------
--- SETUP
+-- SETUP (called by crown button callback)
 ------------------------------------------------------
 
-function onSetup2P() startGame(2) end
-function onSetup3P() startGame(3) end
-function onSetup4P() startGame(4) end
+PREBUILT_DECK_GUIDS = {
+    [2] = "b6ff44",
+    [3] = "3895fe",
+    [4] = "bc3ba4",
+}
 
-function startGame(playerCount)
-    printToAll("[DEBUG] startGame called with " .. tostring(playerCount) .. " players")
-    UIManager.hideSetup()
+function onPhysicalSetupComplete(params)
+    local playerCount = params.playerCount
+    printToAll("Initializing game state for " .. playerCount .. " players...")
+
     local ok, err = pcall(function()
         state = GameState.new(playerCount)
     end)
@@ -92,7 +97,44 @@ function startGame(playerCount)
         printToAll("[ERROR] GameState.new failed: " .. tostring(err))
         return
     end
-    printToAll("[DEBUG] state created, era=" .. tostring(state and state.era))
+
+    -- Deal cards from the deck the crown placed on the board
+    local deck = CardManager.findDeckOnBoard()
+    if deck then
+        CardManager.dealFromDeck(state, deck)
+    else
+        printToAll("[WARNING] Could not find card deck on board")
+    end
+
+    -- Hide unused pre-built decks
+    hideUnusedDecks(playerCount)
+
+    -- Set money counters and reset spend trackers
+    for _, color in ipairs(state.turnOrder) do
+        local moneyGUID = COLOR_TO_MONEY_GUID[color]
+        if moneyGUID then
+            local moneyObj = getObjectFromGUID(moneyGUID)
+            if moneyObj then
+                moneyObj.setDescription(tostring(Constants.INITIAL_MONEY))
+                pcall(function() moneyObj.call('customSet') end)
+            end
+        end
+        local spendGUID = COLOR_TO_SPEND_GUID[color]
+        if spendGUID then
+            local spendObj = getObjectFromGUID(spendGUID)
+            if spendObj and spendObj.Counter then
+                spendObj.Counter.setValue(0)
+            end
+        end
+    end
+
+    PLAYER_SPEND = {}
+
+    -- Spawn market coal/iron cubes
+    spawnMarketCubes(state)
+
+    -- Income phase for first round
+    TurnManager.incomePhase(state)
 
     -- Scan objects on table
     ObjectManager.scanTable()
@@ -101,24 +143,66 @@ function startGame(playerCount)
     local board = ObjectManager.getObject("mainBoard")
     if board then SnapMap.buildFromObject(board) end
 
-    -- Setup cards
-    local deck = ObjectManager.getObject("drawDeck")
-    if deck then
-        CardManager.buildDeck(state, deck)
-        CardManager.dealToAll(state)
-    end
-
-    -- Income phase for first round
-    TurnManager.incomePhase(state)
-
     -- Configure UI
+    UIManager.hideSetup()
     UIManager.configureForPlayerCount(playerCount)
-    UIManager.resetAllCounters(state.turnOrder)
-    UIManager.updateLanguage(state.lang)
+    UIManager.showEndTurnButton()
     broadcastCurrentPlayer()
 
     printToAll(Lang.format("game_started", state.lang, { count = playerCount }))
     printToAll(Lang.get("canal_era", state.lang))
+end
+
+function hideUnusedDecks(playerCount)
+    for pc, guid in pairs(PREBUILT_DECK_GUIDS) do
+        if pc ~= playerCount then
+            local obj = getObjectFromGUID(guid)
+            if obj then
+                obj.setPosition(Vector(0, -5, 0))
+                Wait.time(function()
+                    local o = getObjectFromGUID(guid)
+                    if o then o.destruct() end
+                end, 1.0)
+            end
+        end
+    end
+end
+
+function spawnMarketCubes(gameState)
+    gameState.coalMarket.cubeGUIDs = {}
+    for i = 1, gameState.coalMarket.supply do
+        local pos = MarketLayout.getPosition(Constants.Resource.COAL, i)
+        ResourceAnimation.spawnCube(Constants.Resource.COAL, pos, function(obj)
+            if obj then
+                gameState.coalMarket.cubeGUIDs[i] = obj.getGUID()
+            end
+        end)
+    end
+
+    gameState.ironMarket.cubeGUIDs = {}
+    for i = 1, gameState.ironMarket.supply do
+        local pos = MarketLayout.getPosition(Constants.Resource.IRON, i)
+        ResourceAnimation.spawnCube(Constants.Resource.IRON, pos, function(obj)
+            if obj then
+                gameState.ironMarket.cubeGUIDs[i] = obj.getGUID()
+            end
+        end)
+    end
+end
+
+------------------------------------------------------
+-- RESOURCE MARKER CLICK ROUTING
+------------------------------------------------------
+
+function onResourceMarkerClicked(obj, playerColor)
+    if not state or not state._pendingResource then return end
+    local notes = obj.getGMNotes()
+    if notes and notes ~= "" then
+        local ok, meta = pcall(JSON.decode, notes)
+        if ok and meta and meta.slotId then
+            EventHandlers.onResourceCandidateClicked(playerColor, meta.slotId)
+        end
+    end
 end
 
 ------------------------------------------------------
@@ -126,10 +210,6 @@ end
 ------------------------------------------------------
 
 function onObjectDrop(playerColor, droppedObject)
-    printToAll("[DEBUG] onObjectDrop fired by " .. tostring(playerColor) .. " obj=" .. tostring(droppedObject and droppedObject.getName()))
-    printToAll("[DEBUG] state=" .. tostring(state ~= nil) .. " objType=" .. tostring(droppedObject and droppedObject.type))
-    local notes = droppedObject and droppedObject.getGMNotes and droppedObject.getGMNotes() or ""
-    printToAll("[DEBUG] GMNotes=" .. tostring(notes):sub(1, 80))
     EventHandlers.onObjectDrop(playerColor, droppedObject)
 end
 
@@ -206,6 +286,9 @@ function onEndTurn(player, value, id)
 
     -- Reset per-round spend tracking for this player
     PLAYER_SPEND[color] = 0
+
+    -- Cancel any pending resource selection
+    EventHandlers.cancelPendingResource()
 
     -- Clear any pending action
     if state._pendingCard then
@@ -349,18 +432,18 @@ end
 
 function onChat(message, player)
     if message == "/init2" then
-        startGame(2)
+        onPhysicalSetupComplete({playerCount = 2})
         return false
     elseif message == "/init3" then
-        startGame(3)
+        onPhysicalSetupComplete({playerCount = 3})
         return false
     elseif message == "/init4" then
-        startGame(4)
+        onPhysicalSetupComplete({playerCount = 4})
         return false
     elseif message == "/status" then
         printToAll("[STATUS] state=" .. tostring(state ~= nil))
         if state then
-            printToAll("[STATUS] era=" .. tostring(state.era) .. " round=" .. tostring(state.round) .. " players=" .. tostring(state.playerCount))
+            printToAll("[STATUS] era=" .. tostring(state.era) .. " round=" .. tostring(state.round))
         end
         return false
     end
