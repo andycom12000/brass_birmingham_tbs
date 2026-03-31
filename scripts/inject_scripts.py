@@ -31,6 +31,10 @@ import shutil
 import sys
 from pathlib import Path
 
+# Make src/ importable from the scripts/ directory
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from tile_grid_map import ALL_POSITIONS, TILE_FULL_COST  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -151,6 +155,10 @@ function updateDisplay()
     if count >= 100 then b_display.font_size = 360 else b_display.font_size = 500 end
     b_display.label = tostring(count)
     self.editButton(b_display)
+end
+
+function getCount()
+    return count
 end
 
 function generateButtonParamiters()
@@ -311,6 +319,135 @@ def patch_spend_trackers(mod_data: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
+# GMNotes tagging
+# ---------------------------------------------------------------------------
+
+# FaceURL substrings that identify each sprite sheet type
+TILE_SHEET_IDS  = {"CA13E07E", "59EF30BD"}   # building tile sprite sheets
+CARD_SHEET_IDS  = {"0E058782"}               # location / industry card sheet
+BACK_SHEET_IDS  = {"525F74C1"}               # card-back sheet (skip)
+WILD_SHEET_IDS  = {"2CF61FBB"}               # wild industry tiles (skip)
+PLAYER_AID_IDS  = {"BB0D630F"}               # player aid (skip)
+
+INDUSTRY_NAMES = {
+    "cotton":       "Cotton Mill",
+    "coal":         "Coal Mine",
+    "iron":         "Iron Works",
+    "brewery":      "Brewery",
+    "manufacturer": "Manufacturer",
+    "pottery":      "Pottery",
+}
+
+
+def _get_face_url(obj: dict) -> str:
+    """Return the FaceURL string from a card/deck object, or ''."""
+    # Cards store image data in CustomDeck (keyed by deck ID)
+    custom_deck = obj.get("CustomDeck", {})
+    for deck_entry in custom_deck.values():
+        url = deck_entry.get("FaceURL", "")
+        if url:
+            return url
+    return ""
+
+
+def _face_url_matches(face_url: str, id_set: set) -> bool:
+    return any(sheet_id in face_url for sheet_id in id_set)
+
+
+def _tag_single_card(obj: dict) -> None:
+    """
+    Compute and set GMNotes JSON for a single Card object in-place.
+    Skips objects that are not building tiles or game cards.
+    """
+    face_url = _get_face_url(obj)
+    if not face_url:
+        return
+
+    # ---- building tile ----
+    if _face_url_matches(face_url, TILE_SHEET_IDS):
+        card_id = obj.get("CardID", -1)
+        grid_pos = card_id % 100
+        tile_info = ALL_POSITIONS.get(grid_pos)
+        if tile_info is None:
+            return  # unknown grid position — leave GMNotes untouched
+        industry, level = tile_info
+        cost = TILE_FULL_COST.get((industry, level), {"money": 0, "coal": 0, "iron": 0})
+        notes = {
+            "type":     "tile",
+            "industry": industry,
+            "level":    level,
+            "money":    cost["money"],
+            "coal":     cost["coal"],
+            "iron":     cost["iron"],
+        }
+        obj["GMNotes"] = json.dumps(notes, separators=(",", ":"))
+        return
+
+    # ---- game card ----
+    if _face_url_matches(face_url, CARD_SHEET_IDS):
+        obj["GMNotes"] = json.dumps({"type": "card"}, separators=(",", ":"))
+        return
+
+    # Everything else (back sheet, wild tiles, player aid, etc.) — skip
+
+
+def tag_all_cards(mod_data: dict) -> int:
+    """
+    Walk every object in ObjectStates (and ContainedObjects recursively),
+    tagging Cards with GMNotes metadata.
+    Returns the number of objects tagged.
+    """
+    tagged = 0
+
+    def _walk(obj: dict) -> None:
+        nonlocal tagged
+        obj_type = obj.get("Name", "")
+
+        if obj_type in ("Card", "DeckCustom", "Deck"):
+            before = obj.get("GMNotes", "")
+            # Tag the container itself (Deck objects also have CustomDeck)
+            _tag_single_card(obj)
+            if obj.get("GMNotes", "") != before:
+                tagged += 1
+
+        # Recurse into contained objects (cards inside decks, etc.)
+        for contained in obj.get("ContainedObjects", []):
+            _walk(contained)
+
+    for obj in mod_data.get("ObjectStates", []):
+        _walk(obj)
+
+    return tagged
+
+
+# ---------------------------------------------------------------------------
+# Money counter patcher — inject getCount() into existing MrStump scripts
+# ---------------------------------------------------------------------------
+
+MONEY_COUNTER_GUIDS = {"b56836", "4d732a", "bfdaf2", "4a0fce"}
+
+GET_COUNT_SNIPPET = "\nfunction getCount()\n    return count\nend\n"
+
+
+def patch_money_counters(mod_data: dict) -> int:
+    """
+    Append a getCount() function to the LuaScript of the 4 money counter objects
+    so EventHandlers can read their current value via obj.call('getCount').
+    Returns the number of objects patched.
+    """
+    patched = 0
+    for obj in mod_data.get("ObjectStates", []):
+        guid = obj.get("GUID")
+        if guid in MONEY_COUNTER_GUIDS:
+            script = obj.get("LuaScript", "")
+            # Only append once (idempotent)
+            if "function getCount()" not in script:
+                obj["LuaScript"] = script + GET_COUNT_SNIPPET
+                patched += 1
+    return patched
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -359,6 +496,24 @@ def main():
         print(
             f"  WARNING: Expected {len(SPEND_TRACKER_GUIDS)} objects but only found "
             f"{n_patched}. Check GUIDs in SPEND_TRACKER_GUIDS.",
+            file=sys.stderr,
+        )
+
+    # 4c. Tag all card/tile objects with GMNotes metadata
+    print()
+    print("Tagging cards and tiles with GMNotes metadata...")
+    n_tagged = tag_all_cards(mod_data)
+    print(f"  Tagged {n_tagged} object(s).")
+
+    # 4d. Patch money counter objects to expose getCount()
+    print()
+    print("Patching money counter objects (adding getCount())...")
+    n_money = patch_money_counters(mod_data)
+    print(f"  Patched {n_money} of {len(MONEY_COUNTER_GUIDS)} money counter(s).")
+    if n_money != len(MONEY_COUNTER_GUIDS):
+        print(
+            f"  WARNING: Expected {len(MONEY_COUNTER_GUIDS)} objects but only found "
+            f"{n_money}. Some may already have getCount() or GUIDs have changed.",
             file=sys.stderr,
         )
 

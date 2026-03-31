@@ -16,16 +16,18 @@ local EventHandlers = {}
 -- @param droppedObject  The TTS object that was just released
 function EventHandlers.onObjectDrop(playerColor, droppedObject)
     if not state then return end
-    if not isCurrentPlayer(playerColor) then return end
 
-    local objType = EventHandlers.identifyObject(droppedObject)
+    local objType, meta = EventHandlers.identifyObject(droppedObject)
+    if not objType then return end
 
-    if objType == "card" then
-        EventHandlers.handleCardDrop(playerColor, droppedObject)
-    elseif objType == "building_tile" then
-        EventHandlers.handleBuildingDrop(playerColor, droppedObject)
+    if objType == "building_tile" then
+        EventHandlers.handleTilePlaced(playerColor, droppedObject, meta)
     elseif objType == "link_tile" then
         EventHandlers.handleLinkDrop(playerColor, droppedObject)
+    elseif objType == "card" then
+        if isCurrentPlayer(playerColor) then
+            EventHandlers.handleCardDrop(playerColor, droppedObject)
+        end
     end
 end
 
@@ -37,7 +39,7 @@ function EventHandlers.onObjectPickUp(playerColor, obj)
     if not state then return end
     if not (state._pendingCard and state._pendingPlayer == playerColor) then return end
 
-    local objType = EventHandlers.identifyObject(obj)
+    local objType, _ = EventHandlers.identifyObject(obj)
     if objType ~= "card" then
         -- Player picked up a tile — they are preparing to place it.
         -- Keep the pending card alive; do not cancel.
@@ -49,43 +51,31 @@ end
 ------------------------------------------------------
 
 --- Determine what kind of game object this TTS object represents.
--- Checks object tags first (most reliable), then falls back to name patterns.
+-- Uses GMNotes JSON metadata (set by inject_scripts.py tag_all_cards) as the
+-- primary source.  Falls back to name-pattern heuristics for link tiles and
+-- objects that pre-date the tagging pass.
 -- @param obj  TTS object
--- @return "card" | "building_tile" | "link_tile" | "resource" | "money" | nil
+-- @return ("card"|"building_tile"|"link_tile"|nil), (meta table|nil)
 function EventHandlers.identifyObject(obj)
-    if not obj or obj.isDestroyed() then return nil end
+    if not obj or obj.isDestroyed() then return nil, nil end
 
-    local name = obj.getName() or ""
-    local tags  = obj.getTags and obj.getTags() or {}
-
-    -- Tags are set up in TTS and are the authoritative source
-    for _, tag in ipairs(tags) do
-        if tag == "Card" or tag == "card" then return "card" end
-        if tag == "BuildingTile"           then return "building_tile" end
-        if tag == "LinkTile"               then return "link_tile" end
-        if tag == "Resource"               then return "resource" end
-        if tag == "Money"                  then return "money" end
-    end
-
-    -- Fallback: infer from naming conventions used in CardManager.parseCard
-    if name:find("^Location:") or name:find("^Industry:") or name:find("^Wild") then
-        return "card"
-    end
-
-    -- Building tile names: e.g. "Cotton Tile", "Iron Tile Lv2", "Brewery Tile"
-    if name:find("Tile$") then
-        if name:find("Cotton") or name:find("Coal") or name:find("Iron")
-            or name:find("Brewery") or name:find("Manufacturer") or name:find("Pottery") then
-            return "building_tile"
+    -- Primary: GMNotes JSON metadata
+    local notes = obj.getGMNotes()
+    if notes and notes ~= "" then
+        local ok, meta = pcall(JSON.decode, notes)
+        if ok and meta then
+            if meta.type == "tile" then return "building_tile", meta end
+            if meta.type == "card" then return "card", meta end
         end
     end
 
-    -- Link tile names: e.g. "Canal", "Rail"
+    -- Fallback for link tiles (no GMNotes tagging — they use Custom_Token)
+    local name = obj.getName() or ""
     if name:find("^Canal") or name:find("^Rail") then
-        return "link_tile"
+        return "link_tile", nil
     end
 
-    return nil
+    return nil, nil
 end
 
 ------------------------------------------------------
@@ -138,15 +128,19 @@ function EventHandlers.handleCardDrop(playerColor, cardObj)
 end
 
 ------------------------------------------------------
--- BUILDING TILE DROP
+-- BUILDING TILE PLACED (GMNotes-aware)
 ------------------------------------------------------
 
 --- Handle a building tile being dropped on the board.
--- Requires a pending card (play a card first).
--- Snaps to the nearest valid slot and executes the Build action.
+-- Reads cost metadata from GMNotes and auto-deducts money from the player's
+-- money counter, adding the same amount to the spend tracker.
+-- Also runs the full Build action validation / state update.
 -- @param playerColor  TTS seat color string
--- @param tileObj  TTS object representing a building tile
-function EventHandlers.handleBuildingDrop(playerColor, tileObj)
+-- @param tileObj      TTS object representing a building tile
+-- @param meta         GMNotes table: {type,industry,level,money,coal,iron}
+function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
+    if not isCurrentPlayer(playerColor) then return end
+
     if not state._pendingCard then
         printToColor("Play a card first.", playerColor, {1, 0.5, 0})
         returnToPlayerArea(tileObj, playerColor)
@@ -157,11 +151,9 @@ function EventHandlers.handleBuildingDrop(playerColor, tileObj)
     local snapInfo = SnapMap.findNearestPosition(pos, 2.0)
 
     if snapInfo and snapInfo.type == "slot" then
-        local cityName = GameState.getCityForSlot(state, snapInfo.id)
-        local tileType = tileObj.getVar("industryType")
-                      or EventHandlers.parseTileType(tileObj)
-        local tileLevel = tileObj.getVar("level")
-                       or EventHandlers.parseTileLevel(tileObj)
+        local cityName  = GameState.getCityForSlot(state, snapInfo.id)
+        local tileType  = meta.industry or EventHandlers.parseTileType(tileObj)
+        local tileLevel = meta.level    or EventHandlers.parseTileLevel(tileObj)
 
         local result = Actions.build(state, playerColor, {
             cardType     = state._pendingCard.cardType,
@@ -179,6 +171,12 @@ function EventHandlers.handleBuildingDrop(playerColor, tileObj)
             ObjectManager.lock(tileObj)
 
             spawnTileResources(state, snapInfo.id)
+
+            -- Auto-deduct money cost
+            local moneyCost = meta.money or 0
+            if moneyCost > 0 then
+                EventHandlers.deductTileCost(playerColor, moneyCost, meta)
+            end
 
             printToAll(Lang.format("player_built", state.lang, {
                 player   = playerColor,
@@ -198,6 +196,55 @@ function EventHandlers.handleBuildingDrop(playerColor, tileObj)
     end
 end
 
+--- Deduct a tile's money cost from the player's money counter and update the
+-- spend tracker, using the global PLAYER_SPEND accumulator so reads/writes
+-- do not depend on querying button labels from counter objects.
+-- @param playerColor  TTS seat color string
+-- @param cost         integer money cost to deduct
+-- @param meta         GMNotes table (used for announcement)
+function EventHandlers.deductTileCost(playerColor, cost, meta)
+    -- Accumulate total spend this round
+    PLAYER_SPEND[playerColor] = (PLAYER_SPEND[playerColor] or 0) + cost
+
+    -- Update spend tracker display
+    local spendGUID = COLOR_TO_SPEND_GUID[playerColor]
+    if spendGUID then
+        local spendObj = getObjectFromGUID(spendGUID)
+        if spendObj then
+            spendObj.setDescription(tostring(PLAYER_SPEND[playerColor]))
+            spendObj.call('customSet')
+        end
+    end
+
+    -- Update money counter (read via getCount, then set via customSet)
+    local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
+    if moneyGUID then
+        local moneyObj = getObjectFromGUID(moneyGUID)
+        if moneyObj then
+            local current = moneyObj.call('getCount')
+            if current then
+                local remaining = current - cost
+                if remaining < 0 then remaining = 0 end
+                moneyObj.setDescription(tostring(remaining))
+                moneyObj.call('customSet')
+            end
+        end
+    end
+
+    -- Announce
+    local INDUSTRY_LABELS = {
+        cotton       = "Cotton Mill",
+        coal         = "Coal Mine",
+        iron         = "Iron Works",
+        brewery      = "Brewery",
+        manufacturer = "Manufacturer",
+        pottery      = "Pottery",
+    }
+    local label = (INDUSTRY_LABELS[meta.industry] or meta.industry or "Building")
+                  .. " Lv" .. (meta.level or "?")
+    printToAll(playerColor .. " built " .. label .. " ($" .. cost .. ")")
+end
+
 ------------------------------------------------------
 -- LINK TILE DROP
 ------------------------------------------------------
@@ -208,6 +255,8 @@ end
 -- @param playerColor  TTS seat color string
 -- @param linkObj  TTS object representing a canal or rail tile
 function EventHandlers.handleLinkDrop(playerColor, linkObj)
+    if not isCurrentPlayer(playerColor) then return end
+
     if not state._pendingCard then
         printToColor("Play a card first.", playerColor, {1, 0.5, 0})
         returnToPlayerArea(linkObj, playerColor)
@@ -254,7 +303,7 @@ end
 ------------------------------------------------------
 
 --- Infer industry type from a tile object's name.
--- Used when the tile object does not have the "industryType" script variable set.
+-- Used when the tile object does not have GMNotes set.
 -- @param tileObj  TTS object
 -- @return Constants.Industry string or nil
 function EventHandlers.parseTileType(tileObj)

@@ -32,6 +32,11 @@
 ------------------------------------------------------
 state = nil
 
+-- Tracks money spent by each player this round (color -> integer).
+-- Reset on End Turn and on era transition.
+-- Used by EventHandlers.deductTileCost to avoid reading button labels.
+PLAYER_SPEND = {}
+
 ------------------------------------------------------
 -- TTS LIFECYCLE CALLBACKS
 ------------------------------------------------------
@@ -145,6 +150,7 @@ function afterAction(color)
             CardManager.rebuildDeckForRailEra(state)
             CardManager.dealToAll(state)
             UIManager.resetAllCounters(state.turnOrder)
+            PLAYER_SPEND = {}  -- reset spend tracking for new era
             broadcastCurrentPlayer()
             return
         else
@@ -186,6 +192,9 @@ function onEndTurn(player, value, id)
         return
     end
 
+    -- Reset per-round spend tracking for this player
+    PLAYER_SPEND[color] = 0
+
     -- Clear any pending action
     if state._pendingCard then
         Highlights.clearAll()
@@ -204,6 +213,7 @@ function onEndTurn(player, value, id)
             CardManager.rebuildDeckForRailEra(state)
             CardManager.dealToAll(state)
             UIManager.resetAllCounters(state.turnOrder)
+            PLAYER_SPEND = {}  -- reset spend tracking for new era
             broadcastCurrentPlayer()
             return
         else
@@ -243,32 +253,77 @@ end
 
 -- Maps spend tracker GUIDs to money counter GUIDs
 SPEND_TO_MONEY_MAP = {
-    ["9f808b"] = "bfdaf2",  -- Orange board counter → Orange money counter
-    ["b05299"] = "4a0fce",  -- Purple board counter → Purple money counter
-    ["26e57c"] = "b56836",  -- Yellow board counter → Yellow money counter
-    ["719019"] = "4d732a",  -- White board counter → White money counter
+    ["9f808b"] = "bfdaf2",  -- Orange spend → Orange money
+    ["b05299"] = "4a0fce",  -- Purple spend → Purple money
+    ["26e57c"] = "b56836",  -- Yellow spend → Yellow money
+    ["719019"] = "4d732a",  -- White spend → White money
 }
 
--- Starting money
+-- Maps player color to spend tracker GUID
+-- (reference mod colors: Orange=Green, Purple=Red, Yellow=Yellow, White=Blue)
+COLOR_TO_SPEND_GUID = {
+    ["Green"]  = "9f808b",  -- Orange spend tracker
+    ["Red"]    = "b05299",  -- Purple spend tracker
+    ["Yellow"] = "26e57c",  -- Yellow spend tracker
+    ["Blue"]   = "719019",  -- White spend tracker
+}
+
+-- Maps player color to money counter GUID
+COLOR_TO_MONEY_GUID = {
+    ["Green"]  = "bfdaf2",
+    ["Red"]    = "4a0fce",
+    ["Yellow"] = "b56836",
+    ["Blue"]   = "4d732a",
+}
+
 STARTING_MONEY = 17
 
--- Called by spend tracker objects when their value changes
+-- Push a value to a MrStump counter object (set description + call customSet)
+function setCounterValue(guid, value)
+    local obj = getObjectFromGUID(guid)
+    if obj then
+        obj.setDescription(tostring(value))
+        obj.call('customSet')
+    end
+end
+
+-- Called by spend tracker objects when manually adjusted via buttons
 function onSpendChanged(params)
     local spendGUID = params.guid
     local spent = params.spent
     local moneyGUID = SPEND_TO_MONEY_MAP[spendGUID]
-
     if moneyGUID then
-        local moneyObj = getObjectFromGUID(moneyGUID)
-        if moneyObj then
-            -- Calculate remaining money: starting - spent
-            local remaining = STARTING_MONEY - spent
-            if remaining < 0 then remaining = 0 end
-            -- Set the money counter's description to trigger customSet
-            moneyObj.setDescription(tostring(remaining))
-            -- Call customSet on the money counter to update its display
-            moneyObj.call('customSet')
-        end
+        local remaining = STARTING_MONEY - spent
+        if remaining < 0 then remaining = 0 end
+        setCounterValue(moneyGUID, remaining)
+    end
+end
+
+-- Called by game logic (afterAction) to update spend counter from GameState
+function updateSpendCounterFromState(color)
+    if not state then return end
+    local p = GameState.getPlayer(state, color)
+    if not p then return end
+
+    local spent = p.spentThisRound or 0
+    local spendGUID = COLOR_TO_SPEND_GUID[color]
+    local moneyGUID = COLOR_TO_MONEY_GUID[color]
+
+    -- Update spend tracker display
+    if spendGUID then
+        setCounterValue(spendGUID, spent)
+    end
+
+    -- Update money counter display (remaining = current money)
+    if moneyGUID then
+        setCounterValue(moneyGUID, p.money or 0)
+    end
+end
+
+-- Reset all spend counters to 0 (new round)
+function resetAllSpendCounters()
+    for color, guid in pairs(COLOR_TO_SPEND_GUID) do
+        setCounterValue(guid, 0)
     end
 end
 
