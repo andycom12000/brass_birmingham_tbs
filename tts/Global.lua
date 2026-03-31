@@ -133,8 +133,8 @@ function onPhysicalSetupComplete(params)
     -- Spawn market coal/iron cubes
     spawnMarketCubes(state)
 
-    -- Income phase for first round
-    TurnManager.incomePhase(state)
+    -- No income phase at game start: income is collected at the END of each round.
+    -- First round of canal era = 1 action per player, starting with $17.
 
     -- Scan objects on table
     ObjectManager.scanTable()
