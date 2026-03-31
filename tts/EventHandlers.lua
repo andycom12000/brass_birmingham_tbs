@@ -74,6 +74,11 @@ end
 -- @param playerColor  TTS seat color string
 -- @param obj  The TTS object that was picked up
 function EventHandlers.onObjectPickUp(playerColor, obj)
+    -- Save pickup position for all objects (used by rejectTile to return to original spot)
+    if obj and not obj.isDestroyed() then
+        _pickupPositions[obj.getGUID()] = obj.getPosition()
+    end
+
     if not state then return end
 
     -- Cancel pending resource selection if active
@@ -756,14 +761,25 @@ end
 -- @param playerColor  TTS seat color string
 -- Track tiles that were just rejected to prevent re-triggering on manual return
 local _recentlyRejected = {}
+-- Track pickup positions so rejected tiles return to their original spot
+local _pickupPositions = {}
 
 function rejectTile(obj, playerColor)
-    -- Mark as recently rejected (prevents re-processing for 2 seconds)
     local guid = obj.getGUID()
+
+    -- Mark as recently rejected (prevents re-processing for 2 seconds)
     _recentlyRejected[guid] = true
     Wait.time(function() _recentlyRejected[guid] = nil end, 2.0)
 
-    -- Return to player board (using GUID mapping)
+    -- Return to original pickup position (where the tile was before the player grabbed it)
+    local originalPos = _pickupPositions[guid]
+    _pickupPositions[guid] = nil
+    if originalPos then
+        obj.setPositionSmooth(originalPos)
+        return
+    end
+
+    -- Fallback: center of player board
     local boardGUID = COLOR_TO_BOARD_GUID and COLOR_TO_BOARD_GUID[playerColor]
     if boardGUID then
         local board = getObjectFromGUID(boardGUID)
@@ -773,14 +789,7 @@ function rejectTile(obj, playerColor)
         end
     end
 
-    -- Fallback: use ObjectManager player board
-    local board = ObjectManager.getPlayerBoard(playerColor)
-    if board then
-        obj.setPositionSmooth(board.getPosition() + Vector(0, 2, 0))
-        return
-    end
-
-    -- Last resort: just lift it above where it was dropped
+    -- Last resort: lift above drop point
     local pos = obj.getPosition()
     obj.setPositionSmooth(Vector(pos.x, pos.y + 3, pos.z))
 end
