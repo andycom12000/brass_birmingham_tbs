@@ -43,6 +43,11 @@ local INDUSTRY_LABELS = {
     pottery      = "Pottery",
 }
 
+-- Track tiles that were just rejected to prevent re-triggering on manual return
+local _recentlyRejected = {}
+-- Track pickup positions so rejected tiles return to their original spot
+local _pickupPositions = {}
+
 ------------------------------------------------------
 -- PUBLIC API
 ------------------------------------------------------
@@ -759,11 +764,6 @@ end
 -- Used when an action validation fails to keep the table tidy.
 -- @param obj  TTS object to return
 -- @param playerColor  TTS seat color string
--- Track tiles that were just rejected to prevent re-triggering on manual return
-local _recentlyRejected = {}
--- Track pickup positions so rejected tiles return to their original spot
-local _pickupPositions = {}
-
 function rejectTile(obj, playerColor)
     local guid = obj.getGUID()
 
