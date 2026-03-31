@@ -83,8 +83,16 @@ function onSetup3P() startGame(3) end
 function onSetup4P() startGame(4) end
 
 function startGame(playerCount)
+    printToAll("[DEBUG] startGame called with " .. tostring(playerCount) .. " players")
     UIManager.hideSetup()
-    state = GameState.new(playerCount)
+    local ok, err = pcall(function()
+        state = GameState.new(playerCount)
+    end)
+    if not ok then
+        printToAll("[ERROR] GameState.new failed: " .. tostring(err))
+        return
+    end
+    printToAll("[DEBUG] state created, era=" .. tostring(state and state.era))
 
     -- Scan objects on table
     ObjectManager.scanTable()
@@ -118,6 +126,10 @@ end
 ------------------------------------------------------
 
 function onObjectDrop(playerColor, droppedObject)
+    printToAll("[DEBUG] onObjectDrop fired by " .. tostring(playerColor) .. " obj=" .. tostring(droppedObject and droppedObject.getName()))
+    printToAll("[DEBUG] state=" .. tostring(state ~= nil) .. " objType=" .. tostring(droppedObject and droppedObject.type))
+    local notes = droppedObject and droppedObject.getGMNotes and droppedObject.getGMNotes() or ""
+    printToAll("[DEBUG] GMNotes=" .. tostring(notes):sub(1, 80))
     EventHandlers.onObjectDrop(playerColor, droppedObject)
 end
 
@@ -324,6 +336,33 @@ end
 function resetAllSpendCounters()
     for color, guid in pairs(COLOR_TO_SPEND_GUID) do
         setCounterValue(guid, 0)
+    end
+end
+
+------------------------------------------------------
+-- LANGUAGE TOGGLE
+------------------------------------------------------
+
+------------------------------------------------------
+-- CHAT COMMANDS (for debugging / manual init)
+------------------------------------------------------
+
+function onChat(message, player)
+    if message == "/init2" then
+        startGame(2)
+        return false
+    elseif message == "/init3" then
+        startGame(3)
+        return false
+    elseif message == "/init4" then
+        startGame(4)
+        return false
+    elseif message == "/status" then
+        printToAll("[STATUS] state=" .. tostring(state ~= nil))
+        if state then
+            printToAll("[STATUS] era=" .. tostring(state.era) .. " round=" .. tostring(state.round) .. " players=" .. tostring(state.playerCount))
+        end
+        return false
     end
 end
 

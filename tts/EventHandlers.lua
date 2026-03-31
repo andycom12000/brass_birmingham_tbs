@@ -15,17 +15,17 @@ local EventHandlers = {}
 -- @param playerColor  TTS seat color string ("Red", "Blue", etc.)
 -- @param droppedObject  The TTS object that was just released
 function EventHandlers.onObjectDrop(playerColor, droppedObject)
-    if not state then return end
-
     local objType, meta = EventHandlers.identifyObject(droppedObject)
     if not objType then return end
 
     if objType == "building_tile" then
         EventHandlers.handleTilePlaced(playerColor, droppedObject, meta)
     elseif objType == "link_tile" then
-        EventHandlers.handleLinkDrop(playerColor, droppedObject)
+        if state then
+            EventHandlers.handleLinkDrop(playerColor, droppedObject)
+        end
     elseif objType == "card" then
-        if isCurrentPlayer(playerColor) then
+        if state and isCurrentPlayer(playerColor) then
             EventHandlers.handleCardDrop(playerColor, droppedObject)
         end
     end
@@ -139,36 +139,36 @@ end
 -- @param tileObj      TTS object representing a building tile
 -- @param meta         GMNotes table: {type,industry,level,money,coal,iron}
 function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
-    if not isCurrentPlayer(playerColor) then return end
-
-    if not state._pendingCard then
-        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        returnToPlayerArea(tileObj, playerColor)
-        return
+    -- Auto-deduct money cost whenever a building tile is dropped anywhere
+    local cost = meta.money or 0
+    if cost > 0 then
+        EventHandlers.deductTileCost(playerColor, cost, meta)
     end
 
-    local pos      = tileObj.getPosition()
-    local snapInfo = SnapMap.findNearestPosition(pos, 2.0)
+    -- If full game state is active, also run the game logic
+    if state and state._pendingCard then
+        local pos      = tileObj.getPosition()
+        local snapInfo = SnapMap.findNearestPosition(pos, 2.0)
 
-    if snapInfo and snapInfo.type == "slot" then
-        local cityName  = GameState.getCityForSlot(state, snapInfo.id)
-        local tileType  = meta.industry or EventHandlers.parseTileType(tileObj)
-        local tileLevel = meta.level    or EventHandlers.parseTileLevel(tileObj)
+        if snapInfo and snapInfo.type == "slot" then
+            local cityName  = GameState.getCityForSlot(state, snapInfo.id)
+            local tileType  = meta.industry or EventHandlers.parseTileType(tileObj)
+            local tileLevel = meta.level    or EventHandlers.parseTileLevel(tileObj)
 
-        local result = Actions.build(state, playerColor, {
-            cardType     = state._pendingCard.cardType,
-            location     = cityName,
-            industryType = tileType,
-            level        = tileLevel,
-            slotId       = snapInfo.id,
-        })
+            local result = Actions.build(state, playerColor, {
+                cardType     = state._pendingCard.cardType,
+                location     = cityName,
+                industryType = tileType,
+                level        = tileLevel,
+                slotId       = snapInfo.id,
+            })
 
-        if result.success then
-            Highlights.clearAll()
-            state._pendingCard = nil
+            if result.success then
+                Highlights.clearAll()
+                state._pendingCard = nil
 
-            ObjectManager.moveTo(tileObj, SnapMap.getPositionForSlot(snapInfo.id))
-            ObjectManager.lock(tileObj)
+                ObjectManager.moveTo(tileObj, SnapMap.getPositionForSlot(snapInfo.id))
+                ObjectManager.lock(tileObj)
 
             spawnTileResources(state, snapInfo.id)
 
