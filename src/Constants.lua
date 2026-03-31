@@ -2,8 +2,9 @@ local Constants = {}
 
 Constants.Era = { CANAL = "canal", RAIL = "rail" }
 
-Constants.Color = { RED = "Red", BLUE = "Blue", YELLOW = "Yellow", GREEN = "Green" }
-Constants.ALL_COLORS = { "Red", "Blue", "Yellow", "Green" }
+-- TTS seat colors in the reference mod (not the default Red/Blue/Green/Yellow)
+Constants.Color = { WHITE = "White", PURPLE = "Purple", ORANGE = "Orange", YELLOW = "Yellow" }
+Constants.ALL_COLORS = { "White", "Purple", "Orange", "Yellow" }
 
 Constants.Industry = {
     COTTON = "cotton",
