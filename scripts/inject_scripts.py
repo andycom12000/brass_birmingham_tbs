@@ -503,10 +503,15 @@ def patch_crown_buttons(mod_data: dict) -> int:
                 patched += 1
                 continue
 
-            last_end_idx = script.rfind("\nend")
-            if last_end_idx != -1:
-                obj["LuaScript"] = script[:last_end_idx] + callback + script[last_end_idx:]
+            # The main coroutine ends with "return 1\nend" — it's the FIRST
+            # occurrence of this pattern.  Helper functions (LockButton, delay)
+            # appear later.  Insert the callback just before "return 1".
+            marker = "return 1\nend"
+            idx = script.find(marker)
+            if idx != -1:
+                obj["LuaScript"] = script[:idx] + callback + script[idx:]
             else:
+                # Fallback: append at the very end
                 obj["LuaScript"] = script + "\n" + callback
 
             if guid in CROWN_LABELS:
