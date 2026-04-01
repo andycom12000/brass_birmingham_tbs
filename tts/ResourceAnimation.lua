@@ -55,19 +55,19 @@ end
 --- @param position Vector  TTS world position
 --- @param onSpawned function(obj)  callback with the spawned object (may be nil)
 function ResourceAnimation.spawnCube(resourceType, position, onSpawned)
-    local obj = ObjectManager.spawnResource(resourceType, position)
-    if obj then
-        obj.setLock(true)
-        obj.interactable = false
-        obj.setGMNotes(JSON.encode({
-            type = "resource",
-            resource = resourceType,
-        }))
-        if onSpawned then
-            Wait.time(function() onSpawned(obj) end, 0.1)
+    ObjectManager.spawnResource(resourceType, position, function(obj)
+        if obj then
+            obj.setLock(true)
+            obj.interactable = false
+            obj.setGMNotes(JSON.encode({
+                type = "resource",
+                resource = resourceType,
+            }))
+            if onSpawned then
+                onSpawned(obj)
+            end
         end
-    end
-    return obj
+    end)
 end
 
 --- Spawn a cube at fromPos, then smooth-move it to toPos. Locked on arrival.

@@ -9,7 +9,12 @@ ObjectManager.guids = {
     wildLocationSupply = nil,
     wildIndustrySupply = nil,
     languageToggle = nil,
-    resourceBags = {},     -- { coal = GUID, iron = GUID, beer = GUID }
+    -- Resource infinite bags (hardcoded from reference mod)
+    resourceBags = {
+        coal = "bc1987",  -- 煤矿
+        iron = "4d261e",  -- 钢铁
+        beer = "4be839",  -- 酒桶
+    },
     moneyBags = {},        -- { ["1"] = GUID, ["5"] = GUID, ["15"] = GUID }
 }
 
@@ -37,11 +42,11 @@ function ObjectManager.scanTable()
             ObjectManager.guids.wildIndustrySupply = obj.getGUID()
         elseif name == "Language Toggle" then
             ObjectManager.guids.languageToggle = obj.getGUID()
-        elseif name == "Coal Bag" then
+        elseif name == "Coal Bag" or name == "煤矿" then
             ObjectManager.guids.resourceBags.coal = obj.getGUID()
-        elseif name == "Iron Bag" then
+        elseif name == "Iron Bag" or name == "钢铁" then
             ObjectManager.guids.resourceBags.iron = obj.getGUID()
-        elseif name == "Beer Bag" then
+        elseif name == "Beer Bag" or name == "酒桶" then
             ObjectManager.guids.resourceBags.beer = obj.getGUID()
         elseif name == "Money 1 Bag" then
             ObjectManager.guids.moneyBags["1"] = obj.getGUID()
@@ -77,13 +82,30 @@ function ObjectManager.getPlayerBoard(color)
     return guid and getObjectFromGUID(guid)
 end
 
---- Spawn a resource from its bag at the given position
-function ObjectManager.spawnResource(resourceType, position)
+--- Spawn a resource from its infinite bag at the given position.
+--- @param resourceType string  "coal", "iron", or "beer"
+--- @param position Vector  where to spawn
+--- @param callback function(obj)  optional callback when object is ready
+--- @return TTS object or nil
+function ObjectManager.spawnResource(resourceType, position, callback)
     local bagGUID = ObjectManager.guids.resourceBags[resourceType]
-    if not bagGUID then return nil end
+    if not bagGUID then
+        if printToAll then printToAll("[WARN] No bag GUID for " .. tostring(resourceType)) end
+        return nil
+    end
     local bag = getObjectFromGUID(bagGUID)
-    if not bag then return nil end
-    return bag.takeObject({ position = position })
+    if not bag then
+        if printToAll then printToAll("[WARN] Bag not found: " .. bagGUID) end
+        return nil
+    end
+    local params = {
+        position = position,
+        smooth = false,
+    }
+    if callback then
+        params.callback_function = callback
+    end
+    return bag.takeObject(params)
 end
 
 --- Spawn money from the appropriate bag at the given position
