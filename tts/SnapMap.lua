@@ -156,10 +156,65 @@ function SnapMap.buildFromGlobal()
     SnapMap.byCityCenter["Warrington"]  = Vector(-7.762, 0.96, 12.550)
     SnapMap.byCityCenter["Nottingham"]  = Vector(14.237, 0.96, 10.424)
 
+    -- Link snap point positions → BoardData link IDs
+    -- Generated from save file snap points (rotZ=180) matched to nearest link midpoints
+    local LINK_POSITIONS = {
+        { id = "Redditch-Dudley",             pos = Vector(-5.660, 0.96, -11.507) },
+        { id = "Redditch-Birmingham",         pos = Vector(-0.662, 0.96, -10.045) },
+        { id = "Kidderminster-Dudley",        pos = Vector(-5.175, 0.96, -7.144) },
+        { id = "Kidderminster-Coalbrookdale", pos = Vector(-8.499, 0.96, -6.754) },
+        { id = "Coalbrookdale-Shrewsbury",    pos = Vector(-11.754, 0.96, -1.317) },
+        { id = "Coalbrookdale-Wolverhampton", pos = Vector(-7.388, 0.96, -1.276) },
+        { id = "Gloucester-Redditch",         pos = Vector(-2.077, 0.96, -14.461) },
+        { id = "Oxford-Redditch",             pos = Vector(0.295, 0.96, -12.101) },
+        { id = "Coventry-Oxford",             pos = Vector(5.738, 0.96, -11.260) },
+        { id = "Dudley-Wolverhampton",        pos = Vector(-4.262, 0.96, -3.716) },
+        { id = "Wolverhampton-Walsall",       pos = Vector(-1.709, 0.96, -1.495) },
+        { id = "Dudley-Birmingham",           pos = Vector(0.718, 0.96, -5.985) },
+        { id = "Walsall-Birmingham",          pos = Vector(1.976, 0.96, -4.400) },
+        { id = "Birmingham-Coventry",         pos = Vector(3.980, 0.96, -8.918) },
+        { id = "Burton-on-Trent-Coventry",    pos = Vector(7.655, 0.96, -9.164) },
+        { id = "Coventry-Nuneaton",           pos = Vector(7.749, 0.96, -7.477) },
+        { id = "Birmingham-Nuneaton",         pos = Vector(7.479, 0.96, -4.938) },
+        { id = "Birmingham-Worcester",        pos = Vector(6.758, 0.96, -2.971) },
+        { id = "Nuneaton-Uttoxeter",          pos = Vector(12.644, 0.96, -5.285) },
+        { id = "Burton-on-Trent-Derby",       pos = Vector(9.932, 0.96, -1.112) },
+        { id = "Burton-on-Trent-Cannock",     pos = Vector(4.274, 0.96, -1.763) },
+        { id = "Tamworth-Nuneaton",           pos = Vector(6.974, 0.96, 1.952) },
+        { id = "Birmingham-Tamworth",         pos = Vector(3.035, 0.96, 0.613) },
+        { id = "Cannock-Walsall",             pos = Vector(1.324, 0.96, -0.099) },
+        { id = "Wolverhampton-Cannock",       pos = Vector(-3.743, 0.96, 0.621) },
+        { id = "Stone-Cannock",               pos = Vector(-4.264, 0.96, 2.316) },
+        { id = "Stafford-Cannock",            pos = Vector(-0.808, 0.96, 3.685) },
+        { id = "Stone-Uttoxeter",             pos = Vector(2.477, 0.96, 3.545) },
+        { id = "Leek-Stone",                  pos = Vector(-6.275, 0.96, 5.707) },
+        { id = "Stafford-Burton-on-Trent",    pos = Vector(0.442, 0.96, 6.879) },
+        { id = "Stoke-on-Trent-Stone",        pos = Vector(-1.969, 0.96, 8.921) },
+        { id = "Derby-Tamworth",              pos = Vector(5.863, 0.96, 8.483) },
+        { id = "Uttoxeter-Derby",             pos = Vector(8.926, 0.96, 5.836) },
+        { id = "Derby-Nottingham",            pos = Vector(11.245, 0.96, 9.988) },
+        { id = "Derby-Belper",                pos = Vector(9.337, 0.96, 11.751) },
+        { id = "Uttoxeter-Stoke-on-Trent",    pos = Vector(4.925, 0.96, 14.416) },
+        { id = "Stafford-Stoke-on-Trent",     pos = Vector(-1.007, 0.96, 14.270) },
+        { id = "Stoke-on-Trent-Leek",         pos = Vector(-4.821, 0.96, 10.058) },
+        { id = "Shrewsbury-Warrington",        pos = Vector(-5.131, 0.96, 13.742) },
+    }
+
+    for _, entry in ipairs(LINK_POSITIONS) do
+        local data = {
+            position = entry.pos,
+            tag = "link_" .. entry.id,
+        }
+        SnapMap.byLinkId[entry.id] = data
+        SnapMap.byTag["link_" .. entry.id] = data
+    end
+
     if printToAll then
         local cityCount = 0
         for _ in pairs(SnapMap.byCityCenter) do cityCount = cityCount + 1 end
-        printToAll("[SnapMap] loaded " .. count .. " slots in " .. cityCount .. " cities")
+        local linkCount = 0
+        for _ in pairs(SnapMap.byLinkId) do linkCount = linkCount + 1 end
+        printToAll("[SnapMap] loaded " .. count .. " slots in " .. cityCount .. " cities, " .. linkCount .. " links")
     end
 end
 

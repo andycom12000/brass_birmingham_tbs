@@ -233,18 +233,29 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         return
     end
 
-    -- Find the best slot in this city: matches industry type AND is unoccupied
+    -- Find the nearest empty slot of matching type to where the user dropped the tile
     local buildSlotId = nil
+    local bestSlotDist = math.huge
     if city.slots then
         for _, s in ipairs(city.slots) do
             if not s.occupant and s.types then
+                local typeMatch = false
                 for _, t in ipairs(s.types) do
-                    if t == meta.industry then
+                    if t == meta.industry then typeMatch = true; break end
+                end
+                if typeMatch then
+                    local slotPos = SnapMap.getPositionForSlot(s.id)
+                    if slotPos then
+                        local dist = SnapMap._distance(buildPos, slotPos)
+                        if dist < bestSlotDist then
+                            bestSlotDist = dist
+                            buildSlotId = s.id
+                        end
+                    elseif not buildSlotId then
+                        -- Fallback if no snap position: take first match
                         buildSlotId = s.id
-                        break
                     end
                 end
-                if buildSlotId then break end
             end
         end
     end
@@ -940,30 +951,29 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
         end
     end
 
-    -- Find which link this connects: nearest two cities to the drop position
+    -- Find which link this connects using link snap points
     local dropPos = linkObj.getPosition()
-    local nearestCities = SnapMap.findNearestCities(dropPos, 2)
+    local snapInfo = SnapMap.findNearestPosition(dropPos, 4.0)
     local linkId = nil
     local city1, city2 = nil, nil
-    if nearestCities and #nearestCities >= 2 then
-        city1 = nearestCities[1]
-        city2 = nearestCities[2]
-        -- Try both orderings for the link ID
-        linkId = city1 .. "-" .. city2
-        if not state.board.links[linkId] then
-            linkId = city2 .. "-" .. city1
+
+    if snapInfo and snapInfo.type == "link" then
+        -- Direct match from link snap point
+        linkId = snapInfo.id
+        local linkData = BoardData.links[linkId]
+        if linkData and linkData.cities then
+            city1 = linkData.cities[1]
+            city2 = linkData.cities[2]
         end
-        if not state.board.links[linkId] then
-            -- Search all links for one connecting these two cities
-            for lid, ldata in pairs(state.board.links) do
-                local cities = BoardData.links[lid] and BoardData.links[lid].cities
-                if cities then
-                    if (cities[1] == city1 and cities[2] == city2)
-                    or (cities[1] == city2 and cities[2] == city1) then
-                        linkId = lid
-                        break
-                    end
-                end
+    end
+
+    -- Fallback: if snap didn't match a valid link in game state, try by link ID variations
+    if linkId and not state.board.links[linkId] then
+        -- Try reverse ordering
+        if city1 and city2 then
+            local rev = city2 .. "-" .. city1
+            if state.board.links[rev] then
+                linkId = rev
             end
         end
     end

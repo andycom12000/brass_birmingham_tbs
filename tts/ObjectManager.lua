@@ -42,11 +42,11 @@ function ObjectManager.scanTable()
             ObjectManager.guids.wildIndustrySupply = obj.getGUID()
         elseif name == "Language Toggle" then
             ObjectManager.guids.languageToggle = obj.getGUID()
-        elseif name == "Coal Bag" or name == "煤矿" then
+        elseif (name == "Coal Bag" or name == "煤矿") and (obj.type == "Infinite" or obj.type == "Bag") then
             ObjectManager.guids.resourceBags.coal = obj.getGUID()
-        elseif name == "Iron Bag" or name == "钢铁" then
+        elseif (name == "Iron Bag" or name == "钢铁") and (obj.type == "Infinite" or obj.type == "Bag") then
             ObjectManager.guids.resourceBags.iron = obj.getGUID()
-        elseif name == "Beer Bag" or name == "酒桶" then
+        elseif (name == "Beer Bag" or name == "酒桶") and (obj.type == "Infinite" or obj.type == "Bag") then
             ObjectManager.guids.resourceBags.beer = obj.getGUID()
         elseif name == "Money 1 Bag" then
             ObjectManager.guids.moneyBags["1"] = obj.getGUID()
