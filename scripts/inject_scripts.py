@@ -621,9 +621,9 @@ SNAP_TAGS = {
     # Leek (2 slots)
     194: "city_Leek_1",
     195: "city_Leek_2",
-    # Nuneaton (2 slots)
-    198: "city_Nuneaton_1",
-    199: "city_Nuneaton_2",
+    # Nuneaton (2 slots) — swapped with Uttoxeter per board verification
+    212: "city_Nuneaton_1",
+    213: "city_Nuneaton_2",
     # Redditch (2 slots)
     227: "city_Redditch_1",
     228: "city_Redditch_2",
@@ -640,9 +640,9 @@ SNAP_TAGS = {
     # Tamworth (2 slots)
     189: "city_Tamworth_1",
     190: "city_Tamworth_2",
-    # Uttoxeter (2 slots)
-    212: "city_Uttoxeter_1",
-    213: "city_Uttoxeter_2",
+    # Uttoxeter (2 slots) — swapped with Nuneaton per board verification
+    198: "city_Uttoxeter_1",
+    199: "city_Uttoxeter_2",
     # Walsall (2 slots)
     208: "city_Walsall_1",
     209: "city_Walsall_2",

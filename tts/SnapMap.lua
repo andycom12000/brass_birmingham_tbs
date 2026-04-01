@@ -84,9 +84,9 @@ function SnapMap.buildFromGlobal()
         -- Leek (2 slots)
         { id = "Leek_1", pos = Vector(-7.521, 0.96, 8.399) },
         { id = "Leek_2", pos = Vector(-5.888, 0.96, 8.390) },
-        -- Nuneaton (2 slots)
-        { id = "Nuneaton_1", pos = Vector(5.674, 0.96, 4.249) },
-        { id = "Nuneaton_2", pos = Vector(7.303, 0.96, 4.249) },
+        -- Nuneaton (2 slots) — swapped with Uttoxeter per board verification
+        { id = "Nuneaton_1", pos = Vector(9.378, 0.96, -3.402) },
+        { id = "Nuneaton_2", pos = Vector(11.021, 0.96, -3.395) },
         -- Redditch (2 slots)
         { id = "Redditch_1", pos = Vector(-5.710, 0.96, -13.405) },
         { id = "Redditch_2", pos = Vector(-4.074, 0.96, -13.389) },
@@ -103,9 +103,9 @@ function SnapMap.buildFromGlobal()
         -- Tamworth (2 slots)
         { id = "Tamworth_1", pos = Vector(1.520, 0.96, 8.990) },
         { id = "Tamworth_2", pos = Vector(3.181, 0.96, 8.972) },
-        -- Uttoxeter (2 slots)
-        { id = "Uttoxeter_1", pos = Vector(9.378, 0.96, -3.402) },
-        { id = "Uttoxeter_2", pos = Vector(11.021, 0.96, -3.395) },
+        -- Uttoxeter (2 slots) — swapped with Nuneaton per board verification
+        { id = "Uttoxeter_1", pos = Vector(5.674, 0.96, 4.249) },
+        { id = "Uttoxeter_2", pos = Vector(7.303, 0.96, 4.249) },
         -- Walsall (2 slots)
         { id = "Walsall_1", pos = Vector(0.314, 0.96, -2.130) },
         { id = "Walsall_2", pos = Vector(1.955, 0.96, -2.145) },
