@@ -138,9 +138,8 @@ function onPhysicalSetupComplete(params)
     -- Scan objects on table
     ObjectManager.scanTable()
 
-    -- Build snap point mappings
-    local board = ObjectManager.getObject("mainBoard")
-    if board then SnapMap.buildFromObject(board) end
+    -- Build snap point mappings (hardcoded positions, no board object needed)
+    SnapMap.buildFromGlobal()
 
     -- Configure UI
     UIManager.hideSetup()
