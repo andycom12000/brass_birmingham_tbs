@@ -66,7 +66,7 @@ function EventHandlers.onObjectDrop(playerColor, droppedObject)
     if objType == "building_tile" then
         EventHandlers.handleTilePlaced(playerColor, droppedObject, meta)
     elseif objType == "link_tile" then
-        EventHandlers.handleLinkDrop(playerColor, droppedObject)
+        EventHandlers.handleLinkDrop(playerColor, droppedObject, meta)
     elseif objType == "card" then
         if isCurrentPlayer(playerColor) then
             EventHandlers.handleCardDrop(playerColor, droppedObject)
@@ -137,8 +137,16 @@ function EventHandlers.identifyObject(obj)
 
     -- Fallback for link tiles (no GMNotes tagging -- they use Custom_Token)
     local name = obj.getName() or ""
-    if name:find("^Canal") or name:find("^Rail") then
-        return "link_tile", nil
+    -- English or Chinese link tile names
+    if name:find("^Canal") or name:find("^Rail")
+        or name == "运船" or name == "火车" then
+        local linkType = nil
+        if name:find("^Canal") or name == "运船" then
+            linkType = Constants.Era.CANAL
+        else
+            linkType = Constants.Era.RAIL
+        end
+        return "link_tile", { linkType = linkType }
     end
 
     return nil, nil
@@ -703,48 +711,158 @@ end
 -- Snaps to the nearest valid link point and executes the Network action.
 -- @param playerColor  TTS seat color string
 -- @param linkObj  TTS object representing a canal or rail tile
-function EventHandlers.handleLinkDrop(playerColor, linkObj)
-    if not isCurrentPlayer(playerColor) then return end
+function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
+    if not state then return end
 
-    if not state._pendingCard then
-        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+    local linkType = meta and meta.linkType or Constants.Era.CANAL
+    local isCanal = (linkType == Constants.Era.CANAL)
+    local isRail = (linkType == Constants.Era.RAIL)
+
+    -- Determine costs
+    local moneyCost = 0
+    local coalNeeded = 0
+    if isCanal then
+        moneyCost = Constants.LinkCost.CANAL  -- $3
+    else
+        moneyCost = Constants.LinkCost.SINGLE_RAIL  -- $5
+        coalNeeded = 1
+    end
+
+    -- Era check
+    if isCanal and state.era ~= Constants.Era.CANAL then
+        printToColor("Canal links can only be built in the Canal Era.", playerColor, {1, 0, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
+    if isRail and state.era ~= Constants.Era.RAIL then
+        printToColor("Rail links can only be built in the Rail Era.", playerColor, {1, 0, 0})
         rejectTile(linkObj, playerColor)
         return
     end
 
-    local pos      = linkObj.getPosition()
-    local snapInfo = SnapMap.findNearestPosition(pos, 2.0)
+    -- Money check
+    local player = GameState.getPlayer(state, playerColor)
+    local totalCost = moneyCost
 
-    if snapInfo and snapInfo.type == "link" then
-        local result = Actions.network(state, playerColor, {
-            linkId = snapInfo.id,
-        })
-
-        if result.success then
-            Highlights.clearAll()
-            state._pendingCard = nil
-
-            ObjectManager.moveTo(linkObj, SnapMap.getPositionForLink(snapInfo.id))
-            ObjectManager.lock(linkObj)
-
-            local linkData = BoardData.links[snapInfo.id]
-            local cities   = linkData and linkData.cities or {"?", "?"}
-
-            printToAll(Lang.format("player_linked", state.lang, {
-                player = playerColor,
-                city1  = cities[1],
-                city2  = cities[2],
-            }))
-
-            afterAction(playerColor)
-        else
-            printToColor(result.error, playerColor, {1, 0, 0})
-            rejectTile(linkObj, playerColor)
+    -- Coal check for rail
+    if coalNeeded > 0 then
+        -- Find any city where the player has presence, for BFS coal search
+        local refCity = nil
+        for cName, cData in pairs(state.board.cities) do
+            if cData.slots then
+                for _, s in ipairs(cData.slots) do
+                    if s.occupant == playerColor then
+                        refCity = cName
+                        break
+                    end
+                end
+            end
+            if refCity then break end
         end
-    else
-        printToColor("Invalid link placement.", playerColor, {1, 0, 0})
-        rejectTile(linkObj, playerColor)
+
+        local boardCoal = 0
+        if refCity then
+            local coalSources = Network.findNearestCoal(state, refCity) or {}
+            for _, src in ipairs(coalSources) do
+                boardCoal = boardCoal + #src.slot.tile.resources
+            end
+        end
+
+        local coalFromMarket = math.max(0, coalNeeded - boardCoal)
+
+        -- Market connection check for coal
+        if coalFromMarket > 0 then
+            local hasMarket = false
+            if refCity then
+                hasMarket = Network.hasMarketConnection(state, playerColor, refCity)
+            end
+            if not hasMarket then
+                printToColor("Cannot build rail: no coal available (no board coal or market connection).", playerColor, {1, 0, 0})
+                rejectTile(linkObj, playerColor)
+                return
+            end
+        end
+
+        -- Add market coal cost
+        local coalMarketCost = Market.estimateCost(state, Constants.Resource.COAL, coalFromMarket)
+        totalCost = totalCost + coalMarketCost
     end
+
+    -- Affordability check
+    if player.money < totalCost then
+        printToColor("Not enough money: need $" .. totalCost .. ", have $" .. player.money, playerColor, {1, 0, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
+
+    -- === Passed all checks — commit ===
+
+    -- Deduct money (base cost only; market coal deducted by buyFromMarket)
+    GameState.spendMoney(state, playerColor, moneyCost)
+    updatePhysicalCounters(playerColor, moneyCost)
+
+    -- Consume coal for rail
+    if coalNeeded > 0 then
+        local refCity = nil
+        for cName, cData in pairs(state.board.cities) do
+            if cData.slots then
+                for _, s in ipairs(cData.slots) do
+                    if s.occupant == playerColor then refCity = cName; break end
+                end
+            end
+            if refCity then break end
+        end
+
+        local boardCoal = 0
+        local coalSources = {}
+        if refCity then
+            coalSources = Network.findNearestCoal(state, refCity) or {}
+            for _, src in ipairs(coalSources) do
+                boardCoal = boardCoal + #src.slot.tile.resources
+            end
+        end
+
+        local fromBoard = math.min(coalNeeded, boardCoal)
+        local fromMarket = coalNeeded - fromBoard
+
+        -- Consume from board
+        local remaining = fromBoard
+        for _, src in ipairs(coalSources) do
+            while remaining > 0 and #src.slot.tile.resources > 0 do
+                table.remove(src.slot.tile.resources, #src.slot.tile.resources)
+                Market.returnToMarket(state, Constants.Resource.COAL, 1)
+                Actions.autoFlipIfEmpty(state, src.slot)
+                remaining = remaining - 1
+            end
+            if remaining <= 0 then break end
+        end
+
+        -- Buy from market
+        if fromMarket > 0 then
+            for i = 1, fromMarket do
+                local price = Market.getPrice(state, Constants.Resource.COAL)
+                Market.buyFromMarket(state, playerColor, Constants.Resource.COAL, 1)
+                updatePhysicalCounters(playerColor, price)
+            end
+        end
+    end
+
+    -- Lower tile to board and lock
+    local dropPos = linkObj.getPosition()
+    linkObj.setPositionSmooth(Vector(dropPos.x, 1.05, dropPos.z), false, true)
+    Wait.time(function()
+        if linkObj and not linkObj.isDestroyed() then
+            linkObj.setLock(true)
+        end
+    end, 0.5)
+
+    -- Announce
+    local linkLabel = isCanal and "Canal" or "Rail"
+    local coalInfo = ""
+    if coalNeeded > 0 then
+        coalInfo = " + " .. coalNeeded .. " coal"
+    end
+    printToAll(playerColor .. " built " .. linkLabel .. " link ($" .. moneyCost .. coalInfo .. ")")
 end
 
 ------------------------------------------------------
