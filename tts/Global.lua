@@ -453,7 +453,66 @@ function onChat(message, player)
             printToAll("[STATUS] era=" .. tostring(state.era) .. " round=" .. tostring(state.round))
         end
         return false
+    elseif message == "/slots" then
+        debugShowSlots()
+        return false
+    elseif message == "/clearslots" then
+        debugClearSlots()
+        return false
     end
+end
+
+-- Debug: spawn labels at every slot showing accepted types
+_debugSlotLabels = {}
+
+function debugShowSlots()
+    debugClearSlots()
+    if not state then
+        printToAll("No state — run /init2 first")
+        return
+    end
+
+    local SHORT = {
+        cotton = "Co", coal = "Cl", iron = "Fe",
+        brewery = "Br", manufacturer = "Mf", pottery = "Po",
+    }
+
+    local count = 0
+    for slotId, data in pairs(SnapMap.bySlotId) do
+        local slot = GameState.getSlot(state, slotId)
+        if slot and data.position then
+            local types = slot.types or {}
+            local labels = {}
+            for _, t in ipairs(types) do
+                labels[#labels + 1] = SHORT[t] or t
+            end
+            local text = slotId .. "\n" .. table.concat(labels, "/")
+
+            local pos = data.position + Vector(0, 1.5, 0)
+            local label = spawnObject({
+                type = "3DText",
+                position = pos,
+                rotation = {90, 180, 0},
+            })
+            if label then
+                label.setLock(true)
+                label.setValue(text)
+                label.setScale({0.4, 0.4, 0.4})
+                _debugSlotLabels[#_debugSlotLabels + 1] = label
+                count = count + 1
+            end
+        end
+    end
+    printToAll("Spawned " .. count .. " slot labels. Use /clearslots to remove.")
+end
+
+function debugClearSlots()
+    for _, obj in ipairs(_debugSlotLabels) do
+        if obj and not obj.isDestroyed() then
+            obj.destruct()
+        end
+    end
+    _debugSlotLabels = {}
 end
 
 ------------------------------------------------------
