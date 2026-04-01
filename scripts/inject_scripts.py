@@ -394,6 +394,8 @@ def _tag_single_card(obj: dict) -> None:
             "iron":     cost["iron"],
         }
         obj["GMNotes"] = json.dumps(notes, separators=(",", ":"))
+        # Set readable Nickname
+        obj["Nickname"] = f"{INDUSTRY_NAMES.get(industry, industry)} Lv.{level}"
         return
 
     # ---- game card ----

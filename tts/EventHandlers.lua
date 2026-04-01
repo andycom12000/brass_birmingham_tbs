@@ -78,6 +78,11 @@ end
 -- Cancels pending resource selection if the player picks something up.
 -- @param playerColor  TTS seat color string
 -- @param obj  The TTS object that was picked up
+--- Save a pickup/home position for an object (called from onObjectPickUp and onObjectLeaveContainer)
+function EventHandlers.savePickupPosition(guid, position)
+    _pickupPositions[guid] = position
+end
+
 function EventHandlers.onObjectPickUp(playerColor, obj)
     -- Save pickup position for all objects (used by rejectTile to return to original spot)
     if obj and not obj.isDestroyed() then
@@ -336,8 +341,13 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     slot.occupant = playerColor
     slot.tile = tile
 
-    -- Move tile to board surface at dropped X/Z, then let TTS snap take over
-    tileObj.setPositionSmooth(Vector(buildPos.x, 1.05, buildPos.z), false, true)
+    -- Move tile to the matched slot's snap position (if known), otherwise drop to board surface
+    local snapPos = SnapMap.getPositionForSlot(buildSlotId)
+    if snapPos then
+        tileObj.setPositionSmooth(Vector(snapPos.x, 1.05, snapPos.z), false, true)
+    else
+        tileObj.setPositionSmooth(Vector(buildPos.x, 1.05, buildPos.z), false, true)
+    end
     Wait.time(function()
         if tileObj and not tileObj.isDestroyed() then
             tileObj.setLock(true)

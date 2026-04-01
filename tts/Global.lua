@@ -141,6 +141,15 @@ function onPhysicalSetupComplete(params)
     -- Build snap point mappings (hardcoded positions, no board object needed)
     SnapMap.buildFromGlobal()
 
+    -- Debug: check Nuneaton
+    local nc = state.board.cities["Nuneaton"]
+    printToAll("[DBG] Nuneaton in state=" .. tostring(nc ~= nil))
+    if nc and nc.slots then
+        printToAll("[DBG] Nuneaton slots=" .. #nc.slots)
+    end
+    local nsc = SnapMap.byCityCenter["Nuneaton"]
+    printToAll("[DBG] Nuneaton in SnapMap=" .. tostring(nsc ~= nil))
+
     -- Configure UI
     UIManager.hideSetup()
     UIManager.configureForPlayerCount(playerCount)
@@ -213,6 +222,14 @@ end
 
 function onObjectPickUp(playerColor, pickedUpObject)
     EventHandlers.onObjectPickUp(playerColor, pickedUpObject)
+end
+
+-- Also track position when tile leaves a container (deck/stack on player board)
+function onObjectLeaveContainer(container, obj)
+    if obj and not obj.isDestroyed() then
+        -- Save the container's position as the "home" for this object
+        EventHandlers.savePickupPosition(obj.getGUID(), container.getPosition())
+    end
 end
 
 ------------------------------------------------------
