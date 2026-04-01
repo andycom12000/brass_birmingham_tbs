@@ -116,6 +116,7 @@ function SnapMap.buildFromGlobal()
         { id = "Worcester_2", pos = Vector(7.827, 0.96, 0.012) },
     }
 
+    local count = 0
     for _, entry in ipairs(SLOT_POSITIONS) do
         local data = {
             position = entry.pos,
@@ -124,6 +125,10 @@ function SnapMap.buildFromGlobal()
         }
         SnapMap.bySlotId[entry.id] = data
         SnapMap.byTag["city_" .. entry.id] = data
+        count = count + 1
+    end
+    if printToAll then
+        printToAll("[SnapMap] buildFromGlobal loaded " .. count .. " slots")
     end
 end
 
@@ -164,12 +169,12 @@ function SnapMap.findNearestPosition(worldPos, threshold)
     return nearest
 end
 
---- Euclidean distance between two positions (tables with x,y,z or [1],[2],[3])
+--- 2D distance between two positions (X/Z only, ignoring Y height)
+-- onObjectDrop fires while tile is still in the air, so Y distance is unreliable
 function SnapMap._distance(a, b)
     local dx = (a.x or a[1]) - (b.x or b[1])
-    local dy = (a.y or a[2]) - (b.y or b[2])
     local dz = (a.z or a[3]) - (b.z or b[3])
-    return math.sqrt(dx*dx + dy*dy + dz*dz)
+    return math.sqrt(dx*dx + dz*dz)
 end
 
 return SnapMap
