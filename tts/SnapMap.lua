@@ -3,6 +3,7 @@ local SnapMap = {}
 SnapMap.byTag = {}      -- tag string → { position, rotation, snapIndex }
 SnapMap.bySlotId = {}   -- "Birmingham_1" → snap data
 SnapMap.byLinkId = {}   -- "Birmingham-Coventry" → snap data
+SnapMap.byCityCenter = {} -- "Birmingham" → Vector (center of all slots)
 
 --- Scan a board object's snap points and build all mappings
 -- Snap point tags follow format:
@@ -117,6 +118,7 @@ function SnapMap.buildFromGlobal()
     }
 
     local count = 0
+    local cityAccum = {}  -- cityName -> { sumX, sumZ, n }
     for _, entry in ipairs(SLOT_POSITIONS) do
         local data = {
             position = entry.pos,
@@ -126,10 +128,49 @@ function SnapMap.buildFromGlobal()
         SnapMap.bySlotId[entry.id] = data
         SnapMap.byTag["city_" .. entry.id] = data
         count = count + 1
+
+        -- Accumulate city center
+        local cityName = entry.id:match("^(.+)_%d+$")
+        if cityName then
+            if not cityAccum[cityName] then
+                cityAccum[cityName] = { sumX = 0, sumZ = 0, n = 0 }
+            end
+            local a = cityAccum[cityName]
+            a.sumX = a.sumX + entry.pos.x
+            a.sumZ = a.sumZ + entry.pos.z
+            a.n = a.n + 1
+        end
     end
+
+    -- Compute city centers
+    SnapMap.byCityCenter = {}
+    for cityName, a in pairs(cityAccum) do
+        SnapMap.byCityCenter[cityName] = Vector(a.sumX / a.n, 0.96, a.sumZ / a.n)
+    end
+
     if printToAll then
-        printToAll("[SnapMap] buildFromGlobal loaded " .. count .. " slots")
+        local cityCount = 0
+        for _ in pairs(SnapMap.byCityCenter) do cityCount = cityCount + 1 end
+        printToAll("[SnapMap] loaded " .. count .. " slots in " .. cityCount .. " cities")
     end
+end
+
+--- Find the nearest city to a world position (2D, ignoring Y).
+-- @param worldPos Vector or table
+-- @param threshold number max 2D distance
+-- @return string cityName or nil
+function SnapMap.findNearestCity(worldPos, threshold)
+    local best = nil
+    local bestDist = threshold or 3.0
+
+    for cityName, center in pairs(SnapMap.byCityCenter) do
+        local dist = SnapMap._distance(worldPos, center)
+        if dist < bestDist then
+            bestDist = dist
+            best = cityName
+        end
+    end
+    return best
 end
 
 --- Get world position for a building slot

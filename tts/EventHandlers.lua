@@ -204,27 +204,25 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
 
     local buildPos = tileObj.getPosition()
 
-    -- Find nearest slot, then resolve to the best matching slot in that city
-    local snapInfo = SnapMap.findNearestPosition(buildPos, 3.0)
-    if not snapInfo or snapInfo.type ~= "slot" then
-        printToColor("No valid city found near drop position.", playerColor, {1, 0, 0})
+    -- Find nearest city (not individual slot)
+    local cityName = SnapMap.findNearestCity(buildPos, 4.0)
+    if not cityName then
+        printToColor("No city found near drop position.", playerColor, {1, 0, 0})
         rejectTile(tileObj, playerColor)
         return
     end
 
-    -- Get the city from the nearest slot
-    local nearestSlotId = snapInfo.id
-    local cityName = GameState.getCityForSlot(state, nearestSlotId)
-    if not cityName then
-        printToColor("City not found for slot.", playerColor, {1, 0, 0})
+    -- City must exist in current game state (some removed for 2/3 player)
+    local city = state.board.cities[cityName]
+    if not city then
+        printToColor(cityName .. " is not in this game.", playerColor, {1, 0, 0})
         rejectTile(tileObj, playerColor)
         return
     end
 
     -- Find the best slot in this city: matches industry type AND is unoccupied
     local buildSlotId = nil
-    local city = state.board.cities[cityName]
-    if city and city.slots then
+    if city.slots then
         for _, s in ipairs(city.slots) do
             if not s.occupant and s.types then
                 for _, t in ipairs(s.types) do
@@ -239,9 +237,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     end
 
     if not buildSlotId then
-        -- No matching slot in this city
-        local reason = cityName .. " has no empty slot for " .. (meta.industry or "?")
-        printToColor(reason, playerColor, {1, 0, 0})
+        printToColor(cityName .. " has no empty slot for " .. (meta.industry or "?"), playerColor, {1, 0, 0})
         rejectTile(tileObj, playerColor)
         return
     end
@@ -340,18 +336,13 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     slot.occupant = playerColor
     slot.tile = tile
 
-    -- Snap to position
-    local snapPos = SnapMap.getPositionForSlot(buildSlotId)
-    if snapPos then
-        ObjectManager.moveTo(tileObj, snapPos)
-    end
-
-    -- Lock after a short delay to let smooth movement finish
+    -- Let TTS snap points handle visual positioning (don't force-move).
+    -- Lock after a short delay to let the tile settle onto the snap point.
     Wait.time(function()
         if tileObj and not tileObj.isDestroyed() then
             tileObj.setLock(true)
         end
-    end, 0.3)
+    end, 0.5)
 
     -- Brewery income on placement (breweries auto-flip and give income immediately)
     if industryType == Constants.Industry.BREWERY and tile then
