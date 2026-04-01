@@ -203,43 +203,50 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     local ironNeeded = meta.iron or 0
 
     local buildPos = tileObj.getPosition()
-    local snapInfo = SnapMap.findNearestPosition(buildPos, 2.0)
+
+    -- Find nearest slot, then resolve to the best matching slot in that city
+    local snapInfo = SnapMap.findNearestPosition(buildPos, 3.0)
     if not snapInfo or snapInfo.type ~= "slot" then
-        printToColor("Invalid placement: no valid board slot found.", playerColor, {1, 0, 0})
+        printToColor("No valid city found near drop position.", playerColor, {1, 0, 0})
         rejectTile(tileObj, playerColor)
         return
     end
 
-    local buildSlotId = snapInfo.id
-    local cityName = GameState.getCityForSlot(state, buildSlotId)
+    -- Get the city from the nearest slot
+    local nearestSlotId = snapInfo.id
+    local cityName = GameState.getCityForSlot(state, nearestSlotId)
+    if not cityName then
+        printToColor("City not found for slot.", playerColor, {1, 0, 0})
+        rejectTile(tileObj, playerColor)
+        return
+    end
 
-    -- Validate slot exists in game state
+    -- Find the best slot in this city: matches industry type AND is unoccupied
+    local buildSlotId = nil
+    local city = state.board.cities[cityName]
+    if city and city.slots then
+        for _, s in ipairs(city.slots) do
+            if not s.occupant and s.types then
+                for _, t in ipairs(s.types) do
+                    if t == meta.industry then
+                        buildSlotId = s.id
+                        break
+                    end
+                end
+                if buildSlotId then break end
+            end
+        end
+    end
+
+    if not buildSlotId then
+        -- No matching slot in this city
+        local reason = cityName .. " has no empty slot for " .. (meta.industry or "?")
+        printToColor(reason, playerColor, {1, 0, 0})
+        rejectTile(tileObj, playerColor)
+        return
+    end
+
     local slot = GameState.getSlot(state, buildSlotId)
-    if not slot then
-        printToColor("Slot '" .. buildSlotId .. "' not found in game state.", playerColor, {1, 0, 0})
-        rejectTile(tileObj, playerColor)
-        return
-    end
-
-    -- Basic slot type check (always enforced, even without pending card)
-    if slot.types and meta.industry then
-        local typeMatch = false
-        for _, t in ipairs(slot.types) do
-            if t == meta.industry then typeMatch = true; break end
-        end
-        if not typeMatch then
-            printToColor("This slot accepts {" .. table.concat(slot.types, ", ") .. "}, not " .. meta.industry, playerColor, {1, 0, 0})
-            rejectTile(tileObj, playerColor)
-            return
-        end
-    end
-
-    -- Slot already occupied check
-    if slot.occupant then
-        printToColor("Slot already occupied by " .. slot.occupant, playerColor, {1, 0, 0})
-        rejectTile(tileObj, playerColor)
-        return
-    end
 
     -- Full game-rule validation via Validation.canBuild (when card flow active)
     if state._pendingCard then
