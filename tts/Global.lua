@@ -67,10 +67,29 @@ end
 
 function onSave()
     if state then
-        return JSON.encode({
+        -- Temporarily remove non-serializable fields (Vectors, TTS objects)
+        local pendingBackup = state._pendingResource
+        local animBackup = state._animating
+        state._pendingResource = nil
+        state._animating = nil
+
+        -- cubeGUIDs are fine (string arrays), but remove any Vector refs
+        -- that might have leaked into market data
+        local ok, encoded = pcall(JSON.encode, {
             gameState = state,
             objectGUIDs = ObjectManager.saveGUIDs(),
         })
+
+        -- Restore transient fields
+        state._pendingResource = pendingBackup
+        state._animating = animBackup
+
+        if ok then
+            return encoded
+        else
+            printToAll("[WARN] Save failed: " .. tostring(encoded))
+            return ""
+        end
     end
     return ""
 end
