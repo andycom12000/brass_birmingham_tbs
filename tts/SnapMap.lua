@@ -148,6 +148,14 @@ function SnapMap.buildFromGlobal()
         SnapMap.byCityCenter[cityName] = Vector(a.sumX / a.n, 0.96, a.sumZ / a.n)
     end
 
+    -- Add merchant city centers (no building slots, but needed for link matching)
+    -- Positions from tagged merchant snap points in the save file
+    SnapMap.byCityCenter["Shrewsbury"]  = Vector(-14.439, 0.96, -3.011)
+    SnapMap.byCityCenter["Gloucester"]  = Vector(3.702, 0.96, -14.548)
+    SnapMap.byCityCenter["Oxford"]      = Vector(11.523, 0.96, -11.985)
+    SnapMap.byCityCenter["Warrington"]  = Vector(-7.762, 0.96, 12.550)
+    SnapMap.byCityCenter["Nottingham"]  = Vector(14.237, 0.96, 10.424)
+
     if printToAll then
         local cityCount = 0
         for _ in pairs(SnapMap.byCityCenter) do cityCount = cityCount + 1 end

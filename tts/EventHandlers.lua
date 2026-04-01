@@ -590,7 +590,7 @@ function EventHandlers._buyMarketResources(pending, resourceType)
         -- Actually buy (deducts money, decreases supply)
         Market.buyFromMarket(state, pending.playerColor, resourceType, 1)
 
-        -- Queue animation: cube from market to build site (destroyed on arrival)
+        -- Remove physical market cube (animate to build site then destroy)
         local cubeGUID = nil
         if marketData.cubeGUIDs and #marketData.cubeGUIDs > 0 then
             cubeGUID = table.remove(marketData.cubeGUIDs, #marketData.cubeGUIDs)
@@ -601,6 +601,27 @@ function EventHandlers._buyMarketResources(pending, resourceType)
                 targetPos = pending.buildPos + Vector(0, 1, 0),
                 destroyAfter = true,
             }
+        else
+            -- Fallback: no GUID tracked, try to find and destroy cube at market position
+            local supplyAfter = marketData.supply  -- supply already decremented
+            local trackPos = MarketLayout.getPosition(resourceType, supplyAfter + 1)
+            if trackPos then
+                -- Search for any object near that position
+                for _, obj in ipairs(getAllObjects()) do
+                    if not obj.isDestroyed() and obj.getGMNotes then
+                        local gm = obj.getGMNotes() or ""
+                        if gm:find(resourceType) then
+                            local opos = obj.getPosition()
+                            local dx = opos.x - trackPos.x
+                            local dz = opos.z - trackPos.z
+                            if math.sqrt(dx*dx + dz*dz) < 1.0 then
+                                obj.destruct()
+                                break
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
 
@@ -837,13 +858,25 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
             if remaining <= 0 then break end
         end
 
-        -- Buy from market
+        -- Buy from market (deduct money + remove physical cube)
         if fromMarket > 0 then
+            local marketData = Market.getMarketSupply(state, Constants.Resource.COAL)
+            if not marketData.cubeGUIDs then marketData.cubeGUIDs = {} end
+            local totalPrice = 0
             for i = 1, fromMarket do
                 local price = Market.getPrice(state, Constants.Resource.COAL)
+                totalPrice = totalPrice + price
                 Market.buyFromMarket(state, playerColor, Constants.Resource.COAL, 1)
-                updatePhysicalCounters(playerColor, price)
+                -- Remove physical market cube
+                if #marketData.cubeGUIDs > 0 then
+                    local cubeGUID = table.remove(marketData.cubeGUIDs, #marketData.cubeGUIDs)
+                    if cubeGUID then
+                        local cubeObj = getObjectFromGUID(cubeGUID)
+                        if cubeObj then cubeObj.destruct() end
+                    end
+                end
             end
+            updatePhysicalCounters(playerColor, totalPrice)
         end
     end
 
