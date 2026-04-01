@@ -372,8 +372,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     local boardCoalNeeded = math.min(coalNeeded, boardCoal)
 
     if ironNeeded == 0 and coalNeeded == 0 then
-        -- No resources needed at all
-        EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildPos, meta, cost)
+        EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildPos, meta, cost, tileObj)
         return
     end
 
@@ -383,11 +382,12 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         buildSlotId    = buildSlotId,
         buildPos       = buildPos,
         meta           = meta,
+        tileObj        = tileObj,
         ironNeeded     = boardIronNeeded,
         coalNeeded     = boardCoalNeeded,
         ironFromMarket = ironFromMarket,
         coalFromMarket = coalFromMarket,
-        totalSpent     = cost,  -- will accumulate market costs
+        totalSpent     = cost,
         phase          = Constants.Resource.IRON,
         candidates     = {},
         moves          = {},
@@ -639,7 +639,7 @@ end
 function EventHandlers._playAnimationsAndFinish(pending)
     ResourceAnimation.play(pending.moves, function()
         EventHandlers._handleAutoSellAndFinish(
-            pending.playerColor, pending.buildSlotId, pending.buildPos, pending.meta, pending.totalSpent)
+            pending.playerColor, pending.buildSlotId, pending.buildPos, pending.meta, pending.totalSpent, pending.tileObj)
     end)
 end
 
@@ -650,7 +650,7 @@ end
 -- @param buildPos Vector  TTS world position of the build
 -- @param meta table  GMNotes metadata
 -- @param totalSpent number  Total money spent so far
-function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildPos, meta, totalSpent)
+function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildPos, meta, totalSpent, tileObj)
     local slot = GameState.getSlot(state, buildSlotId)
     if not slot or not slot.tile then
         EventHandlers._finishBuild(playerColor, meta, totalSpent)
@@ -663,75 +663,107 @@ function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildP
         return
     end
 
-    -- Use tile's snap position for spawning (not buildPos which is at hand height)
+    -- Tile position on the board
     local snapPos = SnapMap.getPositionForSlot(buildSlotId)
     local tilePos = snapPos or Vector(buildPos.x, 1.05, buildPos.z)
+    local resourceType = (tileType == Constants.Industry.COAL) and Constants.Resource.COAL or Constants.Resource.IRON
 
-    -- State mutation: auto-sell cubes to market
-    local result = Actions.autoSellToMarket(state, playerColor, slot)
+    -- Calculate sell/keep counts BEFORE state mutation
+    local market = Market.getMarketSupply(state, resourceType)
+    local trackMax = #Market.getTrack(resourceType)
+    local emptySlots = trackMax - market.supply
+    local produced = #slot.tile.resources
+    local sellCount = math.min(produced, emptySlots)
+    local keepCount = produced - sellCount
 
-    if result.sold == 0 and result.kept == 0 then
+    if produced == 0 then
         EventHandlers._finishBuild(playerColor, meta, totalSpent)
         return
     end
 
     if state then state._animating = true end
-    local resourceType = (tileType == Constants.Industry.COAL) and Constants.Resource.COAL or Constants.Resource.IRON
+    if not slot.resourceGUIDs then slot.resourceGUIDs = {} end
+    if not market.cubeGUIDs then market.cubeGUIDs = {} end
 
-    -- Update money counter (autoSellToMarket called gainMoney for sold cubes)
-    if result.sold > 0 then
-        -- Update physical counters to reflect gained money
-        local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
-        if moneyGUID then
-            local moneyObj = getObjectFromGUID(moneyGUID)
-            if moneyObj then
-                pcall(function()
-                    local player = GameState.getPlayer(state, playerColor)
-                    moneyObj.setDescription(tostring(player.money))
-                    moneyObj.call('customSet')
-                end)
-            end
-        end
-        printToAll(playerColor .. " sold " .. result.sold .. " " .. resourceType .. " to market (+$" .. result.sold .. ")")
-    end
-
-    -- Animate sold cubes: spawn at tile, fly to market track
-    local marketData = Market.getMarketSupply(state, resourceType)
-    if not marketData.cubeGUIDs then marketData.cubeGUIDs = {} end
-
-    for i = 1, result.sold do
-        -- Market positions: supply was already increased by autoSellToMarket
-        -- The cubes fill from position (supply - sold + 1) to (supply)
-        local marketIdx = marketData.supply - result.sold + i
-        local targetPos = MarketLayout.getPosition(resourceType, marketIdx)
+    -- Phase 1: Spawn ALL cubes on the tile (visual)
+    local spawnedGUIDs = {}
+    local spawnDelay = 0.15
+    for i = 1, produced do
+        local spawnPos = tilePos + Vector((i - 1) * 0.5 - (produced - 1) * 0.25, 0.5, 0)
         Wait.time(function()
-            ResourceAnimation.spawnAndMoveCube(resourceType, tilePos + Vector(0, 0.5, 0), targetPos, function(obj)
+            ResourceAnimation.spawnCube(resourceType, spawnPos, function(obj)
                 if obj then
-                    marketData.cubeGUIDs[marketIdx] = obj.getGUID()
+                    spawnedGUIDs[i] = obj.getGUID()
                 end
             end)
-        end, (i - 1) * ResourceAnimation.MOVE_INTERVAL)
+        end, (i - 1) * spawnDelay)
     end
 
-    -- Spawn kept cubes on tile (stay in place)
-    for i = 1, result.kept do
-        local spawnPos = tilePos + Vector(0, 0.3 + (i - 1) * 0.4, 0)
-        ResourceAnimation.spawnCube(resourceType, spawnPos, function(obj)
-            if obj then
-                if not slot.resourceGUIDs then slot.resourceGUIDs = {} end
-                slot.resourceGUIDs[#slot.resourceGUIDs + 1] = obj.getGUID()
-            end
-        end)
-    end
-
-    -- Wait for animations, then finish
-    local delay = math.max(result.sold, 1) * ResourceAnimation.MOVE_INTERVAL
-                + ResourceAnimation.MOVE_DURATION
-                + ResourceAnimation.ARRIVE_BUFFER
+    -- Phase 2: After all cubes spawned, do state mutation + sell animation
+    local spawnTime = produced * spawnDelay + 0.3  -- wait for all to appear
     Wait.time(function()
-        if state then state._animating = false end
-        EventHandlers._finishBuild(playerColor, meta, totalSpent)
-    end, delay)
+        -- State mutation
+        local result = Actions.autoSellToMarket(state, playerColor, slot)
+
+        -- Update money counter
+        if result.sold > 0 then
+            local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
+            if moneyGUID then
+                local moneyObj = getObjectFromGUID(moneyGUID)
+                if moneyObj then
+                    pcall(function()
+                        local player = GameState.getPlayer(state, playerColor)
+                        moneyObj.setDescription(tostring(player.money))
+                        moneyObj.call('customSet')
+                    end)
+                end
+            end
+            printToAll(playerColor .. " sold " .. result.sold .. " " .. resourceType .. " to market (+$" .. result.sold .. ")")
+        end
+
+        -- Animate sold cubes: fly from tile to market track
+        for i = 1, sellCount do
+            local marketIdx = market.supply - sellCount + i
+            local targetPos = MarketLayout.getPosition(resourceType, marketIdx)
+            local cubeGUID = spawnedGUIDs[i]
+            Wait.time(function()
+                if cubeGUID then
+                    local cubeObj = getObjectFromGUID(cubeGUID)
+                    if cubeObj then
+                        cubeObj.setLock(false)
+                        cubeObj.setPositionSmooth(targetPos, false, false)
+                        Wait.time(function()
+                            local c = getObjectFromGUID(cubeGUID)
+                            if c then c.setLock(true) end
+                            market.cubeGUIDs[marketIdx] = cubeGUID
+                        end, ResourceAnimation.MOVE_DURATION)
+                    end
+                end
+            end, (i - 1) * ResourceAnimation.MOVE_INTERVAL)
+        end
+
+        -- Kept cubes stay on tile — record their GUIDs
+        for i = sellCount + 1, produced do
+            local cubeGUID = spawnedGUIDs[i]
+            if cubeGUID then
+                slot.resourceGUIDs[#slot.resourceGUIDs + 1] = cubeGUID
+            end
+        end
+
+        -- Phase 3: After sell animations, flip tile if all sold, then finish
+        local sellAnimTime = math.max(sellCount, 1) * ResourceAnimation.MOVE_INTERVAL
+                           + ResourceAnimation.MOVE_DURATION
+                           + ResourceAnimation.ARRIVE_BUFFER
+        Wait.time(function()
+            -- Flip tile if all cubes were sold (tile is now empty)
+            if keepCount == 0 and tileObj and not tileObj.isDestroyed() then
+                tileObj.flip()
+            end
+
+            if state then state._animating = false end
+            EventHandlers._finishBuild(playerColor, meta, totalSpent)
+        end, sellAnimTime)
+    end, spawnTime)
 end
 
 --- Final step: announce build, clean up state, and advance turn.
