@@ -653,11 +653,13 @@ end
 function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildPos, meta, totalSpent, tileObj)
     local slot = GameState.getSlot(state, buildSlotId)
     if not slot or not slot.tile then
+        printToAll("[AutoSell] no slot or tile for " .. tostring(buildSlotId))
         EventHandlers._finishBuild(playerColor, meta, totalSpent)
         return
     end
 
     local tileType = slot.tile.type
+    printToAll("[AutoSell] type=" .. tostring(tileType) .. " resources=" .. #slot.tile.resources)
     if tileType ~= Constants.Industry.COAL and tileType ~= Constants.Industry.IRON then
         EventHandlers._finishBuild(playerColor, meta, totalSpent)
         return
@@ -665,7 +667,7 @@ function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildP
 
     -- Tile position on the board
     local snapPos = SnapMap.getPositionForSlot(buildSlotId)
-    local tilePos = snapPos or Vector(buildPos.x, 1.05, buildPos.z)
+    local tilePos = snapPos and Vector(snapPos.x, 1.05, snapPos.z) or Vector(buildPos.x, 1.05, buildPos.z)
     local resourceType = (tileType == Constants.Industry.COAL) and Constants.Resource.COAL or Constants.Resource.IRON
 
     -- Calculate sell/keep counts BEFORE state mutation
@@ -675,6 +677,9 @@ function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildP
     local produced = #slot.tile.resources
     local sellCount = math.min(produced, emptySlots)
     local keepCount = produced - sellCount
+
+    printToAll("[AutoSell] produced=" .. produced .. " emptySlots=" .. emptySlots .. " sell=" .. sellCount .. " keep=" .. keepCount)
+    printToAll("[AutoSell] tilePos=" .. tostring(tilePos) .. " snapPos=" .. tostring(snapPos))
 
     if produced == 0 then
         EventHandlers._finishBuild(playerColor, meta, totalSpent)

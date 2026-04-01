@@ -149,7 +149,8 @@ function onPhysicalSetupComplete(params)
     PLAYER_SPEND = {}
 
     -- Spawn market coal/iron cubes
-    spawnMarketCubes(state)
+    -- Record existing market cube GUIDs (don't spawn — reference mod already has them)
+    recordMarketCubes(state)
 
     -- No income phase at game start: income is collected at the END of each round.
     -- First round of canal era = 1 action per player, starting with $17.
@@ -194,26 +195,69 @@ function hideUnusedDecks(playerCount)
     end
 end
 
-function spawnMarketCubes(gameState)
+--- Find existing coal/iron cubes on the market track and record their GUIDs.
+--- The reference mod already has cubes placed; we don't spawn new ones.
+function recordMarketCubes(gameState)
     gameState.coalMarket.cubeGUIDs = {}
-    for i = 1, gameState.coalMarket.supply do
-        local pos = MarketLayout.getPosition(Constants.Resource.COAL, i)
-        ResourceAnimation.spawnCube(Constants.Resource.COAL, pos, function(obj)
-            if obj then
-                gameState.coalMarket.cubeGUIDs[i] = obj.getGUID()
+    gameState.ironMarket.cubeGUIDs = {}
+
+    -- Collect all resource cubes on the table
+    local coalCubes = {}
+    local ironCubes = {}
+
+    for _, obj in ipairs(getAllObjects()) do
+        local gm = obj.getGMNotes() or ""
+        local pos = obj.getPosition()
+        -- Check GMNotes (set by inject_scripts.py lock_resource_cubes)
+        if gm:find('"resource":"coal"') or gm:find('"resource": "coal"') then
+            coalCubes[#coalCubes + 1] = { guid = obj.getGUID(), x = pos.x, z = pos.z }
+        elseif gm:find('"resource":"iron"') or gm:find('"resource": "iron"') then
+            ironCubes[#ironCubes + 1] = { guid = obj.getGUID(), x = pos.x, z = pos.z }
+        else
+            -- Fallback: check by Nickname (Chinese names from reference mod)
+            local name = obj.getName() or ""
+            if name == "煤炭" then
+                coalCubes[#coalCubes + 1] = { guid = obj.getGUID(), x = pos.x, z = pos.z }
+            elseif name == "钢铁" then
+                ironCubes[#ironCubes + 1] = { guid = obj.getGUID(), x = pos.x, z = pos.z }
             end
-        end)
+        end
     end
 
-    gameState.ironMarket.cubeGUIDs = {}
-    for i = 1, gameState.ironMarket.supply do
-        local pos = MarketLayout.getPosition(Constants.Resource.IRON, i)
-        ResourceAnimation.spawnCube(Constants.Resource.IRON, pos, function(obj)
-            if obj then
-                gameState.ironMarket.cubeGUIDs[i] = obj.getGUID()
+    -- Match cubes to market track positions (nearest to each slot)
+    local function assignCubesToTrack(cubes, resourceType, market)
+        local trackMax = #Market.getTrack(resourceType)
+        local used = {}
+        for idx = 1, math.min(market.supply, trackMax) do
+            local trackPos = MarketLayout.getPosition(resourceType, idx)
+            local bestCube = nil
+            local bestDist = 2.0  -- max search radius
+            for ci, cube in ipairs(cubes) do
+                if not used[ci] then
+                    local dx = cube.x - trackPos.x
+                    local dz = cube.z - trackPos.z
+                    local dist = math.sqrt(dx*dx + dz*dz)
+                    if dist < bestDist then
+                        bestDist = dist
+                        bestCube = ci
+                    end
+                end
             end
-        end)
+            if bestCube then
+                market.cubeGUIDs[idx] = cubes[bestCube].guid
+                used[bestCube] = true
+            end
+        end
     end
+
+    assignCubesToTrack(coalCubes, Constants.Resource.COAL, gameState.coalMarket)
+    assignCubesToTrack(ironCubes, Constants.Resource.IRON, gameState.ironMarket)
+
+    local coalCount = 0
+    for _ in pairs(gameState.coalMarket.cubeGUIDs) do coalCount = coalCount + 1 end
+    local ironCount = 0
+    for _ in pairs(gameState.ironMarket.cubeGUIDs) do ironCount = ironCount + 1 end
+    printToAll("[Market] Recorded " .. coalCount .. " coal + " .. ironCount .. " iron cube GUIDs")
 end
 
 ------------------------------------------------------
