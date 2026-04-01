@@ -583,34 +583,31 @@ function EventHandlers._buyMarketResources(pending, resourceType)
 
     local totalPrice = 0
     for _ = 1, fromMarket do
-        -- Get price before buying (for tracking)
         local price = Market.getPrice(state, resourceType)
         totalPrice = totalPrice + price
 
-        -- Actually buy (deducts money, decreases supply)
+        -- State: buy from market (deducts money, decreases supply)
         Market.buyFromMarket(state, pending.playerColor, resourceType, 1)
 
-        -- Remove physical market cube (animate to build site then destroy)
+        -- Visual: directly remove the most expensive market cube
         local cubeGUID = nil
-        if marketData.cubeGUIDs and #marketData.cubeGUIDs > 0 then
+        if #marketData.cubeGUIDs > 0 then
             cubeGUID = table.remove(marketData.cubeGUIDs, #marketData.cubeGUIDs)
         end
         if cubeGUID then
-            pending.moves[#pending.moves + 1] = {
-                guid = cubeGUID,
-                targetPos = pending.buildPos + Vector(0, 1, 0),
-                destroyAfter = true,
-            }
+            local cubeObj = getObjectFromGUID(cubeGUID)
+            if cubeObj then cubeObj.destruct() end
         else
-            -- Fallback: no GUID tracked, try to find and destroy cube at market position
-            local supplyAfter = marketData.supply  -- supply already decremented
-            local trackPos = MarketLayout.getPosition(resourceType, supplyAfter + 1)
+            -- Fallback: find cube near the now-empty track position
+            local emptyIdx = marketData.supply + 1
+            local trackPos = MarketLayout.getPosition(resourceType, emptyIdx)
             if trackPos then
-                -- Search for any object near that position
                 for _, obj in ipairs(getAllObjects()) do
-                    if not obj.isDestroyed() and obj.getGMNotes then
-                        local gm = obj.getGMNotes() or ""
-                        if gm:find(resourceType) then
+                    if not obj.isDestroyed() then
+                        local name = obj.getName() or ""
+                        local isMatch = (resourceType == Constants.Resource.COAL and name == "煤炭")
+                                     or (resourceType == Constants.Resource.IRON and name == "钢铁")
+                        if isMatch then
                             local opos = obj.getPosition()
                             local dx = opos.x - trackPos.x
                             local dz = opos.z - trackPos.z
@@ -625,7 +622,6 @@ function EventHandlers._buyMarketResources(pending, resourceType)
         end
     end
 
-    -- Update counters once after all market purchases
     pending.totalSpent = pending.totalSpent + totalPrice
     updatePhysicalCounters(pending.playerColor, totalPrice)
 end
@@ -686,89 +682,68 @@ function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildP
         return
     end
 
-    if state then state._animating = true end
     if not slot.resourceGUIDs then slot.resourceGUIDs = {} end
     if not market.cubeGUIDs then market.cubeGUIDs = {} end
 
-    -- Phase 1: Spawn ALL cubes on the tile (visual)
-    local spawnedGUIDs = {}
-    local spawnDelay = 0.15
-    for i = 1, produced do
-        local spawnPos = tilePos + Vector((i - 1) * 0.5 - (produced - 1) * 0.25, 0.5, 0)
+    -- State mutation: auto-sell (removes resources, adds to market supply, gives money)
+    local result = Actions.autoSellToMarket(state, playerColor, slot)
+
+    -- Update money counter for sold income
+    if result.sold > 0 then
+        local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
+        if moneyGUID then
+            local moneyObj = getObjectFromGUID(moneyGUID)
+            if moneyObj then
+                pcall(function()
+                    local player = GameState.getPlayer(state, playerColor)
+                    moneyObj.setDescription(tostring(player.money))
+                    moneyObj.call('customSet')
+                end)
+            end
+        end
+        printToAll(playerColor .. " sold " .. result.sold .. " " .. resourceType .. " to market (+$" .. result.sold .. ")")
+    end
+
+    -- Spawn ALL produced tokens from infinite bag
+    -- Sold ones go to market positions, kept ones stay on tile
+    if state then state._animating = true end
+    local spawnDelay = 0.25
+
+    -- Spawn sold cubes → directly at market track positions
+    for i = 1, result.sold do
+        local marketIdx = market.supply - result.sold + i
+        local targetPos = MarketLayout.getPosition(resourceType, marketIdx)
         Wait.time(function()
-            ResourceAnimation.spawnCube(resourceType, spawnPos, function(obj)
+            ResourceAnimation.spawnCube(resourceType, targetPos, function(obj)
                 if obj then
-                    spawnedGUIDs[i] = obj.getGUID()
+                    market.cubeGUIDs[marketIdx] = obj.getGUID()
                 end
             end)
         end, (i - 1) * spawnDelay)
     end
 
-    -- Phase 2: After all cubes spawned, do state mutation + sell animation
-    local spawnTime = produced * spawnDelay + 0.3  -- wait for all to appear
-    Wait.time(function()
-        -- State mutation
-        local result = Actions.autoSellToMarket(state, playerColor, slot)
-
-        -- Update money counter
-        if result.sold > 0 then
-            local moneyGUID = COLOR_TO_MONEY_GUID[playerColor]
-            if moneyGUID then
-                local moneyObj = getObjectFromGUID(moneyGUID)
-                if moneyObj then
-                    pcall(function()
-                        local player = GameState.getPlayer(state, playerColor)
-                        moneyObj.setDescription(tostring(player.money))
-                        moneyObj.call('customSet')
-                    end)
-                end
-            end
-            printToAll(playerColor .. " sold " .. result.sold .. " " .. resourceType .. " to market (+$" .. result.sold .. ")")
-        end
-
-        -- Animate sold cubes: fly from tile to market track
-        for i = 1, sellCount do
-            local marketIdx = market.supply - sellCount + i
-            local targetPos = MarketLayout.getPosition(resourceType, marketIdx)
-            local cubeGUID = spawnedGUIDs[i]
-            Wait.time(function()
-                if cubeGUID then
-                    local cubeObj = getObjectFromGUID(cubeGUID)
-                    if cubeObj then
-                        cubeObj.setLock(false)
-                        cubeObj.setPositionSmooth(targetPos, false, false)
-                        Wait.time(function()
-                            local c = getObjectFromGUID(cubeGUID)
-                            if c then c.setLock(true) end
-                            market.cubeGUIDs[marketIdx] = cubeGUID
-                        end, ResourceAnimation.MOVE_DURATION)
-                    end
-                end
-            end, (i - 1) * ResourceAnimation.MOVE_INTERVAL)
-        end
-
-        -- Kept cubes stay on tile — record their GUIDs
-        for i = sellCount + 1, produced do
-            local cubeGUID = spawnedGUIDs[i]
-            if cubeGUID then
-                slot.resourceGUIDs[#slot.resourceGUIDs + 1] = cubeGUID
-            end
-        end
-
-        -- Phase 3: After sell animations, flip tile if all sold, then finish
-        local sellAnimTime = math.max(sellCount, 1) * ResourceAnimation.MOVE_INTERVAL
-                           + ResourceAnimation.MOVE_DURATION
-                           + ResourceAnimation.ARRIVE_BUFFER
+    -- Spawn kept cubes → on the tile
+    for i = 1, result.kept do
+        local spawnPos = Vector(tilePos.x + (i - 1) * 0.5 - (result.kept - 1) * 0.25, 1.5, tilePos.z)
         Wait.time(function()
-            -- Flip tile if all cubes were sold (tile is now empty)
-            if keepCount == 0 and tileObj and not tileObj.isDestroyed() then
-                tileObj.flip()
-            end
+            ResourceAnimation.spawnCube(resourceType, spawnPos, function(obj)
+                if obj then
+                    slot.resourceGUIDs[#slot.resourceGUIDs + 1] = obj.getGUID()
+                end
+            end)
+        end, (result.sold + i - 1) * spawnDelay)
+    end
 
-            if state then state._animating = false end
-            EventHandlers._finishBuild(playerColor, meta, totalSpent)
-        end, sellAnimTime)
-    end, spawnTime)
+    -- After all spawns complete, flip tile if all sold, then finish
+    local totalSpawns = result.sold + result.kept
+    local finishDelay = totalSpawns * spawnDelay + 0.5
+    Wait.time(function()
+        if keepCount == 0 and tileObj and not tileObj.isDestroyed() then
+            tileObj.flip()
+        end
+        if state then state._animating = false end
+        EventHandlers._finishBuild(playerColor, meta, totalSpent)
+    end, finishDelay)
 end
 
 --- Final step: announce build, clean up state, and advance turn.
@@ -924,7 +899,7 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
             if remaining <= 0 then break end
         end
 
-        -- Buy from market (deduct money + remove physical cube)
+        -- Buy from market (deduct money + directly remove cube)
         if fromMarket > 0 then
             local marketData = Market.getMarketSupply(state, Constants.Resource.COAL)
             if not marketData.cubeGUIDs then marketData.cubeGUIDs = {} end
@@ -933,12 +908,31 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
                 local price = Market.getPrice(state, Constants.Resource.COAL)
                 totalPrice = totalPrice + price
                 Market.buyFromMarket(state, playerColor, Constants.Resource.COAL, 1)
-                -- Remove physical market cube
+
+                -- Directly remove market cube
+                local cubeGUID = nil
                 if #marketData.cubeGUIDs > 0 then
-                    local cubeGUID = table.remove(marketData.cubeGUIDs, #marketData.cubeGUIDs)
-                    if cubeGUID then
-                        local cubeObj = getObjectFromGUID(cubeGUID)
-                        if cubeObj then cubeObj.destruct() end
+                    cubeGUID = table.remove(marketData.cubeGUIDs, #marketData.cubeGUIDs)
+                end
+                if cubeGUID then
+                    local cubeObj = getObjectFromGUID(cubeGUID)
+                    if cubeObj then cubeObj.destruct() end
+                else
+                    -- Fallback: find cube near the now-empty track position
+                    local emptyIdx = marketData.supply + 1
+                    local trackPos = MarketLayout.getPosition(Constants.Resource.COAL, emptyIdx)
+                    if trackPos then
+                        for _, obj in ipairs(getAllObjects()) do
+                            if not obj.isDestroyed() and obj.getName() == "煤炭" then
+                                local opos = obj.getPosition()
+                                local dx = opos.x - trackPos.x
+                                local dz = opos.z - trackPos.z
+                                if math.sqrt(dx*dx + dz*dz) < 1.0 then
+                                    obj.destruct()
+                                    break
+                                end
+                            end
+                        end
                     end
                 end
             end
