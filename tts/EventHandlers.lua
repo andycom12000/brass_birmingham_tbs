@@ -213,7 +213,29 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     local buildSlotId = snapInfo.id
     local cityName = GameState.getCityForSlot(state, buildSlotId)
 
-    -- Full game-rule validation via Validation.canBuild
+    -- Validate slot exists in game state
+    local slot = GameState.getSlot(state, buildSlotId)
+    if not slot then
+        printToColor("Slot '" .. buildSlotId .. "' not found in game state.", playerColor, {1, 0, 0})
+        rejectTile(tileObj, playerColor)
+        return
+    end
+
+    -- Basic slot type check (always enforced, even without pending card)
+    if slot.type and meta.industry and slot.type ~= meta.industry then
+        printToColor("This slot accepts " .. slot.type .. ", not " .. meta.industry, playerColor, {1, 0, 0})
+        rejectTile(tileObj, playerColor)
+        return
+    end
+
+    -- Slot already occupied check
+    if slot.occupant then
+        printToColor("Slot already occupied by " .. slot.occupant, playerColor, {1, 0, 0})
+        rejectTile(tileObj, playerColor)
+        return
+    end
+
+    -- Full game-rule validation via Validation.canBuild (when card flow active)
     if state._pendingCard then
         local v = Validation.canBuild(state, playerColor, {
             cardType     = state._pendingCard.cardType,
