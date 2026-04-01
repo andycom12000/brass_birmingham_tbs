@@ -173,6 +173,24 @@ function SnapMap.findNearestCity(worldPos, threshold)
     return best
 end
 
+--- Find the N nearest cities to a world position (2D, ignoring Y).
+-- @param worldPos Vector or table
+-- @param count number how many cities to return
+-- @return table array of city names sorted by distance
+function SnapMap.findNearestCities(worldPos, count)
+    local all = {}
+    for cityName, center in pairs(SnapMap.byCityCenter) do
+        local dist = SnapMap._distance(worldPos, center)
+        all[#all + 1] = { name = cityName, dist = dist }
+    end
+    table.sort(all, function(a, b) return a.dist < b.dist end)
+    local result = {}
+    for i = 1, math.min(count or 2, #all) do
+        result[i] = all[i].name
+    end
+    return result
+end
+
 --- Get world position for a building slot
 function SnapMap.getPositionForSlot(slotId)
     local data = SnapMap.bySlotId[slotId]

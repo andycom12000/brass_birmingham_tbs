@@ -847,8 +847,40 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
         end
     end
 
-    -- Lower tile to board and lock
+    -- Find which link this connects: nearest two cities to the drop position
     local dropPos = linkObj.getPosition()
+    local nearestCities = SnapMap.findNearestCities(dropPos, 2)
+    local linkId = nil
+    local city1, city2 = nil, nil
+    if nearestCities and #nearestCities >= 2 then
+        city1 = nearestCities[1]
+        city2 = nearestCities[2]
+        -- Try both orderings for the link ID
+        linkId = city1 .. "-" .. city2
+        if not state.board.links[linkId] then
+            linkId = city2 .. "-" .. city1
+        end
+        if not state.board.links[linkId] then
+            -- Search all links for one connecting these two cities
+            for lid, ldata in pairs(state.board.links) do
+                local cities = BoardData.links[lid] and BoardData.links[lid].cities
+                if cities then
+                    if (cities[1] == city1 and cities[2] == city2)
+                    or (cities[1] == city2 and cities[2] == city1) then
+                        linkId = lid
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    -- Record link ownership in game state
+    if linkId and state.board.links[linkId] then
+        state.board.links[linkId].owner = playerColor
+    end
+
+    -- Lower tile to board and lock
     linkObj.setPositionSmooth(Vector(dropPos.x, 1.05, dropPos.z), false, true)
     Wait.time(function()
         if linkObj and not linkObj.isDestroyed() then
@@ -862,7 +894,11 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
     if coalNeeded > 0 then
         coalInfo = " + " .. coalNeeded .. " coal"
     end
-    printToAll(playerColor .. " built " .. linkLabel .. " link ($" .. moneyCost .. coalInfo .. ")")
+    local cityInfo = ""
+    if city1 and city2 then
+        cityInfo = " (" .. city1 .. " - " .. city2 .. ")"
+    end
+    printToAll(playerColor .. " built " .. linkLabel .. " link" .. cityInfo .. " ($" .. moneyCost .. coalInfo .. ")")
 end
 
 ------------------------------------------------------
