@@ -222,10 +222,16 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     end
 
     -- Basic slot type check (always enforced, even without pending card)
-    if slot.type and meta.industry and slot.type ~= meta.industry then
-        printToColor("This slot accepts " .. slot.type .. ", not " .. meta.industry, playerColor, {1, 0, 0})
-        rejectTile(tileObj, playerColor)
-        return
+    if slot.types and meta.industry then
+        local typeMatch = false
+        for _, t in ipairs(slot.types) do
+            if t == meta.industry then typeMatch = true; break end
+        end
+        if not typeMatch then
+            printToColor("This slot accepts {" .. table.concat(slot.types, ", ") .. "}, not " .. meta.industry, playerColor, {1, 0, 0})
+            rejectTile(tileObj, playerColor)
+            return
+        end
     end
 
     -- Slot already occupied check

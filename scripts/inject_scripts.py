@@ -586,73 +586,72 @@ def lock_resource_cubes(mod_data: dict) -> int:
 # Ordering within each city: left-to-right (X asc), top-to-bottom (Z desc)
 # Maps to BoardData slot order (first slot in city.slots array = _1, etc.)
 SNAP_TAGS = {
-    # Belper (3 slots): cotton, manufacturer, pottery
-    186: "city_Belper_cotton_1",
-    187: "city_Belper_manufacturer_1",
-    188: "city_Belper_pottery_1",
-    # Birmingham (4 slots): cotton, manufacturer, iron, manufacturer
-    216: "city_Birmingham_cotton_1",
-    218: "city_Birmingham_manufacturer_1",
-    217: "city_Birmingham_iron_1",
-    219: "city_Birmingham_manufacturer_2",
-    # Burton-on-Trent (3 slots): brewery, brewery, coal
-    221: "city_Burton-on-Trent_brewery_1",
-    220: "city_Burton-on-Trent_brewery_2",
-    222: "city_Burton-on-Trent_coal_1",
-    # Cannock (2 slots): coal, manufacturer
-    201: "city_Cannock_coal_1",
-    202: "city_Cannock_manufacturer_1",
-    # Coalbrookdale (3 slots): iron, iron, brewery
-    206: "city_Coalbrookdale_iron_1",
-    207: "city_Coalbrookdale_iron_2",
-    205: "city_Coalbrookdale_brewery_1",
-    # Coventry (2 slots): pottery, manufacturer
-    223: "city_Coventry_pottery_1",
-    224: "city_Coventry_manufacturer_1",
-    # Derby (3 slots): cotton, brewery, manufacturer
-    192: "city_Derby_cotton_1",
-    191: "city_Derby_brewery_1",
-    193: "city_Derby_manufacturer_1",
-    # Dudley (2 slots): coal, iron
-    225: "city_Dudley_coal_1",
-    226: "city_Dudley_iron_1",
-    # Kidderminster (2 slots): cotton, cotton
-    214: "city_Kidderminster_cotton_1",
-    215: "city_Kidderminster_cotton_2",
-    # Leek (2 slots): cotton, manufacturer
-    194: "city_Leek_cotton_1",
-    195: "city_Leek_manufacturer_1",
-    # Nuneaton (2 slots): manufacturer, cotton
-    198: "city_Nuneaton_manufacturer_1",
-    199: "city_Nuneaton_cotton_1",
-    # Redditch (2 slots): coal, iron
-    227: "city_Redditch_coal_1",
-    228: "city_Redditch_iron_1",
-    # Stafford (2 slots): manufacturer, pottery
-    184: "city_Stafford_manufacturer_1",
-    185: "city_Stafford_pottery_1",
-    # Stoke-on-Trent (3 slots): cotton, manufacturer, pottery
-    181: "city_Stoke-on-Trent_cotton_1",
-    182: "city_Stoke-on-Trent_manufacturer_1",
-    183: "city_Stoke-on-Trent_pottery_1",
-    # Stone (2 slots): cotton, manufacturer
-    196: "city_Stone_cotton_1",
-    197: "city_Stone_manufacturer_1",
-    # Tamworth (2 slots): cotton, coal
-    189: "city_Tamworth_cotton_1",
-    190: "city_Tamworth_coal_1",
-    # Uttoxeter (2 slots): manufacturer, brewery
-    212: "city_Uttoxeter_manufacturer_1",
-    213: "city_Uttoxeter_brewery_1",
-    # Walsall (2 slots): manufacturer, brewery
-    208: "city_Walsall_manufacturer_1",
-    209: "city_Walsall_brewery_1",
-    # Wolverhampton (2 slots): manufacturer, manufacturer
-    203: "city_Wolverhampton_manufacturer_1",
-    204: "city_Wolverhampton_manufacturer_2",
-    # Worcester (2 slots): cotton, cotton
-    210: "city_Worcester_cotton_1",
-    211: "city_Worcester_cotton_2",
+    # Belper (3 slots)
+    186: "city_Belper_1",
+    187: "city_Belper_2",
+    188: "city_Belper_3",
+    # Birmingham (4 slots)
+    216: "city_Birmingham_1",
+    218: "city_Birmingham_2",
+    217: "city_Birmingham_3",
+    219: "city_Birmingham_4",
+    # Burton-on-Trent (2 slots — 3rd snap point 222 skipped, not a game slot)
+    221: "city_Burton-on-Trent_1",
+    220: "city_Burton-on-Trent_2",
+    # Cannock (2 slots)
+    201: "city_Cannock_1",
+    202: "city_Cannock_2",
+    # Coalbrookdale (3 slots)
+    206: "city_Coalbrookdale_1",
+    207: "city_Coalbrookdale_2",
+    205: "city_Coalbrookdale_3",
+    # Coventry (3 slots — 3rd snap point has no TTS snap; handled via SnapMap estimate)
+    223: "city_Coventry_1",
+    224: "city_Coventry_2",
+    # Derby (3 slots)
+    192: "city_Derby_1",
+    191: "city_Derby_2",
+    193: "city_Derby_3",
+    # Dudley (2 slots)
+    225: "city_Dudley_1",
+    226: "city_Dudley_2",
+    # Kidderminster (2 slots)
+    214: "city_Kidderminster_1",
+    215: "city_Kidderminster_2",
+    # Leek (2 slots)
+    194: "city_Leek_1",
+    195: "city_Leek_2",
+    # Nuneaton (2 slots)
+    198: "city_Nuneaton_1",
+    199: "city_Nuneaton_2",
+    # Redditch (2 slots)
+    227: "city_Redditch_1",
+    228: "city_Redditch_2",
+    # Stafford (2 slots)
+    184: "city_Stafford_1",
+    185: "city_Stafford_2",
+    # Stoke-on-Trent (3 slots)
+    181: "city_Stoke-on-Trent_1",
+    182: "city_Stoke-on-Trent_2",
+    183: "city_Stoke-on-Trent_3",
+    # Stone (2 slots)
+    196: "city_Stone_1",
+    197: "city_Stone_2",
+    # Tamworth (2 slots)
+    189: "city_Tamworth_1",
+    190: "city_Tamworth_2",
+    # Uttoxeter (2 slots)
+    212: "city_Uttoxeter_1",
+    213: "city_Uttoxeter_2",
+    # Walsall (2 slots)
+    208: "city_Walsall_1",
+    209: "city_Walsall_2",
+    # Wolverhampton (2 slots)
+    203: "city_Wolverhampton_1",
+    204: "city_Wolverhampton_2",
+    # Worcester (2 slots)
+    210: "city_Worcester_1",
+    211: "city_Worcester_2",
 }
 
 

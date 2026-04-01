@@ -192,8 +192,14 @@ function Validation.canBuild(state, color, params)
     end
 
     -- ---- 5. Slot industry type matches what player wants to build ----
-    if slot.type and slot.type ~= industryType then
-        return fail("Slot accepts " .. tostring(slot.type) .. " but you want to build " .. tostring(industryType))
+    if slot.types then
+        local typeMatch = false
+        for _, t in ipairs(slot.types) do
+            if t == industryType then typeMatch = true; break end
+        end
+        if not typeMatch then
+            return fail("Slot accepts {" .. table.concat(slot.types, ", ") .. "} but you want to build " .. tostring(industryType))
+        end
     end
 
     -- ---- 6. Player has the tile available ----
@@ -226,7 +232,7 @@ function Validation.canBuild(state, color, params)
                 return fail("'" .. cityName .. "' is not in your network (industry card requires network connection)")
             end
         end
-        -- No location restriction — just industry type match (already done via slot.type)
+        -- No location restriction — just industry type match (already done via slot.types)
     else
         return fail("Unknown card type: " .. tostring(cardType))
     end

@@ -13,131 +13,131 @@ local BoardData = {}
 -- completeness; their slots array is empty.
 
 BoardData.cities = {
+    Belper = {
+        slots = {
+            { id = "Belper_1", types = {I.COTTON, I.MANUFACTURER} },
+            { id = "Belper_2", types = {I.COAL} },
+            { id = "Belper_3", types = {I.POTTERY} },
+        }
+    },
     Birmingham = {
         slots = {
-            { id = "Birmingham_cotton_1",      type = I.COTTON },
-            { id = "Birmingham_manufacturer_1", type = I.MANUFACTURER },
-            { id = "Birmingham_iron_1",         type = I.IRON },
-            { id = "Birmingham_manufacturer_2", type = I.MANUFACTURER },
-        }
-    },
-    Coventry = {
-        slots = {
-            { id = "Coventry_pottery_1",      type = I.POTTERY },
-            { id = "Coventry_manufacturer_1", type = I.MANUFACTURER },
-        }
-    },
-    Dudley = {
-        slots = {
-            { id = "Dudley_coal_1", type = I.COAL },
-            { id = "Dudley_iron_1", type = I.IRON },
-        }
-    },
-    Kidderminster = {
-        slots = {
-            { id = "Kidderminster_cotton_1", type = I.COTTON },
-            { id = "Kidderminster_cotton_2", type = I.COTTON },
-        }
-    },
-    Wolverhampton = {
-        slots = {
-            { id = "Wolverhampton_manufacturer_1", type = I.MANUFACTURER },
-            { id = "Wolverhampton_manufacturer_2", type = I.MANUFACTURER },
-        }
-    },
-    Coalbrookdale = {
-        slots = {
-            { id = "Coalbrookdale_iron_1",    type = I.IRON },
-            { id = "Coalbrookdale_iron_2",    type = I.IRON },
-            { id = "Coalbrookdale_brewery_1", type = I.BREWERY },
-        }
-    },
-    Nuneaton = {
-        slots = {
-            { id = "Nuneaton_manufacturer_1", type = I.MANUFACTURER },
-            { id = "Nuneaton_cotton_1",       type = I.COTTON },
-        }
-    },
-    Worcester = {
-        slots = {
-            { id = "Worcester_cotton_1", type = I.COTTON },
-            { id = "Worcester_cotton_2", type = I.COTTON },
-        }
-    },
-    Tamworth = {
-        slots = {
-            { id = "Tamworth_cotton_1", type = I.COTTON },
-            { id = "Tamworth_coal_1",   type = I.COAL },
-        }
-    },
-    Walsall = {
-        slots = {
-            { id = "Walsall_manufacturer_1", type = I.MANUFACTURER },
-            { id = "Walsall_brewery_1",      type = I.BREWERY },
-        }
-    },
-    Cannock = {
-        slots = {
-            { id = "Cannock_coal_1",         type = I.COAL },
-            { id = "Cannock_manufacturer_1", type = I.MANUFACTURER },
+            { id = "Birmingham_1", types = {I.COTTON, I.MANUFACTURER} },
+            { id = "Birmingham_2", types = {I.MANUFACTURER} },
+            { id = "Birmingham_3", types = {I.IRON} },
+            { id = "Birmingham_4", types = {I.MANUFACTURER} },
         }
     },
     ["Burton-on-Trent"] = {
         slots = {
-            { id = "Burton-on-Trent_brewery_1", type = I.BREWERY },
-            { id = "Burton-on-Trent_brewery_2", type = I.BREWERY },
-            { id = "Burton-on-Trent_coal_1",    type = I.COAL },
+            { id = "Burton-on-Trent_1", types = {I.MANUFACTURER, I.COAL} },
+            { id = "Burton-on-Trent_2", types = {I.BREWERY} },
         }
     },
-    Stafford = {
+    Cannock = {
         slots = {
-            { id = "Stafford_manufacturer_1", type = I.MANUFACTURER },
-            { id = "Stafford_pottery_1",      type = I.POTTERY },
+            { id = "Cannock_1", types = {I.MANUFACTURER, I.COAL} },
+            { id = "Cannock_2", types = {I.COAL} },
         }
     },
-    ["Stoke-on-Trent"] = {
+    Coalbrookdale = {
         slots = {
-            { id = "Stoke-on-Trent_cotton_1",       type = I.COTTON },
-            { id = "Stoke-on-Trent_manufacturer_1",  type = I.MANUFACTURER },
-            { id = "Stoke-on-Trent_pottery_1",       type = I.POTTERY },
+            { id = "Coalbrookdale_1", types = {I.IRON, I.BREWERY} },
+            { id = "Coalbrookdale_2", types = {I.IRON} },
+            { id = "Coalbrookdale_3", types = {I.COAL} },
         }
     },
-    Leek = {
+    Coventry = {
         slots = {
-            { id = "Leek_cotton_1",       type = I.COTTON },
-            { id = "Leek_manufacturer_1", type = I.MANUFACTURER },
-        }
-    },
-    Stone = {
-        slots = {
-            { id = "Stone_cotton_1",       type = I.COTTON },
-            { id = "Stone_manufacturer_1", type = I.MANUFACTURER },
-        }
-    },
-    Uttoxeter = {
-        slots = {
-            { id = "Uttoxeter_manufacturer_1", type = I.MANUFACTURER },
-            { id = "Uttoxeter_brewery_1",      type = I.BREWERY },
-        }
-    },
-    Belper = {
-        slots = {
-            { id = "Belper_cotton_1",       type = I.COTTON },
-            { id = "Belper_manufacturer_1", type = I.MANUFACTURER },
-            { id = "Belper_pottery_1",      type = I.POTTERY },
+            { id = "Coventry_1", types = {I.POTTERY} },
+            { id = "Coventry_2", types = {I.MANUFACTURER, I.COAL} },
+            { id = "Coventry_3", types = {I.IRON, I.MANUFACTURER} },
         }
     },
     Derby = {
         slots = {
-            { id = "Derby_cotton_1",       type = I.COTTON },
-            { id = "Derby_brewery_1",      type = I.BREWERY },
-            { id = "Derby_manufacturer_1", type = I.MANUFACTURER },
+            { id = "Derby_1", types = {I.COTTON, I.BREWERY} },
+            { id = "Derby_2", types = {I.COTTON, I.MANUFACTURER} },
+            { id = "Derby_3", types = {I.IRON} },
+        }
+    },
+    Dudley = {
+        slots = {
+            { id = "Dudley_1", types = {I.COAL} },
+            { id = "Dudley_2", types = {I.IRON} },
+        }
+    },
+    Kidderminster = {
+        slots = {
+            { id = "Kidderminster_1", types = {I.COTTON, I.COAL} },
+            { id = "Kidderminster_2", types = {I.COTTON} },
+        }
+    },
+    Leek = {
+        slots = {
+            { id = "Leek_1", types = {I.COTTON, I.MANUFACTURER} },
+            { id = "Leek_2", types = {I.COTTON, I.COAL} },
+        }
+    },
+    Nuneaton = {
+        slots = {
+            { id = "Nuneaton_1", types = {I.MANUFACTURER, I.BREWERY} },
+            { id = "Nuneaton_2", types = {I.COTTON, I.COAL} },
         }
     },
     Redditch = {
         slots = {
-            { id = "Redditch_coal_1", type = I.COAL },
-            { id = "Redditch_iron_1", type = I.IRON },
+            { id = "Redditch_1", types = {I.MANUFACTURER, I.COAL} },
+            { id = "Redditch_2", types = {I.IRON} },
+        }
+    },
+    Stafford = {
+        slots = {
+            { id = "Stafford_1", types = {I.MANUFACTURER, I.BREWERY} },
+            { id = "Stafford_2", types = {I.POTTERY} },
+        }
+    },
+    Stone = {
+        slots = {
+            { id = "Stone_1", types = {I.COTTON, I.BREWERY} },
+            { id = "Stone_2", types = {I.MANUFACTURER, I.COAL} },
+        }
+    },
+    ["Stoke-on-Trent"] = {
+        slots = {
+            { id = "Stoke-on-Trent_1", types = {I.COTTON, I.MANUFACTURER} },
+            { id = "Stoke-on-Trent_2", types = {I.POTTERY, I.IRON} },
+            { id = "Stoke-on-Trent_3", types = {I.MANUFACTURER} },
+        }
+    },
+    Tamworth = {
+        slots = {
+            { id = "Tamworth_1", types = {I.COTTON, I.COAL} },
+            { id = "Tamworth_2", types = {I.COTTON, I.COAL} },
+        }
+    },
+    Uttoxeter = {
+        slots = {
+            { id = "Uttoxeter_1", types = {I.MANUFACTURER, I.BREWERY} },
+            { id = "Uttoxeter_2", types = {I.COTTON, I.BREWERY} },
+        }
+    },
+    Walsall = {
+        slots = {
+            { id = "Walsall_1", types = {I.IRON, I.MANUFACTURER} },
+            { id = "Walsall_2", types = {I.MANUFACTURER, I.BREWERY} },
+        }
+    },
+    Wolverhampton = {
+        slots = {
+            { id = "Wolverhampton_1", types = {I.MANUFACTURER} },
+            { id = "Wolverhampton_2", types = {I.MANUFACTURER, I.COAL} },
+        }
+    },
+    Worcester = {
+        slots = {
+            { id = "Worcester_1", types = {I.COTTON} },
+            { id = "Worcester_2", types = {I.COTTON} },
         }
     },
     -- Merchant-only cities (no industry slots)
