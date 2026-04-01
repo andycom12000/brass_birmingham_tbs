@@ -336,8 +336,8 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     slot.occupant = playerColor
     slot.tile = tile
 
-    -- Let TTS snap points handle visual positioning (don't force-move).
-    -- Lock after a short delay to let the tile settle onto the snap point.
+    -- Move tile to board surface at dropped X/Z, then let TTS snap take over
+    tileObj.setPositionSmooth(Vector(buildPos.x, 1.05, buildPos.z), false, true)
     Wait.time(function()
         if tileObj and not tileObj.isDestroyed() then
             tileObj.setLock(true)
