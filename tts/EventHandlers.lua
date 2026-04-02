@@ -34,6 +34,34 @@ local function updatePhysicalCounters(playerColor, spentAmount)
     end
 end
 
+--- Find and flip the physical TTS tile at a board slot, and announce income.
+--- Called when a coal mine or iron works has its resources exhausted.
+--- @param slotId string  The slot whose tile was auto-flipped in state
+--- @param occupant string  The tile owner's color
+--- @param incomeSpaces number  Income spaces awarded
+local function flipPhysicalTile(slotId, occupant, incomeSpaces)
+    local snapPos = SnapMap.getPositionForSlot(slotId)
+    if not snapPos then return end
+
+    -- Find locked tile object near the snap position
+    for _, obj in ipairs(getAllObjects()) do
+        if not obj.isDestroyed() and obj.getLock and obj.getLock() then
+            local opos = obj.getPosition()
+            local dx = opos.x - snapPos.x
+            local dz = opos.z - snapPos.z
+            if math.sqrt(dx*dx + dz*dz) < 1.0 then
+                obj.flip()
+                break
+            end
+        end
+    end
+
+    -- Announce income advance
+    if occupant and incomeSpaces and incomeSpaces > 0 then
+        printToAll(occupant .. " tile flipped — income +" .. incomeSpaces)
+    end
+end
+
 local INDUSTRY_LABELS = {
     cotton       = "Cotton Mill",
     coal         = "Coal Mine",
@@ -137,11 +165,10 @@ function EventHandlers.identifyObject(obj)
 
     -- Fallback for link tiles (no GMNotes tagging -- they use Custom_Token)
     local name = obj.getName() or ""
-    -- English or Chinese link tile names
-    if name:find("^Canal") or name:find("^Rail")
-        or name == "运船" or name == "火车" then
+    local ON = Constants.ObjectName
+    if name:find("^" .. ON.CANAL) or name:find("^" .. ON.RAIL) then
         local linkType = nil
-        if name:find("^Canal") or name == "运船" then
+        if name:find("^" .. ON.CANAL) then
             linkType = Constants.Era.CANAL
         else
             linkType = Constants.Era.RAIL
@@ -295,7 +322,6 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     end
 
     -- Coal requires knowing the city for BFS connectivity
-    local cachedCoalSources = {}
     local boardCoal = 0
     if coalNeeded > 0 then
         if not cityName then
@@ -303,10 +329,8 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
             rejectTile(tileObj, playerColor)
             return
         end
-        cachedCoalSources = Network.findNearestCoal(state, cityName) or {}
-        for _, src in ipairs(cachedCoalSources) do
-            boardCoal = boardCoal + #src.slot.tile.resources
-        end
+        -- Count ALL connected coal (not just nearest) for accurate market shortfall
+        boardCoal = Network.countConnectedCoal(state, cityName)
     end
 
     local ironFromMarket = math.max(0, ironNeeded - boardIron)
@@ -360,18 +384,18 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     slot.occupant = playerColor
     slot.tile = tile
 
-    -- Move tile to the matched slot's snap position (if known), otherwise drop to board surface
+    -- Move tile to the matched slot's snap position.
+    -- Wait 2 frames for TTS snap to settle, then setPosition + lock.
     local snapPos = SnapMap.getPositionForSlot(buildSlotId)
-    if snapPos then
-        tileObj.setPositionSmooth(Vector(snapPos.x, 1.05, snapPos.z), false, true)
-    else
-        tileObj.setPositionSmooth(Vector(buildPos.x, 1.05, buildPos.z), false, true)
-    end
-    Wait.time(function()
+    local targetPos = snapPos
+        and Vector(snapPos.x, 1.05, snapPos.z)
+        or  Vector(buildPos.x, 1.05, buildPos.z)
+    Wait.frames(function()
         if tileObj and not tileObj.isDestroyed() then
+            tileObj.setPosition(targetPos)
             tileObj.setLock(true)
         end
-    end, 0.5)
+    end, 2)
 
     -- Brewery income on placement (breweries auto-flip and give income immediately)
     if industryType == Constants.Industry.BREWERY and tile then
@@ -519,9 +543,14 @@ function EventHandlers._consumeOneFromSource(pending, slotId)
         marketCubes.cubeGUIDs[marketSupply] = cubeGUID
     end
 
-    -- Auto-flip if empty
-    if #slot.tile.resources == 0 then
-        Actions.autoFlipIfEmpty(state, slot)
+    -- Auto-flip if empty — record for physical flip after animations
+    if Actions.autoFlipIfEmpty(state, slot) then
+        if not pending.flippedSlots then pending.flippedSlots = {} end
+        pending.flippedSlots[#pending.flippedSlots + 1] = {
+            slotId = slotId,
+            occupant = slot.occupant,
+            incomeSpaces = slot.tile.incomeSpaces or 0,
+        }
     end
 
     -- Decrement need
@@ -616,8 +645,8 @@ function EventHandlers._buyMarketResources(pending, resourceType)
                 for _, obj in ipairs(getAllObjects()) do
                     if not obj.isDestroyed() then
                         local name = obj.getName() or ""
-                        local isMatch = (resourceType == Constants.Resource.COAL and name == "煤炭")
-                                     or (resourceType == Constants.Resource.IRON and name == "钢铁")
+                        local isMatch = (resourceType == Constants.Resource.COAL and name == Constants.ObjectName.COAL_CUBE)
+                                     or (resourceType == Constants.Resource.IRON and name == Constants.ObjectName.IRON_CUBE)
                         if isMatch then
                             local opos = obj.getPosition()
                             local dx = opos.x - trackPos.x
@@ -645,6 +674,12 @@ end
 -- @param pending table  The _pendingResource state table
 function EventHandlers._playAnimationsAndFinish(pending)
     ResourceAnimation.play(pending.moves, function()
+        -- Physically flip any source tiles emptied during resource consumption
+        if pending.flippedSlots then
+            for _, info in ipairs(pending.flippedSlots) do
+                flipPhysicalTile(info.slotId, info.occupant, info.incomeSpaces)
+            end
+        end
         EventHandlers._handleAutoSellAndFinish(
             pending.playerColor, pending.buildSlotId, pending.buildPos, pending.meta, pending.totalSpent, pending.tileObj)
     end)
@@ -749,7 +784,7 @@ function EventHandlers._handleAutoSellAndFinish(playerColor, buildSlotId, buildP
     local totalSpawns = result.sold + result.kept
     local finishDelay = totalSpawns * spawnDelay + 0.5
     Wait.time(function()
-        if keepCount == 0 and tileObj and not tileObj.isDestroyed() then
+        if result.kept == 0 and tileObj and not tileObj.isDestroyed() then
             tileObj.flip()
         end
         if state then state._animating = false end
@@ -833,12 +868,10 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
             if refCity then break end
         end
 
+        -- Count ALL connected coal (not just nearest) for accurate market shortfall
         local boardCoal = 0
         if refCity then
-            local coalSources = Network.findNearestCoal(state, refCity) or {}
-            for _, src in ipairs(coalSources) do
-                boardCoal = boardCoal + #src.slot.tile.resources
-            end
+            boardCoal = Network.countConnectedCoal(state, refCity)
         end
 
         local coalFromMarket = math.max(0, coalNeeded - boardCoal)
@@ -904,7 +937,9 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
             while remaining > 0 and #src.slot.tile.resources > 0 do
                 table.remove(src.slot.tile.resources, #src.slot.tile.resources)
                 Market.returnToMarket(state, Constants.Resource.COAL, 1)
-                Actions.autoFlipIfEmpty(state, src.slot)
+                if Actions.autoFlipIfEmpty(state, src.slot) then
+                    flipPhysicalTile(src.slotId, src.slot.occupant, src.slot.tile.incomeSpaces or 0)
+                end
                 remaining = remaining - 1
             end
             if remaining <= 0 then break end
@@ -934,7 +969,7 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
                     local trackPos = MarketLayout.getPosition(Constants.Resource.COAL, emptyIdx)
                     if trackPos then
                         for _, obj in ipairs(getAllObjects()) do
-                            if not obj.isDestroyed() and obj.getName() == "煤炭" then
+                            if not obj.isDestroyed() and obj.getName() == Constants.ObjectName.COAL_CUBE then
                                 local opos = obj.getPosition()
                                 local dx = opos.x - trackPos.x
                                 local dz = opos.z - trackPos.z
@@ -981,6 +1016,11 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
     -- Record link ownership in game state
     if linkId and state.board.links[linkId] then
         state.board.links[linkId].owner = playerColor
+    elseif linkId then
+        -- SnapMap found a link ID but it doesn't exist in BoardData/game state
+        printToColor("[Warning] Link '" .. linkId .. "' not found in game state — canal/rail not tracked!", playerColor, {1, 0.5, 0})
+    else
+        printToColor("[Warning] No link snap found near drop position — canal/rail not tracked!", playerColor, {1, 0.5, 0})
     end
 
     -- Lower tile to board and lock

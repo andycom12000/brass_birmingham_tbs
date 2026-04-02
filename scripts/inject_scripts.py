@@ -480,9 +480,9 @@ CROWN_CALLBACK_SNIPPET = """
 """
 
 CROWN_LABELS = {
-    "5f8b97": "2 Players / 2\u4eba\u904a\u6232",
-    "9c5d5e": "3 Players / 3\u4eba\u904a\u6232",
-    "3ba14f": "4 Players / 4\u4eba\u904a\u6232",
+    "5f8b97": "2 Players",
+    "9c5d5e": "3 Players",
+    "3ba14f": "4 Players",
 }
 
 
@@ -528,20 +528,62 @@ def patch_crown_buttons(mod_data: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Rename Chinese nicknames to English
+# ---------------------------------------------------------------------------
+
+NICKNAME_RENAME_MAP = {
+    "\u8fd0\u8239":          "Canal",
+    "\u8fd0\u8239-\u8fd0\u6cb3\u65f6\u4ee3": "Canal - Canal Era",
+    "\u706b\u8f66":          "Rail",
+    "\u706b\u8f66-\u94c1\u8def\u65f6\u4ee3": "Rail - Rail Era",
+    "\u7164\u70ad":          "Coal",
+    "\u94a2\u94c1":          "Iron",
+    "\u9152\u6876":          "Beer",
+    "\u7164\u77ff":          "Coal Bag",
+    "\u6536\u5165\u6307\u793a\u7269":  "Income Marker",
+    "\u5206\u6570\u6307\u793a\u7269":  "Score Marker",
+    "\u4e07\u80fd\u5730\u70b9\u724c":  "Wild Location",
+    "\u4e07\u80fd\u4ea7\u4e1a\u724c":  "Wild Industry",
+    "AI\u62bd\u724c\u6309\u94ae":      "AI Draw Button",
+    "\u8bbe\u7f6e -\u7b80\u5355AI-":   "Setup - Easy AI",
+    "\u8bbe\u7f6e -\u4e2d\u7b49AI-":   "Setup - Medium AI",
+    "\u8bbe\u7f6e -\u56f0\u96beAI-":   "Setup - Hard AI",
+}
+
+
+def rename_chinese_nicknames(mod_data: dict) -> int:
+    """Rename Chinese Nicknames in all ObjectStates to English equivalents."""
+    renamed = 0
+
+    def _walk(obj: dict) -> None:
+        nonlocal renamed
+        nickname = obj.get("Nickname", "")
+        if nickname in NICKNAME_RENAME_MAP:
+            obj["Nickname"] = NICKNAME_RENAME_MAP[nickname]
+            renamed += 1
+        for child in obj.get("ContainedObjects", []):
+            _walk(child)
+
+    for obj in mod_data.get("ObjectStates", []):
+        _walk(obj)
+
+    return renamed
+
+
+# ---------------------------------------------------------------------------
 # Lock coal/iron resource cubes
 # ---------------------------------------------------------------------------
 
 def lock_resource_cubes(mod_data: dict) -> int:
     """
     Lock coal/iron cube objects on the market track.
-    Reference mod uses Chinese names: 煤炭 (coal), 钢铁 (iron).
     Object type is BlockSquare, not Custom_Token.
     """
     locked = 0
 
-    # Match patterns for coal/iron cubes (English + Chinese)
-    COAL_NAMES = {"coal", "煤炭", "煤"}
-    IRON_NAMES = {"iron", "钢铁", "铁"}
+    # Match patterns for coal/iron cubes
+    COAL_NAMES = {"coal", "Coal", "Coal Bag"}
+    IRON_NAMES = {"iron", "Iron", "Iron Bag"}
     # Object types that are cubes (not bags or boards)
     CUBE_TYPES = {"BlockSquare", "Custom_Token", "Custom_Model"}
 
@@ -751,7 +793,13 @@ def main():
     n_crowns = patch_crown_buttons(mod_data)
     print(f"  Patched {n_crowns} crown button(s).")
 
-    # 4f. Lock resource cubes
+    # 4f. Rename Chinese nicknames to English
+    print()
+    print("Renaming Chinese nicknames to English...")
+    n_renamed = rename_chinese_nicknames(mod_data)
+    print(f"  Renamed {n_renamed} object(s).")
+
+    # 4g. Lock resource cubes
     print()
     print("Locking coal/iron resource cubes...")
     n_cubes = lock_resource_cubes(mod_data)

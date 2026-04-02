@@ -214,11 +214,11 @@ function recordMarketCubes(gameState)
         elseif gm:find('"resource":"iron"') or gm:find('"resource": "iron"') then
             ironCubes[#ironCubes + 1] = { guid = obj.getGUID(), x = pos.x, z = pos.z }
         else
-            -- Fallback: check by Nickname (Chinese names from reference mod)
+            -- Fallback: check by Nickname
             local name = obj.getName() or ""
-            if name == "煤炭" then
+            if name == Constants.ObjectName.COAL_CUBE then
                 coalCubes[#coalCubes + 1] = { guid = obj.getGUID(), x = pos.x, z = pos.z }
-            elseif name == "钢铁" then
+            elseif name == Constants.ObjectName.IRON_CUBE then
                 ironCubes[#ironCubes + 1] = { guid = obj.getGUID(), x = pos.x, z = pos.z }
             end
         end
@@ -602,7 +602,7 @@ function toggleLanguage()
     if not state then return end
     state.lang = (state.lang == "en") and "zh-TW" or "en"
     UIManager.updateLanguage(state.lang)
-    printToAll("Language: " .. (state.lang == "en" and "English" or "繁體中文"))
+    printToAll("Language: " .. (state.lang == "en" and "English" or "Traditional Chinese"))
 end
 
 ------------------------------------------------------

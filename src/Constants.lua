@@ -42,4 +42,25 @@ Constants.INITIAL_COAL_SUPPLY = 13
 Constants.INITIAL_IRON_SUPPLY = 8
 Constants.WILD_SUPPLY_COUNT = 4
 
+Constants.ObjectName = {
+    -- Resource bags (infinite bags on table)
+    COAL_BAG  = "Coal Bag",
+    IRON_BAG  = "Iron Bag",
+    BEER_BAG  = "Beer Bag",
+    -- Resource cubes/tokens (Nickname on individual objects)
+    COAL_CUBE = "Coal",
+    IRON_CUBE = "Iron",
+    BEER      = "Beer",
+    -- Link tiles (prefix — matched with string.find)
+    CANAL     = "Canal",
+    RAIL      = "Rail",
+    -- Other identifiable objects
+    MAIN_BOARD           = "Main Board",
+    DRAW_DECK            = "Draw Deck",
+    DISCARD_ZONE         = "Discard Zone",
+    WILD_LOCATION_SUPPLY = "Wild Location Supply",
+    WILD_INDUSTRY_SUPPLY = "Wild Industry Supply",
+    LANGUAGE_TOGGLE      = "Language Toggle",
+}
+
 return Constants
