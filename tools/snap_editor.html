@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>Brass Birmingham Snap Map Editor</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', sans-serif; background:#1a1a2e; color:#eee; display:flex; height:100vh; overflow:hidden; }
+
+/* Board area */
+#board-wrap { flex:1; position:relative; overflow:hidden; }
+#board-container {
+  position:absolute; top:50%; left:50%;
+  transform-origin: center center;
+}
+#board-img {
+  position:absolute;
+  opacity:0.80;
+  pointer-events:none;
+  transform-origin: 0 0;
+}
+#grid-canvas {
+  position:absolute; top:0; left:0;
+  pointer-events:none;
+}
+.marker {
+  position:absolute;
+  width:22px; height:22px;
+  border-radius:50%;
+  border:2px solid #fff;
+  cursor:grab;
+  display:flex; align-items:center; justify-content:center;
+  font-size:9px; font-weight:bold; color:#fff;
+  text-shadow:0 0 3px #000;
+  transform:translate(-50%,-50%);
+  z-index:10;
+  transition: box-shadow 0.15s;
+}
+.marker:hover { box-shadow:0 0 8px 2px rgba(255,255,255,0.6); z-index:20; }
+.marker.selected { box-shadow:0 0 12px 3px #ffd700; z-index:30; border-color:#ffd700; }
+.marker.link-marker {
+  width:14px; height:14px;
+  border-radius:2px;
+  opacity:0.5;
+  font-size:7px;
+  z-index:5;
+  border:1px solid #888;
+}
+.marker.link-marker:hover { opacity:0.9; }
+.marker.unassigned { border-style:dashed; opacity:0.5; }
+.marker.swap-pick { animation: pulse 0.6s ease-in-out infinite alternate; }
+@keyframes pulse { from { box-shadow:0 0 6px 2px #ff0; } to { box-shadow:0 0 14px 5px #ff0; } }
+.city-label {
+  position:absolute;
+  transform:translate(-50%,-120%);
+  font-size:10px;
+  color:#ffd700;
+  text-shadow:0 0 4px #000, 0 0 4px #000;
+  pointer-events:none;
+  white-space:nowrap;
+  z-index:8;
+}
+
+/* Sidebar */
+#sidebar {
+  width:380px; background:#16213e; border-left:1px solid #333;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+#sidebar h2 { padding:12px 16px; background:#0f3460; font-size:15px; }
+#toolbar {
+  padding:8px 12px; background:#1a1a3e; display:flex; gap:8px; flex-wrap:wrap;
+  border-bottom:1px solid #333;
+}
+#toolbar button, #toolbar label {
+  padding:6px 12px; border:1px solid #555; border-radius:4px;
+  background:#2a2a4a; color:#eee; cursor:pointer; font-size:12px;
+}
+#toolbar button:hover, #toolbar label:hover { background:#3a3a6a; }
+
+#slot-list {
+  flex:1; overflow-y:auto; padding:8px;
+}
+.slot-item {
+  padding:8px 10px; margin-bottom:4px;
+  border-radius:4px; cursor:pointer;
+  border:1px solid transparent;
+  font-size:12px;
+  display:flex; align-items:center; gap:8px;
+}
+.slot-item:hover { background:rgba(255,255,255,0.05); }
+.slot-item.selected { border-color:#ffd700; background:rgba(255,215,0,0.1); }
+.slot-color {
+  width:14px; height:14px; border-radius:50%; border:1px solid #888; flex-shrink:0;
+}
+.slot-info { flex:1; }
+.slot-city { font-weight:bold; }
+.slot-types { font-size:10px; color:#aaa; }
+.slot-pos { font-size:10px; color:#666; }
+
+/* Detail panel */
+#detail-panel {
+  border-top:1px solid #333; padding:12px; background:#0f3460;
+  display:none;
+}
+#detail-panel h3 { margin-bottom:8px; font-size:14px; color:#ffd700; }
+#detail-panel .field { margin-bottom:8px; }
+#detail-panel label { font-size:12px; display:block; margin-bottom:2px; color:#aaa; }
+#detail-panel select, #detail-panel input[type=text] {
+  width:100%; padding:4px 8px; border-radius:3px;
+  border:1px solid #555; background:#1a1a3e; color:#eee; font-size:12px;
+}
+.type-checks { display:flex; flex-wrap:wrap; gap:6px; }
+.type-check {
+  display:flex; align-items:center; gap:3px;
+  padding:3px 8px; border-radius:3px; font-size:11px;
+  border:1px solid #555; cursor:pointer;
+}
+.type-check.active { border-color:#ffd700; background:rgba(255,215,0,0.2); }
+.type-check input { display:none; }
+
+/* Zoom controls */
+#zoom-info {
+  position:fixed; bottom:10px; left:10px; font-size:11px;
+  color:#888; z-index:100; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:3px;
+}
+
+/* Export modal */
+#export-modal {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.8); z-index:1000;
+  align-items:center; justify-content:center;
+}
+#export-modal.show { display:flex; }
+#export-content {
+  background:#16213e; border-radius:8px; padding:20px;
+  max-width:800px; width:90%; max-height:80vh; overflow:auto;
+}
+#export-content h3 { margin-bottom:12px; }
+#export-content textarea {
+  width:100%; height:400px; background:#0a0a1e; color:#0f0;
+  border:1px solid #333; border-radius:4px; padding:10px;
+  font-family:monospace; font-size:11px;
+}
+#export-content button {
+  margin-top:10px; padding:8px 20px; border:none; border-radius:4px;
+  background:#ffd700; color:#000; font-weight:bold; cursor:pointer;
+}
+
+/* Toggle buttons */
+.toggle-btn { font-size:11px !important; }
+.toggle-btn.active { background:#3a6a3a !important; border-color:#5a5 !important; }
+
+/* Tabs */
+.tab-bar { display:flex; border-bottom:1px solid #333; }
+.tab-btn { flex:1; padding:8px; text-align:center; cursor:pointer; font-size:12px; border:none; background:#1a1a3e; color:#888; border-bottom:2px solid transparent; transition:all 0.15s; }
+.tab-btn.active { color:#ffd700; border-bottom-color:#ffd700; background:#16213e; }
+.tab-btn:hover { color:#eee; }
+
+/* Link list */
+.link-item { padding:6px 10px; margin-bottom:3px; border-radius:4px; cursor:pointer; border:1px solid transparent; font-size:12px; display:flex; align-items:center; gap:8px; }
+.link-item:hover { background:rgba(255,255,255,0.05); }
+.link-item.selected { border-color:#ffd700; background:rgba(255,215,0,0.1); }
+.link-info { flex:1; }
+.link-name { font-weight:bold; }
+.link-pos { font-size:10px; color:#666; }
+.link-tags { display:flex; gap:3px; margin-top:2px; }
+.link-tag { font-size:9px; padding:1px 5px; border-radius:3px; font-weight:bold; }
+.link-tag.canal { background:#1565c0; color:#fff; }
+.link-tag.rail { background:#c62828; color:#fff; }
+.link-tag.market { background:#f9a825; color:#000; }
+
+/* Link marker selected */
+.marker.link-marker.selected { opacity:1 !important; box-shadow:0 0 10px 3px #ffd700; border-color:#ffd700 !important; z-index:25; }
+.marker.link-marker.has-market { border-color:#f9a825 !important; }
+</style>
+</head>
+<body>
+
+<div id="board-wrap">
+  <div id="board-container">
+    <img id="board-img">
+    <canvas id="grid-canvas"></canvas>
+  </div>
+  <div id="zoom-info">滾輪=縮放 | 拖曳=平移 | 點擊圓點=編輯 | Alt+方向鍵=移動圖片 | Alt+/-=縮放圖片 | Alt+O=切換透明度</div>
+</div>
+
+<div id="sidebar">
+  <h2>Snap Map 編輯器</h2>
+  <div id="toolbar">
+    <button id="btn-swap" class="toggle-btn" style="background:#8b2500;border-color:#c33">互換城市</button>
+    <button id="btn-toggle-grid" class="toggle-btn active">格線</button>
+    <button id="btn-toggle-links" class="toggle-btn active">路線</button>
+    <button id="btn-toggle-labels" class="toggle-btn active">城市名</button>
+    <button id="btn-export">匯出</button>
+    <span id="swap-hint" style="font-size:11px;color:#ff0;display:none">點擊第一個城市的格子，再點第二個城市的格子即完成互換</span>
+    <span id="normal-hint" style="font-size:11px;color:#888">Alt+方向鍵=移動圖片 Alt+/-=縮放 Alt+O=透明度</span>
+  </div>
+  <div class="tab-bar">
+    <div class="tab-btn active" data-tab="slots">建築格 (Slots)</div>
+    <div class="tab-btn" data-tab="links">路線 (Links)</div>
+  </div>
+  <div id="slot-list"></div>
+  <div id="link-list" style="display:none;flex:1;overflow-y:auto;padding:8px;"></div>
+  <div id="detail-panel">
+    <h3 id="detail-title">Slot Detail</h3>
+    <div class="field">
+      <label>城市 City</label>
+      <select id="detail-city"></select>
+    </div>
+    <div class="field">
+      <label>城市內 Slot 編號</label>
+      <input type="text" id="detail-slot-num" readonly>
+    </div>
+    <div class="field">
+      <label>產業類型（勾選所有適用的）</label>
+      <div class="type-checks" id="detail-types"></div>
+    </div>
+    <div class="field">
+      <label>位置（拖曳地圖上的圓點調整）</label>
+      <input type="text" id="detail-pos" readonly>
+    </div>
+    <div class="field">
+      <label>Snap 索引</label>
+      <input type="text" id="detail-idx" readonly>
+    </div>
+  </div>
+  <div id="link-detail-panel" style="display:none;border-top:1px solid #333;padding:12px;background:#0f3460;">
+    <h3 id="link-detail-title" style="margin-bottom:8px;font-size:14px;color:#ffd700;">Link Detail</h3>
+    <div class="field">
+      <label>路線 ID</label>
+      <input type="text" id="link-detail-id" readonly style="width:100%;padding:4px 8px;border-radius:3px;border:1px solid #555;background:#1a1a3e;color:#eee;font-size:12px;">
+    </div>
+    <div class="field">
+      <label>路線屬性（勾選所有適用的）</label>
+      <div class="type-checks" id="link-detail-types"></div>
+    </div>
+    <div class="field">
+      <label>位置（拖曳地圖上的方塊調整）</label>
+      <input type="text" id="link-detail-pos" readonly style="width:100%;padding:4px 8px;border-radius:3px;border:1px solid #555;background:#1a1a3e;color:#eee;font-size:12px;">
+    </div>
+    <div class="field">
+      <label>Snap 索引</label>
+      <input type="text" id="link-detail-idx" readonly style="width:100%;padding:4px 8px;border-radius:3px;border:1px solid #555;background:#1a1a3e;color:#eee;font-size:12px;">
+    </div>
+  </div>
+</div>
+
+<div id="export-modal">
+  <div id="export-content">
+    <h3>匯出 SnapMap 資料</h3>
+    <textarea id="export-text" readonly></textarea>
+    <button onclick="copyExport()">複製到剪貼簿</button>
+    <button onclick="document.getElementById('export-modal').classList.remove('show')">關閉</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const INDUSTRY_TYPES = ['cotton','coal','iron','brewery','manufacturer','pottery'];
+const TYPE_COLORS = {
+  cotton:'#4fc3f7', coal:'#616161', iron:'#9e9e9e',
+  brewery:'#ff8f00', manufacturer:'#ab47bc', pottery:'#e65100',
+};
+const TYPE_LABELS = {
+  cotton:'Cotton 棉花', coal:'Coal 煤礦', iron:'Iron 鐵礦',
+  brewery:'Brewery 釀酒廠', manufacturer:'Manufacturer 工廠', pottery:'Pottery 陶器',
+};
+
+const CITY_ZH = {
+  'Belper':'貝爾珀','Birmingham':'伯明罕','Burton-on-Trent':'特倫特河畔伯頓',
+  'Cannock':'坎諾克','Coalbrookdale':'科布魯克戴爾','Coventry':'考文垂',
+  'Derby':'德比','Dudley':'達德利','Kidderminster':'基德明斯特',
+  'Leek':'利克','Nuneaton':'納尼頓','Redditch':'雷迪奇',
+  'Stafford':'斯塔福德','Stoke-on-Trent':'特倫特河畔斯托克','Stone':'斯通',
+  'Tamworth':'塔姆沃思','Uttoxeter':'厄托克塞特','Walsall':'沃爾索爾',
+  'Wolverhampton':'伍爾弗漢普頓','Worcester':'伍斯特',
+};
+function cityDisplay(name) { return name + ' ' + (CITY_ZH[name]||''); }
+
+const CITY_COLORS = {
+  'Belper':'#e91e63','Birmingham':'#f44336','Burton-on-Trent':'#ff9800',
+  'Cannock':'#ffeb3b','Coalbrookdale':'#8bc34a','Coventry':'#4caf50',
+  'Derby':'#009688','Dudley':'#00bcd4','Kidderminster':'#03a9f4',
+  'Leek':'#2196f3','Nuneaton':'#3f51b5','Redditch':'#673ab7',
+  'Stafford':'#9c27b0','Stoke-on-Trent':'#e91e63','Stone':'#795548',
+  'Tamworth':'#ff5722','Uttoxeter':'#607d8b','Walsall':'#cddc39',
+  'Wolverhampton':'#ffc107','Worcester':'#00e676',
+};
+
+// Raw snap points from JSON
+const RAW_BUILDING_SNAPS = [
+  {idx:181,x:-3.885,z:11.988},{idx:182,x:-3.022,z:13.529},{idx:183,x:-2.225,z:11.988},
+  {idx:184,x:1.098,z:14.439},{idx:185,x:2.732,z:14.424},
+  {idx:186,x:7.299,z:13.939},{idx:187,x:8.955,z:13.939},{idx:188,x:10.584,z:13.939},
+  {idx:189,x:1.52,z:8.99},{idx:190,x:3.181,z:8.972},
+  {idx:191,x:9.234,z:9.794},{idx:192,x:8.429,z:8.222},{idx:193,x:10.044,z:8.203},
+  {idx:194,x:-7.521,z:8.399},{idx:195,x:-5.888,z:8.39},
+  {idx:196,x:-4.259,z:5.207},{idx:197,x:-2.637,z:5.223},
+  {idx:198,x:5.674,z:4.249},{idx:199,x:7.303,z:4.249},
+  {idx:200,x:-7.06,z:2.173},
+  {idx:201,x:-1.692,z:1.758},{idx:202,x:-0.032,z:1.781},
+  {idx:203,x:-5.35,z:-1.34},{idx:204,x:-3.743,z:-1.347},
+  {idx:205,x:-8.53,z:-2.829},{idx:206,x:-10.2,z:-2.829},{idx:207,x:-9.368,z:-1.263},
+  {idx:208,x:0.314,z:-2.13},{idx:209,x:1.955,z:-2.145},
+  {idx:210,x:6.208,z:-0.016},{idx:211,x:7.827,z:0.012},
+  {idx:212,x:9.378,z:-3.402},{idx:213,x:11.021,z:-3.395},
+  {idx:214,x:-3.722,z:-5.508},{idx:215,x:-2.096,z:-5.496},
+  {idx:216,x:3.743,z:-6.824},{idx:217,x:5.386,z:-6.817},
+  {idx:218,x:3.764,z:-5.244},{idx:219,x:5.414,z:-5.223},
+  {idx:220,x:10.99,z:-6.282},{idx:221,x:10.171,z:-7.885},{idx:222,x:11.802,z:-7.864},
+  {idx:223,x:2.114,z:-10.818},{idx:224,x:3.773,z:-10.818},
+  {idx:225,x:-6.169,z:-9.017},{idx:226,x:-4.555,z:-9.001},
+  {idx:227,x:-5.71,z:-13.405},{idx:228,x:-4.074,z:-13.389},
+  {idx:229,x:-8.422,z:-11.546},
+];
+
+const RAW_LINK_SNAPS = [
+  {idx:141,x:-5.66,z:-11.507},{idx:142,x:-0.662,z:-10.045},
+  {idx:143,x:-5.175,z:-7.144},{idx:144,x:-8.499,z:-6.754},
+  {idx:145,x:-11.754,z:-1.317},{idx:146,x:-7.388,z:-1.276},
+  {idx:147,x:-2.077,z:-14.461},{idx:148,x:0.295,z:-12.101},
+  {idx:149,x:5.738,z:-11.26},{idx:150,x:-4.262,z:-3.716},
+  {idx:151,x:-1.709,z:-1.495},{idx:152,x:0.718,z:-5.985},
+  {idx:153,x:1.976,z:-4.4},{idx:154,x:3.98,z:-8.918},
+  {idx:155,x:7.655,z:-9.164},{idx:156,x:7.749,z:-7.477},
+  {idx:157,x:7.479,z:-4.938},{idx:158,x:6.758,z:-2.971},
+  {idx:159,x:12.644,z:-5.285},{idx:160,x:9.932,z:-1.112},
+  {idx:161,x:4.274,z:-1.763},{idx:162,x:6.974,z:1.952},
+  {idx:163,x:3.035,z:0.613},{idx:164,x:1.324,z:-0.099},
+  {idx:165,x:-3.743,z:0.621},{idx:166,x:-4.264,z:2.316},
+  {idx:167,x:-0.808,z:3.685},{idx:168,x:2.477,z:3.545},
+  {idx:169,x:-6.275,z:5.707},{idx:170,x:0.442,z:6.879},
+  {idx:171,x:-1.969,z:8.921},{idx:172,x:5.863,z:8.483},
+  {idx:173,x:8.926,z:5.836},{idx:174,x:11.245,z:9.988},
+  {idx:175,x:9.337,z:11.751},{idx:176,x:4.925,z:14.416},
+  {idx:177,x:-1.007,z:14.27},{idx:178,x:-4.821,z:10.058},
+  {idx:179,x:-5.131,z:13.742},
+];
+
+// Current SnapMap assignments + BoardData types
+// Each slot: { id, city, slotNum, types[], x, z, snapIdx }
+const CURRENT_SLOTS = [
+  {id:"Belper_1",city:"Belper",slotNum:1,types:["cotton","manufacturer"],x:7.045,z:13.941,snapIdx:186},
+  {id:"Belper_2",city:"Belper",slotNum:2,types:["coal"],x:8.637,z:13.921,snapIdx:187},
+  {id:"Belper_3",city:"Belper",slotNum:3,types:["pottery"],x:10.193,z:13.936,snapIdx:188},
+  {id:"Birmingham_1",city:"Birmingham",slotNum:1,types:["iron"],x:3.663,z:-6.824,snapIdx:216},
+  {id:"Birmingham_2",city:"Birmingham",slotNum:2,types:["manufacturer","cotton"],x:3.700,z:-5.212,snapIdx:218},
+  {id:"Birmingham_3",city:"Birmingham",slotNum:3,types:["manufacturer"],x:5.178,z:-6.849,snapIdx:217},
+  {id:"Birmingham_4",city:"Birmingham",slotNum:4,types:["manufacturer"],x:5.141,z:-5.239,snapIdx:219},
+  {id:"Burton-on-Trent_1",city:"Burton-on-Trent",slotNum:1,types:["manufacturer","coal"],x:5.459,z:4.249,snapIdx:198},
+  {id:"Burton-on-Trent_2",city:"Burton-on-Trent",slotNum:2,types:["brewery"],x:6.998,z:4.213,snapIdx:199},
+  {id:"Cannock_1",city:"Cannock",slotNum:1,types:["manufacturer","coal"],x:-1.692,z:1.758,snapIdx:201},
+  {id:"Cannock_2",city:"Cannock",slotNum:2,types:["coal"],x:-0.032,z:1.781,snapIdx:202},
+  {id:"Coalbrookdale_1",city:"Coalbrookdale",slotNum:1,types:["iron"],x:-9.743,z:-2.866,snapIdx:206},
+  {id:"Coalbrookdale_2",city:"Coalbrookdale",slotNum:2,types:["iron","brewery"],x:-8.984,z:-1.263,snapIdx:207},
+  {id:"Coalbrookdale_3",city:"Coalbrookdale",slotNum:3,types:["coal"],x:-8.201,z:-2.866,snapIdx:205},
+  {id:"Coventry_1",city:"Coventry",slotNum:1,types:["manufacturer","coal"],x:9.786,z:-7.869,snapIdx:221},
+  {id:"Coventry_2",city:"Coventry",slotNum:2,types:["pottery"],x:10.493,z:-6.234,snapIdx:220},
+  {id:"Coventry_3",city:"Coventry",slotNum:3,types:["iron"],x:11.284,z:-7.889,snapIdx:222},
+  {id:"Derby_1",city:"Derby",slotNum:1,types:["cotton","manufacturer"],x:8.063,z:8.131,snapIdx:192},
+  {id:"Derby_2",city:"Derby",slotNum:2,types:["cotton","brewery"],x:8.868,z:9.703,snapIdx:191},
+  {id:"Derby_3",city:"Derby",slotNum:3,types:["iron"],x:9.633,z:8.088,snapIdx:193},
+  {id:"Dudley_1",city:"Dudley",slotNum:1,types:["coal"],x:-3.594,z:-5.524,snapIdx:214},
+  {id:"Dudley_2",city:"Dudley",slotNum:2,types:["iron"],x:-2.000,z:-5.512,snapIdx:215},
+  {id:"Kidderminster_1",city:"Kidderminster",slotNum:1,types:["cotton","coal"],x:-5.912,z:-8.953,snapIdx:225},
+  {id:"Kidderminster_2",city:"Kidderminster",slotNum:2,types:["cotton"],x:-4.379,z:-9.001,snapIdx:226},
+  {id:"Leek_1",city:"Leek",slotNum:1,types:["cotton","manufacturer"],x:1.068,z:14.348,snapIdx:184},
+  {id:"Leek_2",city:"Leek",slotNum:2,types:["cotton","coal"],x:2.593,z:14.352,snapIdx:185},
+  {id:"Nuneaton_1",city:"Nuneaton",slotNum:1,types:["manufacturer","brewery"],x:8.989,z:-3.449,snapIdx:212},
+  {id:"Nuneaton_2",city:"Nuneaton",slotNum:2,types:["cotton","coal"],x:10.570,z:-3.473,snapIdx:213},
+  {id:"Redditch_1",city:"Redditch",slotNum:1,types:["coal","manufacturer"],x:2.114,z:-10.818,snapIdx:223},
+  {id:"Redditch_2",city:"Redditch",slotNum:2,types:["iron"],x:3.629,z:-10.786,snapIdx:224},
+  {id:"Stafford_1",city:"Stafford",slotNum:1,types:["manufacturer","brewery"],x:-4.010,z:5.160,snapIdx:196},
+  {id:"Stafford_2",city:"Stafford",slotNum:2,types:["pottery"],x:-2.513,z:5.176,snapIdx:197},
+  {id:"Stoke-on-Trent_1",city:"Stoke-on-Trent",slotNum:1,types:["iron","pottery"],x:-3.666,z:11.933,snapIdx:181},
+  {id:"Stoke-on-Trent_2",city:"Stoke-on-Trent",slotNum:2,types:["cotton","manufacturer"],x:-2.933,z:13.516,snapIdx:182},
+  {id:"Stoke-on-Trent_3",city:"Stoke-on-Trent",slotNum:3,types:["manufacturer"],x:-2.097,z:11.823,snapIdx:183},
+  {id:"Stone_1",city:"Stone",slotNum:1,types:["cotton","brewery"],x:-7.216,z:8.338,snapIdx:194},
+  {id:"Stone_2",city:"Stone",slotNum:2,types:["manufacturer","coal"],x:-5.659,z:8.375,snapIdx:195},
+  {id:"Tamworth_1",city:"Tamworth",slotNum:1,types:["cotton","coal"],x:5.961,z:-0.047,snapIdx:210},
+  {id:"Tamworth_2",city:"Tamworth",slotNum:2,types:["cotton","coal"],x:7.476,z:-0.049,snapIdx:211},
+  {id:"Uttoxeter_1",city:"Uttoxeter",slotNum:1,types:["manufacturer","brewery"],x:1.520,z:8.990,snapIdx:189},
+  {id:"Uttoxeter_2",city:"Uttoxeter",slotNum:2,types:["cotton","brewery"],x:3.053,z:8.972,snapIdx:190},
+  {id:"Walsall_1",city:"Walsall",slotNum:1,types:["iron","manufacturer"],x:0.314,z:-2.130,snapIdx:208},
+  {id:"Walsall_2",city:"Walsall",slotNum:2,types:["manufacturer","brewery"],x:1.924,z:-2.145,snapIdx:209},
+  {id:"Wolverhampton_1",city:"Wolverhampton",slotNum:1,types:["manufacturer"],x:-5.098,z:-1.390,snapIdx:203},
+  {id:"Wolverhampton_2",city:"Wolverhampton",slotNum:2,types:["manufacturer","coal"],x:-3.626,z:-1.381,snapIdx:204},
+  {id:"Worcester_1",city:"Worcester",slotNum:1,types:["cotton"],x:-5.424,z:-13.336,snapIdx:227},
+  {id:"Worcester_2",city:"Worcester",slotNum:2,types:["cotton"],x:-3.873,z:-13.366,snapIdx:228},
+];
+
+// Current link assignments
+const CURRENT_LINKS = [
+  {id:"Kidderminster-Worcester",x:-5.660,z:-11.507,snapIdx:141},
+  {id:"Birmingham-Worcester",x:-0.662,z:-10.045,snapIdx:142},
+  {id:"Dudley-Kidderminster",x:-5.175,z:-7.144,snapIdx:143},
+  {id:"Coalbrookdale-Kidderminster",x:-8.499,z:-6.754,snapIdx:144},
+  {id:"Coalbrookdale-Shrewsbury",x:-11.754,z:-1.317,snapIdx:145},
+  {id:"Coalbrookdale-Wolverhampton",x:-7.388,z:-1.276,snapIdx:146},
+  {id:"Gloucester-Worcester",x:-2.077,z:-14.461,snapIdx:147},
+  {id:"Redditch-Worcester",x:0.295,z:-12.101,snapIdx:148},
+  {id:"Oxford-Redditch",x:5.738,z:-11.260,snapIdx:149},
+  {id:"Dudley-Wolverhampton",x:-4.262,z:-3.716,snapIdx:150},
+  {id:"Walsall-Wolverhampton",x:-1.709,z:-1.495,snapIdx:151},
+  {id:"Birmingham-Dudley",x:0.718,z:-5.985,snapIdx:152},
+  {id:"Birmingham-Walsall",x:1.976,z:-4.400,snapIdx:153},
+  {id:"Birmingham-Redditch",x:3.980,z:-8.918,snapIdx:154},
+  {id:"Coventry-Oxford",x:7.655,z:-9.164,snapIdx:155},
+  {id:"Birmingham-Coventry",x:7.749,z:-7.477,snapIdx:156},
+  // NOTE: snapIdx 157 removed — was "Birmingham-Nuneaton" but no such link exists
+  {id:"Birmingham-Tamworth",x:6.758,z:-2.971,snapIdx:158},
+  {id:"Coventry-Nuneaton",x:12.644,z:-5.265,snapIdx:159},
+  {id:"Nuneaton-Tamworth",x:9.932,z:-1.112,snapIdx:160},
+  {id:"Birmingham-Cannock",x:4.294,z:-1.743,snapIdx:161},
+  {id:"Burton-on-Trent-Tamworth",x:6.974,z:1.952,snapIdx:162},
+  {id:"Burton-on-Trent-Cannock",x:3.035,z:0.613,snapIdx:163},
+  {id:"Cannock-Walsall",x:1.324,z:-0.099,snapIdx:164},
+  {id:"Cannock-Wolverhampton",x:-3.743,z:0.621,snapIdx:165},
+  {id:"Stone-Cannock",x:-4.264,z:2.316,snapIdx:166},
+  {id:"Cannock-Stafford",x:-0.808,z:3.685,snapIdx:167},
+  {id:"Burton-on-Trent-Uttoxeter",x:2.477,z:3.545,snapIdx:168},
+  {id:"Stafford-Stone",x:-6.275,z:5.707,snapIdx:169},
+  {id:"Stafford-Uttoxeter",x:0.442,z:6.879,snapIdx:170},
+  {id:"Stone-Uttoxeter",x:-1.969,z:8.921,snapIdx:171},
+  {id:"Derby-Uttoxeter",x:5.863,z:8.483,snapIdx:172},
+  {id:"Burton-on-Trent-Derby",x:8.926,z:5.836,snapIdx:173},
+  {id:"Derby-Nottingham",x:11.245,z:9.988,snapIdx:174},
+  {id:"Belper-Derby",x:9.337,z:11.751,snapIdx:175},
+  {id:"Belper-Leek",x:4.925,z:14.416,snapIdx:176},
+  {id:"Leek-Stoke-on-Trent",x:-1.007,z:14.270,snapIdx:177},
+  {id:"Stoke-on-Trent-Stone",x:-4.821,z:10.058,snapIdx:178},
+  {id:"Shrewsbury-Warrington",x:-5.131,z:13.742,snapIdx:179},
+];
+
+// BoardData link types (from BoardData.lua)
+const BOARDDATA_TYPES = {};
+"Birmingham-Coventry Birmingham-Dudley Birmingham-Redditch Birmingham-Tamworth Birmingham-Walsall Birmingham-Wolverhampton Birmingham-Worcester Coventry-Nuneaton Coventry-Oxford Dudley-Kidderminster Dudley-Wolverhampton Kidderminster-Worcester Coalbrookdale-Kidderminster Cannock-Wolverhampton Shrewsbury-Wolverhampton Coalbrookdale-Wolverhampton Coalbrookdale-Shrewsbury Cannock-Walsall Cannock-Stafford Burton-on-Trent-Tamworth Burton-on-Trent-Uttoxeter Nuneaton-Tamworth Stafford-Stone Leek-Stoke-on-Trent Stoke-on-Trent-Stone Stoke-on-Trent-Warrington Shrewsbury-Warrington Stone-Uttoxeter Derby-Uttoxeter Belper-Derby Derby-Nottingham Gloucester-Redditch Oxford-Redditch Redditch-Worcester Gloucester-Worcester".split(' ').forEach(id => BOARDDATA_TYPES[id] = {canal:true,rail:true});
+"Dudley-Walsall Birmingham-Cannock Burton-on-Trent-Cannock Stafford-Uttoxeter Nottingham-Nuneaton Leek-Uttoxeter Walsall-Wolverhampton Belper-Leek Burton-on-Trent-Derby".split(' ').forEach(id => BOARDDATA_TYPES[id] = {canal:false,rail:true});
+
+const MERCHANT_CITIES = new Set(["Shrewsbury","Gloucester","Oxford","Warrington","Nottingham"]);
+
+// All known cities (longest first for greedy parsing of hyphenated IDs)
+const ALL_CITY_NAMES = ["Burton-on-Trent","Stoke-on-Trent","Coalbrookdale","Kidderminster","Wolverhampton","Shrewsbury","Birmingham","Nottingham","Gloucester","Warrington","Nuneaton","Tamworth","Uttoxeter","Stafford","Coventry","Redditch","Worcester","Cannock","Walsall","Dudley","Oxford","Derby","Stone","Belper","Leek"];
+
+function parseLinkCities(id) {
+  for (const city of ALL_CITY_NAMES) {
+    if (id.startsWith(city + '-')) {
+      return [city, id.substring(city.length + 1)];
+    }
+  }
+  return [id, ''];
+}
+
+function lookupLinkType(id) {
+  if (BOARDDATA_TYPES[id]) return BOARDDATA_TYPES[id];
+  const [a, b] = parseLinkCities(id);
+  if (a && b) {
+    const sorted = [a, b].sort().join('-');
+    if (BOARDDATA_TYPES[sorted]) return BOARDDATA_TYPES[sorted];
+  }
+  return {canal: true, rail: true}; // default for unmatched
+}
+
+function isMarketLink(id) {
+  const [a, b] = parseLinkCities(id);
+  return MERCHANT_CITIES.has(a) || MERCHANT_CITIES.has(b);
+}
+
+// Unassigned building snaps (snap points not mapped to any city slot)
+const assignedSnapIdx = new Set(CURRENT_SLOTS.map(s=>s.snapIdx).filter(i=>i>=0));
+const UNASSIGNED_SNAPS = RAW_BUILDING_SNAPS.filter(s => !assignedSnapIdx.has(s.idx));
+
+// ============================================================
+// STATE
+// ============================================================
+let slots = JSON.parse(JSON.stringify(CURRENT_SLOTS));
+let links = CURRENT_LINKS.map(lnk => {
+  const t = lookupLinkType(lnk.id);
+  return { ...lnk, canal: t.canal, rail: t.rail, market: isMarketLink(lnk.id) };
+});
+let selectedSlotIdx = -1;
+let selectedLinkIdx = -1;
+let activeTab = 'slots';
+let showGrid = true;
+let showLinks = true;
+let showLabels = true;
+
+// Swap mode state
+let swapMode = false;
+let swapFirstCity = null; // city name of first click
+
+// Board view transform
+const WORLD_MIN = -17, WORLD_MAX = 17;
+const WORLD_SIZE = WORLD_MAX - WORLD_MIN;
+const BOARD_PX = 900;
+const SCALE = BOARD_PX / WORLD_SIZE;
+let zoom = 1;
+let panX = 0, panY = 0;
+
+function worldToScreen(wx, wz) {
+  return {
+    x: (wx - WORLD_MIN) * SCALE,
+    y: (WORLD_MAX - wz) * SCALE,
+  };
+}
+function screenToWorld(sx, sy) {
+  return {
+    x: sx / SCALE + WORLD_MIN,
+    z: WORLD_MAX - sy / SCALE,
+  };
+}
+
+// ============================================================
+// INIT
+// ============================================================
+const boardContainer = document.getElementById('board-container');
+const boardImg = document.getElementById('board-img');
+const gridCanvas = document.getElementById('grid-canvas');
+const slotList = document.getElementById('slot-list');
+const detailPanel = document.getElementById('detail-panel');
+
+// === Board image mapping ===
+// The board.jpg is the full table texture (10000x6144).
+// The game board area sits inside it. We need to map the image so that
+// the game board's TTS world coordinates align with our editor grid.
+//
+// Known reference points (player board corners visible in image):
+//   TTS world (-35.4, 19.1)  ≈ image top-left dark rect
+//   TTS world (35.5,  19.1)  ≈ image top-right dark rect
+//   TTS world (-35.4,-19.1)  ≈ image bottom-left dark rect
+//   TTS world (35.5, -19.1)  ≈ image bottom-right dark rect
+//
+// We estimate the image covers world X ∈ [-42, 42] and Z ∈ [-25.8, 25.8]
+// (maintaining the 10000/6144 aspect ratio: 84/51.6 ≈ 1.628)
+
+const IMG_WORLD_X_MIN = -42;
+const IMG_WORLD_X_MAX = 42;
+const IMG_WORLD_Z_MIN = -25.8;
+const IMG_WORLD_Z_MAX = 25.8;
+
+// Image adjustment state (user can tweak)
+let imgOffsetX = 0; // additional pixel shift
+let imgOffsetY = 0;
+let imgExtraScale = 1.0;
+let imgOpacity = 0.80;
+
+function getImgTransform() {
+  // Map image so its world coverage aligns with the editor grid.
+  // Editor: screenX = (worldX - WORLD_MIN) * SCALE
+  // Image:  imgPxX  = (worldX - IMG_WORLD_X_MIN) / (IMG_WORLD_X_MAX - IMG_WORLD_X_MIN) * imgNaturalW
+
+  const imgW = 10000, imgH = 6144;
+  const imgWorldW = IMG_WORLD_X_MAX - IMG_WORLD_X_MIN; // 84
+  const imgWorldH = IMG_WORLD_Z_MAX - IMG_WORLD_Z_MIN; // 51.6
+
+  // Pixels per world unit in image
+  const imgPxPerUnit = imgW / imgWorldW; // ~119
+
+  // Pixels per world unit in editor
+  const edPxPerUnit = SCALE; // 900/34 ≈ 26.47
+
+  // Display scale: editor pixels / image pixels
+  const displayScale = edPxPerUnit / imgPxPerUnit * imgExtraScale;
+
+  // Display size
+  const displayW = imgW * displayScale;
+  const displayH = imgH * displayScale;
+
+  // Position: the image world origin (IMG_WORLD_X_MIN, IMG_WORLD_Z_MAX) maps to
+  // editor pixel (screenX, screenY) where:
+  //   screenX = (IMG_WORLD_X_MIN - WORLD_MIN) * SCALE
+  //   screenY = (WORLD_MAX - IMG_WORLD_Z_MAX) * SCALE
+  const left = (IMG_WORLD_X_MIN - WORLD_MIN) * SCALE + imgOffsetX;
+  const top  = (WORLD_MAX - IMG_WORLD_Z_MAX) * SCALE + imgOffsetY;
+
+  return { left, top, displayW, displayH, displayScale };
+}
+
+function applyImgTransform() {
+  const t = getImgTransform();
+  boardImg.style.left = t.left + 'px';
+  boardImg.style.top  = t.top + 'px';
+  boardImg.style.width = t.displayW + 'px';
+  boardImg.style.height = t.displayH + 'px';
+  boardImg.style.opacity = imgOpacity;
+}
+
+function init() {
+  boardContainer.style.width = BOARD_PX + 'px';
+  boardContainer.style.height = BOARD_PX + 'px';
+  boardContainer.style.marginLeft = -BOARD_PX/2 + 'px';
+  boardContainer.style.marginTop = -BOARD_PX/2 + 'px';
+  gridCanvas.width = BOARD_PX;
+  gridCanvas.height = BOARD_PX;
+
+  // Auto-load board image from same directory
+  boardImg.src = 'board.jpg';
+  boardImg.onload = () => {
+    applyImgTransform();
+  };
+
+  drawGrid();
+  renderMarkers();
+  renderSlotList();
+  renderLinkList();
+  updateTransform();
+}
+
+function updateTransform() {
+  boardContainer.style.transform = `translate(-50%,-50%) translate(${panX}px,${panY}px) scale(${zoom})`;
+}
+
+function drawGrid() {
+  const ctx = gridCanvas.getContext('2d');
+  ctx.clearRect(0,0,BOARD_PX,BOARD_PX);
+  if (!showGrid) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  for (let w = -16; w <= 16; w += 2) {
+    const p = worldToScreen(w, 0);
+    ctx.beginPath(); ctx.moveTo(p.x, 0); ctx.lineTo(p.x, BOARD_PX); ctx.stroke();
+    const p2 = worldToScreen(0, w);
+    ctx.beginPath(); ctx.moveTo(0, p2.y); ctx.lineTo(BOARD_PX, p2.y); ctx.stroke();
+  }
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  const o = worldToScreen(0,0);
+  ctx.beginPath(); ctx.moveTo(o.x,0); ctx.lineTo(o.x,BOARD_PX); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,o.y); ctx.lineTo(BOARD_PX,o.y); ctx.stroke();
+  // Labels
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = '10px monospace';
+  for (let w = -16; w <= 16; w += 4) {
+    const px = worldToScreen(w, 0);
+    ctx.fillText(w.toString(), px.x+2, o.y-3);
+    const pz = worldToScreen(0, w);
+    ctx.fillText(w.toString(), o.x+3, pz.y-2);
+  }
+}
+
+// ============================================================
+// MARKERS
+// ============================================================
+let markerEls = [];
+let labelEls = [];
+let linkMarkerEls = [];
+
+function renderMarkers() {
+  // Clear existing
+  markerEls.forEach(el => el.remove());
+  labelEls.forEach(el => el.remove());
+  linkMarkerEls.forEach(el => el.remove());
+  markerEls = [];
+  labelEls = [];
+  linkMarkerEls = [];
+
+  // Slot markers
+  const citySlots = {};
+  slots.forEach((s,i) => {
+    if (!citySlots[s.city]) citySlots[s.city] = [];
+    citySlots[s.city].push(i);
+  });
+
+  slots.forEach((s, i) => {
+    const p = worldToScreen(s.x, s.z);
+    const el = document.createElement('div');
+    let cls = 'marker';
+    if (i === selectedSlotIdx) cls += ' selected';
+    if (swapMode && swapFirstCity && s.city === swapFirstCity) cls += ' swap-pick';
+    el.className = cls;
+    // Color by city
+    el.style.background = CITY_COLORS[s.city] || '#888';
+    el.style.left = p.x + 'px';
+    el.style.top = p.y + 'px';
+    el.textContent = s.slotNum;
+    el.title = `${cityDisplay(s.city)} #${s.slotNum}\n${s.types.map(t=>TYPE_LABELS[t]).join(' / ')}\nsnap[${s.snapIdx}] (${s.x.toFixed(3)}, ${s.z.toFixed(3)})`;
+    el.dataset.slotIdx = i;
+    el.addEventListener('mousedown', onMarkerMouseDown);
+    boardContainer.appendChild(el);
+    markerEls.push(el);
+  });
+
+  // City labels (one per city, at center)
+  if (showLabels) {
+    for (const [city, indices] of Object.entries(citySlots)) {
+      const cx = indices.reduce((s,i)=>s+slots[i].x, 0) / indices.length;
+      const cz = indices.reduce((s,i)=>s+slots[i].z, 0) / indices.length;
+      const p = worldToScreen(cx, cz);
+      const lbl = document.createElement('div');
+      lbl.className = 'city-label';
+      lbl.style.left = p.x + 'px';
+      lbl.style.top = p.y + 'px';
+      lbl.textContent = cityDisplay(city);
+      boardContainer.appendChild(lbl);
+      labelEls.push(lbl);
+    }
+  }
+
+  // Unassigned snaps
+  UNASSIGNED_SNAPS.forEach(s => {
+    const p = worldToScreen(s.x, s.z);
+    const el = document.createElement('div');
+    el.className = 'marker unassigned';
+    el.style.background = '#555';
+    el.style.left = p.x + 'px';
+    el.style.top = p.y + 'px';
+    el.textContent = '?';
+    el.title = `Unassigned snap[${s.idx}] (${s.x}, ${s.z})`;
+    boardContainer.appendChild(el);
+    markerEls.push(el);
+  });
+
+  // Link markers
+  if (showLinks) {
+    links.forEach((lnk, li) => {
+      const p = worldToScreen(lnk.x, lnk.z);
+      const el = document.createElement('div');
+      // Color by type
+      let bg = '#555';
+      if (lnk.canal && lnk.rail) bg = '#7b1fa2';
+      else if (lnk.canal) bg = '#1565c0';
+      else if (lnk.rail) bg = '#c62828';
+      let cls = 'marker link-marker';
+      if (li === selectedLinkIdx) cls += ' selected';
+      if (lnk.market) cls += ' has-market';
+      el.className = cls;
+      el.style.background = bg;
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      el.dataset.linkIdx = li;
+      const tags = [];
+      if (lnk.canal) tags.push('運船');
+      if (lnk.rail) tags.push('火車');
+      if (lnk.market) tags.push('市場');
+      el.title = `${lnk.id}\n${tags.join(' / ')}\nsnap[${lnk.snapIdx}] (${lnk.x.toFixed(3)}, ${lnk.z.toFixed(3)})`;
+      el.addEventListener('mousedown', onLinkMarkerMouseDown);
+      boardContainer.appendChild(el);
+      linkMarkerEls.push(el);
+    });
+  }
+}
+
+// ============================================================
+// DRAG MARKERS
+// ============================================================
+let dragging = null;
+let dragOffsetX = 0, dragOffsetY = 0;
+let dragStartTime = 0;
+
+function onMarkerMouseDown(e) {
+  e.stopPropagation();
+  const idx = parseInt(e.target.dataset.slotIdx);
+  if (isNaN(idx)) return;
+  dragging = { el: e.target, idx };
+  dragStartTime = Date.now();
+  const rect = boardContainer.getBoundingClientRect();
+  const currentLeft = parseFloat(e.target.style.left);
+  const currentTop = parseFloat(e.target.style.top);
+  dragOffsetX = e.clientX - (rect.left + currentLeft * zoom);
+  dragOffsetY = e.clientY - (rect.top + currentTop * zoom);
+  e.target.style.cursor = 'grabbing';
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const rect = boardContainer.getBoundingClientRect();
+  const sx = (e.clientX - dragOffsetX - rect.left) / zoom;
+  const sy = (e.clientY - dragOffsetY - rect.top) / zoom;
+  dragging.el.style.left = sx + 'px';
+  dragging.el.style.top = sy + 'px';
+  // Update world coords
+  const w = screenToWorld(sx, sy);
+  const slot = slots[dragging.idx];
+  if (slot) {
+    slot.x = Math.round(w.x * 1000) / 1000;
+    slot.z = Math.round(w.z * 1000) / 1000;
+    document.getElementById('detail-pos').value = `(${slot.x.toFixed(3)}, ${slot.z.toFixed(3)})`;
+  }
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (!dragging) return;
+  dragging.el.style.cursor = 'grab';
+  const elapsed = Date.now() - dragStartTime;
+  if (elapsed < 200) {
+    // Click: select
+    selectSlot(dragging.idx);
+  } else {
+    // Drag completed: update sidebar
+    updateSlotListItem(dragging.idx);
+  }
+  dragging = null;
+});
+
+// ============================================================
+// SLOT LIST (sidebar)
+// ============================================================
+function renderSlotList() {
+  slotList.innerHTML = '';
+  slots.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'slot-item' + (i === selectedSlotIdx ? ' selected' : '');
+    el.dataset.idx = i;
+    el.innerHTML = `
+      <div class="slot-color" style="background:${CITY_COLORS[s.city]||'#888'}"></div>
+      <div class="slot-info">
+        <div class="slot-city">${cityDisplay(s.city)} #${s.slotNum}</div>
+        <div class="slot-types">${s.types.map(t=>TYPE_LABELS[t]).join(' / ')}</div>
+        <div class="slot-pos">snap[${s.snapIdx}] (${s.x.toFixed(3)}, ${s.z.toFixed(3)})</div>
+      </div>`;
+    el.addEventListener('click', () => selectSlot(i));
+    slotList.appendChild(el);
+  });
+}
+
+function updateSlotListItem(idx) {
+  const items = slotList.querySelectorAll('.slot-item');
+  if (items[idx]) {
+    const s = slots[idx];
+    items[idx].querySelector('.slot-color').style.background = CITY_COLORS[s.city]||'#888';
+    items[idx].querySelector('.slot-city').textContent = `${cityDisplay(s.city)} #${s.slotNum}`;
+    items[idx].querySelector('.slot-types').textContent = s.types.map(t=>TYPE_LABELS[t]).join(' / ');
+    items[idx].querySelector('.slot-pos').textContent = `snap[${s.snapIdx}] (${s.x.toFixed(3)}, ${s.z.toFixed(3)})`;
+  }
+}
+
+// ============================================================
+// DETAIL PANEL
+// ============================================================
+function swapCities(cityA, cityB) {
+  if (cityA === cityB) return;
+  // Swap city names, slotNums, types, and IDs between the two city groups
+  const slotsA = slots.filter(s => s.city === cityA);
+  const slotsB = slots.filter(s => s.city === cityB);
+  // Swap city name
+  slotsA.forEach(s => { s.city = cityB; });
+  slotsB.forEach(s => { s.city = cityA; });
+  // Renumber all affected slots
+  [...slotsA, ...slotsB].forEach(s => {
+    const sameCity = slots.filter(ss => ss.city === s.city);
+    s.slotNum = sameCity.indexOf(s) + 1;
+    s.id = `${s.city}_${s.slotNum}`;
+  });
+  // Also swap the types arrays: each position keeps its NEW city's type definitions
+  // Actually NO — the user wants to swap which city NAME is assigned to which POSITION cluster.
+  // The types should follow the city name (since types are defined per city in BoardData).
+  // So we DON'T swap types — we swap city+types together.
+  // But wait, the point is: the positions are correct, the city labels are wrong.
+  // So we just need to swap city names. The types are already correct for each city in BoardData.
+  // We need to swap types along with city names.
+  // slotsA now has cityB name, but they still have cityA's types → need to swap types too.
+
+  // Actually the simplest: swap the city, slotNum, id, AND types.
+  // We swap ALL metadata between the two groups, keeping only positions.
+
+  // Reset: undo what we just did
+  slotsA.forEach(s => { s.city = cityA; });
+  slotsB.forEach(s => { s.city = cityB; });
+
+  // Collect metadata
+  const metaA = slotsA.map(s => ({ city: s.city, slotNum: s.slotNum, id: s.id, types: [...s.types] }));
+  const metaB = slotsB.map(s => ({ city: s.city, slotNum: s.slotNum, id: s.id, types: [...s.types] }));
+
+  // Apply B's metadata to A's positions, and vice versa
+  // Only works if both have the same slot count
+  if (slotsA.length === slotsB.length) {
+    for (let i = 0; i < slotsA.length; i++) {
+      slotsA[i].city = metaB[i].city;
+      slotsA[i].slotNum = metaB[i].slotNum;
+      slotsA[i].id = metaB[i].id;
+      slotsA[i].types = metaB[i].types;
+    }
+    for (let i = 0; i < slotsB.length; i++) {
+      slotsB[i].city = metaA[i].city;
+      slotsB[i].slotNum = metaA[i].slotNum;
+      slotsB[i].id = metaA[i].id;
+      slotsB[i].types = metaA[i].types;
+    }
+  } else {
+    // Different slot counts: just swap city names, renumber
+    slotsA.forEach(s => { s.city = cityB; });
+    slotsB.forEach(s => { s.city = cityA; });
+    slots.filter(s => s.city === cityA || s.city === cityB).forEach(s => {
+      const sameCity = slots.filter(ss => ss.city === s.city);
+      s.slotNum = sameCity.indexOf(s) + 1;
+      s.id = `${s.city}_${s.slotNum}`;
+    });
+  }
+
+  renderMarkers();
+  renderSlotList();
+}
+
+function selectSlot(idx) {
+  // Handle swap mode
+  if (swapMode) {
+    const clickedCity = slots[idx].city;
+    if (!swapFirstCity) {
+      swapFirstCity = clickedCity;
+      document.getElementById('swap-hint').textContent =
+        `已選 ${cityDisplay(clickedCity)}，再點另一個城市的格子完成互換（Esc取消）`;
+      renderMarkers(); // highlight first city
+      return;
+    } else {
+      if (clickedCity !== swapFirstCity) {
+        const nameA = cityDisplay(swapFirstCity);
+        const nameB = cityDisplay(clickedCity);
+        swapCities(swapFirstCity, clickedCity);
+        document.getElementById('swap-hint').textContent = `已互換 ${nameA} ↔ ${nameB}！可繼續互換或按按鈕結束`;
+      }
+      swapFirstCity = null;
+      renderMarkers();
+      return;
+    }
+  }
+
+  // Deselect link
+  selectedLinkIdx = -1;
+  document.getElementById('link-detail-panel').style.display = 'none';
+  linkMarkerEls.forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('#link-list .link-item').forEach(el => el.classList.remove('selected'));
+
+  selectedSlotIdx = idx;
+  const s = slots[idx];
+
+  // Update markers
+  markerEls.forEach((el,i) => {
+    if (i < slots.length) el.classList.toggle('selected', i === idx);
+  });
+
+  // Update list
+  slotList.querySelectorAll('.slot-item').forEach((el,i) => {
+    el.classList.toggle('selected', i === idx);
+  });
+
+  // Scroll into view
+  const listItem = slotList.querySelectorAll('.slot-item')[idx];
+  if (listItem) listItem.scrollIntoView({block:'nearest'});
+
+  // Show detail panel
+  detailPanel.style.display = 'block';
+  document.getElementById('detail-title').textContent = s.id;
+
+  // City dropdown
+  const citySelect = document.getElementById('detail-city');
+  citySelect.innerHTML = '';
+  Object.keys(CITY_COLORS).sort().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = cityDisplay(c);
+    if (c === s.city) opt.selected = true;
+    citySelect.appendChild(opt);
+  });
+  citySelect.onchange = () => {
+    s.city = citySelect.value;
+    // Renumber
+    const sameCity = slots.filter(ss => ss.city === s.city);
+    s.slotNum = sameCity.indexOf(s) + 1;
+    s.id = `${s.city}_${s.slotNum}`;
+    document.getElementById('detail-slot-num').value = s.slotNum;
+    document.getElementById('detail-title').textContent = s.id;
+    updateSlotListItem(idx);
+    renderMarkers();
+  };
+
+  document.getElementById('detail-slot-num').value = s.slotNum;
+  document.getElementById('detail-pos').value = `(${s.x.toFixed(3)}, ${s.z.toFixed(3)})`;
+  document.getElementById('detail-idx').value = s.snapIdx;
+
+  // Type checkboxes
+  const typesDiv = document.getElementById('detail-types');
+  typesDiv.innerHTML = '';
+  INDUSTRY_TYPES.forEach(t => {
+    const active = s.types.includes(t);
+    const label = document.createElement('label');
+    label.className = 'type-check' + (active ? ' active' : '');
+    label.style.borderColor = active ? TYPE_COLORS[t] : '#555';
+    label.innerHTML = `<input type="checkbox" value="${t}" ${active?'checked':''}>${TYPE_LABELS[t]}`;
+    label.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (!s.types.includes(t)) s.types.push(t);
+      } else {
+        s.types = s.types.filter(tt => tt !== t);
+      }
+      label.className = 'type-check' + (e.target.checked ? ' active' : '');
+      label.style.borderColor = e.target.checked ? TYPE_COLORS[t] : '#555';
+      updateSlotListItem(idx);
+      renderMarkers();
+    });
+    typesDiv.appendChild(label);
+  });
+}
+
+// ============================================================
+// LINK MARKERS – drag & click
+// ============================================================
+let draggingLink = null;
+let linkDragStartTime = 0;
+
+function onLinkMarkerMouseDown(e) {
+  e.stopPropagation();
+  const li = parseInt(e.target.dataset.linkIdx);
+  if (isNaN(li)) return;
+  draggingLink = { el: e.target, idx: li };
+  linkDragStartTime = Date.now();
+  const rect = boardContainer.getBoundingClientRect();
+  const currentLeft = parseFloat(e.target.style.left);
+  const currentTop = parseFloat(e.target.style.top);
+  draggingLink.offX = e.clientX - (rect.left + currentLeft * zoom);
+  draggingLink.offY = e.clientY - (rect.top + currentTop * zoom);
+  e.target.style.cursor = 'grabbing';
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!draggingLink) return;
+  const rect = boardContainer.getBoundingClientRect();
+  const sx = (e.clientX - draggingLink.offX - rect.left) / zoom;
+  const sy = (e.clientY - draggingLink.offY - rect.top) / zoom;
+  draggingLink.el.style.left = sx + 'px';
+  draggingLink.el.style.top = sy + 'px';
+  const w = screenToWorld(sx, sy);
+  const lnk = links[draggingLink.idx];
+  if (lnk) {
+    lnk.x = Math.round(w.x * 1000) / 1000;
+    lnk.z = Math.round(w.z * 1000) / 1000;
+    const posField = document.getElementById('link-detail-pos');
+    if (posField) posField.value = `(${lnk.x.toFixed(3)}, ${lnk.z.toFixed(3)})`;
+  }
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (!draggingLink) return;
+  draggingLink.el.style.cursor = 'grab';
+  const elapsed = Date.now() - linkDragStartTime;
+  if (elapsed < 200) {
+    selectLink(draggingLink.idx);
+  } else {
+    updateLinkListItem(draggingLink.idx);
+  }
+  draggingLink = null;
+});
+
+// ============================================================
+// LINK LIST (sidebar)
+// ============================================================
+const linkList = document.getElementById('link-list');
+
+function renderLinkList() {
+  linkList.innerHTML = '';
+  links.forEach((lnk, i) => {
+    const el = document.createElement('div');
+    el.className = 'link-item' + (i === selectedLinkIdx ? ' selected' : '');
+    el.dataset.linkIdx = i;
+    const tags = [];
+    if (lnk.canal) tags.push('<span class="link-tag canal">運船</span>');
+    if (lnk.rail) tags.push('<span class="link-tag rail">火車</span>');
+    if (lnk.market) tags.push('<span class="link-tag market">市場</span>');
+    el.innerHTML = `
+      <div class="link-info">
+        <div class="link-name">${lnk.id}</div>
+        <div class="link-tags">${tags.join('')}</div>
+        <div class="link-pos">snap[${lnk.snapIdx}] (${lnk.x.toFixed(3)}, ${lnk.z.toFixed(3)})</div>
+      </div>`;
+    el.addEventListener('click', () => selectLink(i));
+    linkList.appendChild(el);
+  });
+}
+
+function updateLinkListItem(idx) {
+  const items = linkList.querySelectorAll('.link-item');
+  if (items[idx]) {
+    const lnk = links[idx];
+    const tags = [];
+    if (lnk.canal) tags.push('<span class="link-tag canal">運船</span>');
+    if (lnk.rail) tags.push('<span class="link-tag rail">火車</span>');
+    if (lnk.market) tags.push('<span class="link-tag market">市場</span>');
+    items[idx].querySelector('.link-name').textContent = lnk.id;
+    items[idx].querySelector('.link-tags').innerHTML = tags.join('');
+    items[idx].querySelector('.link-pos').textContent = `snap[${lnk.snapIdx}] (${lnk.x.toFixed(3)}, ${lnk.z.toFixed(3)})`;
+  }
+}
+
+// ============================================================
+// LINK DETAIL PANEL
+// ============================================================
+const LINK_PROP_DEFS = [
+  { key:'canal',  label:'運船 (Canal)',  color:'#1565c0' },
+  { key:'rail',   label:'火車 (Rail)',   color:'#c62828' },
+  { key:'market', label:'市場連結 (Market)', color:'#f9a825' },
+];
+
+function selectLink(idx) {
+  // Deselect slot
+  selectedSlotIdx = -1;
+  detailPanel.style.display = 'none';
+  markerEls.forEach(el => el.classList.remove('selected'));
+  slotList.querySelectorAll('.slot-item').forEach(el => el.classList.remove('selected'));
+
+  selectedLinkIdx = idx;
+  const lnk = links[idx];
+
+  // Update link markers
+  linkMarkerEls.forEach((el, i) => el.classList.toggle('selected', i === idx));
+
+  // Update link list
+  linkList.querySelectorAll('.link-item').forEach((el, i) => el.classList.toggle('selected', i === idx));
+
+  // Scroll into view
+  const listItem = linkList.querySelectorAll('.link-item')[idx];
+  if (listItem) listItem.scrollIntoView({block:'nearest'});
+
+  // Switch to links tab if not active
+  if (activeTab !== 'links') {
+    switchTab('links');
+  }
+
+  // Show link detail panel
+  const panel = document.getElementById('link-detail-panel');
+  panel.style.display = 'block';
+  document.getElementById('link-detail-title').textContent = lnk.id;
+  document.getElementById('link-detail-id').value = lnk.id;
+  document.getElementById('link-detail-pos').value = `(${lnk.x.toFixed(3)}, ${lnk.z.toFixed(3)})`;
+  document.getElementById('link-detail-idx').value = lnk.snapIdx;
+
+  // Type checkboxes
+  const typesDiv = document.getElementById('link-detail-types');
+  typesDiv.innerHTML = '';
+  LINK_PROP_DEFS.forEach(def => {
+    const active = lnk[def.key];
+    const label = document.createElement('label');
+    label.className = 'type-check' + (active ? ' active' : '');
+    label.style.borderColor = active ? def.color : '#555';
+    label.innerHTML = `<input type="checkbox" value="${def.key}" ${active?'checked':''}>${def.label}`;
+    label.querySelector('input').addEventListener('change', (e) => {
+      lnk[def.key] = e.target.checked;
+      label.className = 'type-check' + (e.target.checked ? ' active' : '');
+      label.style.borderColor = e.target.checked ? def.color : '#555';
+      updateLinkListItem(idx);
+      renderMarkers();
+    });
+    typesDiv.appendChild(label);
+  });
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  slotList.style.display = tab === 'slots' ? '' : 'none';
+  linkList.style.display = tab === 'links' ? '' : 'none';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ============================================================
+// PAN & ZOOM
+// ============================================================
+let isPanning = false;
+let panStartX, panStartY;
+
+document.getElementById('board-wrap').addEventListener('mousedown', (e) => {
+  if (e.target.classList.contains('marker')) return;
+  isPanning = true;
+  panStartX = e.clientX - panX;
+  panStartY = e.clientY - panY;
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  panX = e.clientX - panStartX;
+  panY = e.clientY - panStartY;
+  updateTransform();
+});
+
+document.addEventListener('mouseup', () => { isPanning = false; });
+
+document.getElementById('board-wrap').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  zoom = Math.max(0.3, Math.min(5, zoom * delta));
+  updateTransform();
+}, {passive:false});
+
+// ============================================================
+// IMAGE UPLOAD / PASTE
+// ============================================================
+// No manual upload needed — board.jpg loads automatically from same directory
+
+// ============================================================
+// SWAP MODE
+// ============================================================
+document.getElementById('btn-swap').addEventListener('click', (e) => {
+  swapMode = !swapMode;
+  swapFirstCity = null;
+  e.target.classList.toggle('active', swapMode);
+  e.target.style.background = swapMode ? '#c33' : '#8b2500';
+  document.getElementById('swap-hint').style.display = swapMode ? 'inline' : 'none';
+  document.getElementById('normal-hint').style.display = swapMode ? 'none' : 'inline';
+  if (swapMode) {
+    document.getElementById('swap-hint').textContent = '點擊第一個城市的格子，再點第二個城市的格子即完成互換';
+  }
+  renderMarkers();
+});
+
+// Esc to cancel swap
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && swapMode) {
+    swapFirstCity = null;
+    document.getElementById('swap-hint').textContent = '點擊第一個城市的格子，再點第二個城市的格子即完成互換';
+    renderMarkers();
+  }
+});
+
+// Image position adjustment via keyboard (Alt+Arrow=move, Alt+/-=scale, Alt+O=opacity)
+document.addEventListener('keydown', (e) => {
+  if (!boardImg.src) return;
+  const step = e.shiftKey ? 5 : 1;
+  let changed = false;
+  if (e.key === 'ArrowLeft'  && e.altKey) { imgOffsetX -= step; changed = true; }
+  if (e.key === 'ArrowRight' && e.altKey) { imgOffsetX += step; changed = true; }
+  if (e.key === 'ArrowUp'   && e.altKey) { imgOffsetY -= step; changed = true; }
+  if (e.key === 'ArrowDown' && e.altKey) { imgOffsetY += step; changed = true; }
+  if ((e.key === '+' || e.key === '=') && e.altKey) { imgExtraScale *= 1.01; changed = true; }
+  if (e.key === '-' && e.altKey) { imgExtraScale /= 1.01; changed = true; }
+  if (e.key === 'o' && e.altKey) {
+    imgOpacity = imgOpacity > 0.5 ? 0.3 : 0.8;
+    changed = true;
+  }
+  if (changed) {
+    e.preventDefault();
+    applyImgTransform();
+  }
+});
+
+// ============================================================
+// TOGGLES
+// ============================================================
+document.getElementById('btn-toggle-grid').addEventListener('click', (e) => {
+  showGrid = !showGrid;
+  e.target.classList.toggle('active', showGrid);
+  drawGrid();
+});
+document.getElementById('btn-toggle-links').addEventListener('click', (e) => {
+  showLinks = !showLinks;
+  e.target.classList.toggle('active', showLinks);
+  renderMarkers();
+});
+document.getElementById('btn-toggle-labels').addEventListener('click', (e) => {
+  showLabels = !showLabels;
+  e.target.classList.toggle('active', showLabels);
+  renderMarkers();
+});
+
+// ============================================================
+// EXPORT
+// ============================================================
+document.getElementById('btn-export').addEventListener('click', () => {
+  const lines = [];
+  lines.push('    -- Hardcoded: snap point world position -> BoardData slot ID');
+  lines.push('    -- Generated by snap_editor.html');
+  lines.push('    local SLOT_POSITIONS = {');
+
+  // Group by city
+  const byCity = {};
+  slots.forEach(s => {
+    if (!byCity[s.city]) byCity[s.city] = [];
+    byCity[s.city].push(s);
+  });
+
+  for (const city of Object.keys(byCity).sort()) {
+    const citySlots = byCity[city];
+    citySlots.sort((a,b) => a.slotNum - b.slotNum);
+    lines.push(`        -- ${city} (${citySlots.length} slots)`);
+    citySlots.forEach(s => {
+      lines.push(`        { id = "${s.id}", pos = Vector(${s.x.toFixed(3)}, 0.96, ${s.z.toFixed(3)}) },`);
+    });
+  }
+  lines.push('    }');
+
+  lines.push('');
+  lines.push('-- BoardData slot types update:');
+  for (const city of Object.keys(byCity).sort()) {
+    const citySlots = byCity[city];
+    citySlots.sort((a,b) => a.slotNum - b.slotNum);
+    lines.push(`    ${city.includes('-') ? '["'+city+'"]' : city} = {`);
+    lines.push('        slots = {');
+    citySlots.forEach(s => {
+      const typesStr = s.types.map(t => {
+        const map = {cotton:'I.COTTON',coal:'I.COAL',iron:'I.IRON',brewery:'I.BREWERY',manufacturer:'I.MANUFACTURER',pottery:'I.POTTERY'};
+        return map[t] || t;
+      }).join(', ');
+      lines.push(`            { id = "${s.id}", types = {${typesStr}} },`);
+    });
+    lines.push('        }');
+    lines.push('    },');
+  }
+
+  // Link positions and types
+  lines.push('');
+  lines.push('    -- Link snap positions and types');
+  lines.push('    -- Generated by snap_editor.html');
+  lines.push('    local LINK_POSITIONS = {');
+  links.forEach(lnk => {
+    const types = [];
+    if (lnk.canal) types.push('E.CANAL');
+    if (lnk.rail) types.push('E.RAIL');
+    const typesStr = types.join(', ');
+    const marketStr = lnk.market ? ', market = true' : '';
+    lines.push(`        { id = "${lnk.id}", pos = Vector(${lnk.x.toFixed(3)}, 0.96, ${lnk.z.toFixed(3)}), types = {${typesStr}}${marketStr} },`);
+  });
+  lines.push('    }');
+
+  lines.push('');
+  lines.push('-- BoardData links update:');
+  links.forEach(lnk => {
+    const [a, b] = parseLinkCities(lnk.id);
+    const sorted = [a, b].sort();
+    const key = sorted.join('-');
+    const types = [];
+    if (lnk.canal) types.push('E.CANAL');
+    if (lnk.rail) types.push('E.RAIL');
+    lines.push(`    ["${key}"] = { cities = { "${sorted[0]}", "${sorted[1]}" }, types = { ${types.join(', ')} } },`);
+  });
+
+  document.getElementById('export-text').value = lines.join('\n');
+  document.getElementById('export-modal').classList.add('show');
+});
+
+function copyExport() {
+  const ta = document.getElementById('export-text');
+  ta.select();
+  document.execCommand('copy');
+  alert('Copied!');
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+init();
+</script>
+</body>
+</html>
