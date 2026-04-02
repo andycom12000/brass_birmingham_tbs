@@ -22,9 +22,9 @@ BoardData.cities = {
     },
     Birmingham = {
         slots = {
-            { id = "Birmingham_1", types = {I.COTTON, I.MANUFACTURER} },
-            { id = "Birmingham_2", types = {I.MANUFACTURER} },
-            { id = "Birmingham_3", types = {I.IRON} },
+            { id = "Birmingham_1", types = {I.IRON} },
+            { id = "Birmingham_2", types = {I.MANUFACTURER, I.COTTON} },
+            { id = "Birmingham_3", types = {I.MANUFACTURER} },
             { id = "Birmingham_4", types = {I.MANUFACTURER} },
         }
     },
@@ -42,22 +42,22 @@ BoardData.cities = {
     },
     Coalbrookdale = {
         slots = {
-            { id = "Coalbrookdale_1", types = {I.IRON, I.BREWERY} },
-            { id = "Coalbrookdale_2", types = {I.IRON} },
+            { id = "Coalbrookdale_1", types = {I.IRON} },
+            { id = "Coalbrookdale_2", types = {I.IRON, I.BREWERY} },
             { id = "Coalbrookdale_3", types = {I.COAL} },
         }
     },
     Coventry = {
         slots = {
-            { id = "Coventry_1", types = {I.POTTERY} },
-            { id = "Coventry_2", types = {I.MANUFACTURER, I.COAL} },
-            { id = "Coventry_3", types = {I.IRON, I.MANUFACTURER} },
+            { id = "Coventry_1", types = {I.MANUFACTURER, I.COAL} },
+            { id = "Coventry_2", types = {I.POTTERY} },
+            { id = "Coventry_3", types = {I.IRON} },
         }
     },
     Derby = {
         slots = {
-            { id = "Derby_1", types = {I.COTTON, I.BREWERY} },
-            { id = "Derby_2", types = {I.COTTON, I.MANUFACTURER} },
+            { id = "Derby_1", types = {I.COTTON, I.MANUFACTURER} },
+            { id = "Derby_2", types = {I.COTTON, I.BREWERY} },
             { id = "Derby_3", types = {I.IRON} },
         }
     },
@@ -87,7 +87,7 @@ BoardData.cities = {
     },
     Redditch = {
         slots = {
-            { id = "Redditch_1", types = {I.MANUFACTURER, I.COAL} },
+            { id = "Redditch_1", types = {I.COAL, I.MANUFACTURER} },
             { id = "Redditch_2", types = {I.IRON} },
         }
     },
@@ -105,8 +105,8 @@ BoardData.cities = {
     },
     ["Stoke-on-Trent"] = {
         slots = {
-            { id = "Stoke-on-Trent_1", types = {I.COTTON, I.MANUFACTURER} },
-            { id = "Stoke-on-Trent_2", types = {I.POTTERY, I.IRON} },
+            { id = "Stoke-on-Trent_1", types = {I.IRON, I.POTTERY} },
+            { id = "Stoke-on-Trent_2", types = {I.COTTON, I.MANUFACTURER} },
             { id = "Stoke-on-Trent_3", types = {I.MANUFACTURER} },
         }
     },
