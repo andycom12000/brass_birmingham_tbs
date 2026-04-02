@@ -32,13 +32,14 @@ end
 
 --- Auto-flip a tile (coal/iron) when its resources are exhausted.
 --- Awards income advancement to the tile's owner.
+--- @return boolean  true if the tile was flipped this call
 function Actions.autoFlipIfEmpty(state, slot)
     local tile = slot.tile
-    if not tile then return end
-    if tile.flipped then return end
+    if not tile then return false end
+    if tile.flipped then return false end
     -- Only auto-flip coal mines and iron works
     if tile.type ~= Constants.Industry.COAL and tile.type ~= Constants.Industry.IRON then
-        return
+        return false
     end
     if #tile.resources == 0 then
         tile.flipped = true
@@ -46,7 +47,9 @@ function Actions.autoFlipIfEmpty(state, slot)
         if slot.occupant then
             Actions.advanceIncome(state, slot.occupant, tile.incomeSpaces)
         end
+        return true
     end
+    return false
 end
 
 --- Consume up to `needed` coal from buildings connected to `cityName`.
@@ -220,6 +223,15 @@ function Actions.autoSellToMarket(state, color, slot)
         return { sold = 0, kept = 0 }
     end
 
+    -- Coal requires a network connection to a merchant city to sell to market.
+    -- Iron is always sellable (global market).
+    if resourceType == Constants.Resource.COAL then
+        local cityName = GameState.getCityForSlot(state, slot.id)
+        if not cityName or not Network.isConnectedToMerchant(state, color, cityName) then
+            return { sold = 0, kept = #tile.resources }
+        end
+    end
+
     local track = Market.getTrack(resourceType)
     local trackMax = #track
     local market = Market.getMarketSupply(state, resourceType)
@@ -233,7 +245,7 @@ function Actions.autoSellToMarket(state, color, slot)
     if sellCount > 0 then
         Market.returnToMarket(state, resourceType, sellCount)
         -- Remove sold cubes from tile
-        for i = 1, sellCount do
+        for _ = 1, sellCount do
             table.remove(tile.resources, #tile.resources)
         end
         -- Builder gains $1 per cube sold
@@ -314,7 +326,7 @@ function Actions.build(state, color, params)
     end
 
     -- Auto-sell for coal mines and iron works (mandatory rule)
-    local autoSellResult = Actions.autoSellToMarket(state, color, slot)
+    Actions.autoSellToMarket(state, color, slot)
 
     -- Step 10: Update handSize (player played a card)
     GameState.playCard(state, color)

@@ -238,6 +238,32 @@ function Network.findNearestCoal(state, cityName)
     return results
 end
 
+--- Count ALL coal cubes reachable from cityName via any placed links.
+--- Unlike findNearestCoal (which returns only the nearest distance),
+--- this counts coal at every reachable city.
+---
+--- @param state table
+--- @param cityName string
+--- @return number  total coal cubes reachable
+function Network.countConnectedCoal(state, cityName)
+    local total = 0
+    bfsAllLinks(state, cityName, function(reachedCity, _)
+        local city = state.board.cities[reachedCity]
+        if city and city.slots then
+            for _, slot in ipairs(city.slots) do
+                if slot.tile
+                    and slot.tile.type == Constants.Industry.COAL
+                    and not slot.tile.flipped
+                    and #slot.tile.resources > 0
+                then
+                    total = total + #slot.tile.resources
+                end
+            end
+        end
+    end)
+    return total
+end
+
 --- Find all iron sources on the board (no connection required).
 --- Returns every unflipped iron works with at least one iron resource.
 ---

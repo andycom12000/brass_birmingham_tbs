@@ -50,14 +50,20 @@ end
 
 --- Count how many coal cubes are reachable from cityName (via any placed links,
 --- including coal at the city itself) plus market supply.
+--- Market coal is only available if the city is connected to a merchant city.
 --- Returns boardCoal, marketCoal.
 local function countCoalAvailable(state, cityName)
     local boardCoal = 0
+    local reachedMerchant = false
     local visited   = {}
 
     local function bfs(city)
         if visited[city] then return end
         visited[city] = true
+        -- Check if this city is an active merchant
+        if state.board.merchants[city] then
+            reachedMerchant = true
+        end
         local cityData = state.board.cities[city]
         if cityData and cityData.slots then
             for _, slot in ipairs(cityData.slots) do
@@ -85,7 +91,7 @@ local function countCoalAvailable(state, cityName)
 
     bfs(cityName)
 
-    local marketCoal = state.coalMarket.supply
+    local marketCoal = reachedMerchant and state.coalMarket.supply or 0
     return boardCoal, marketCoal
 end
 
