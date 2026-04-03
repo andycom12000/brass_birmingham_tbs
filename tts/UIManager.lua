@@ -46,4 +46,15 @@ function UIManager.updateLanguage(lang)
     UI.setAttribute("endTurnBtn", "text", btnText)
 end
 
+--- Show the "Single Link" button during double rail flow.
+-- @param playerColor string  TTS seat color (used for visibility filtering if needed)
+function UIManager.showSingleLinkButton(playerColor)
+    UI.setAttribute("singleLinkBtn", "active", "true")
+end
+
+--- Hide the "Single Link" button.
+function UIManager.hideSingleLinkButton()
+    UI.setAttribute("singleLinkBtn", "active", "false")
+end
+
 return UIManager

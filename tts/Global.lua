@@ -70,8 +70,10 @@ function onSave()
         -- Temporarily remove non-serializable fields (Vectors, TTS objects)
         local pendingBackup = state._pendingResource
         local animBackup = state._animating
+        local pendingFirstLinkBackup = state._pendingFirstLink
         state._pendingResource = nil
         state._animating = nil
+        state._pendingFirstLink = nil
 
         -- cubeGUIDs are fine (string arrays), but remove any Vector refs
         -- that might have leaked into market data
@@ -83,6 +85,7 @@ function onSave()
         -- Restore transient fields
         state._pendingResource = pendingBackup
         state._animating = animBackup
+        state._pendingFirstLink = pendingFirstLinkBackup
 
         if ok then
             return encoded
@@ -682,4 +685,18 @@ function onPassAction(playerColor)
     state._pendingCard = nil
     printToAll(playerColor .. " passed")
     afterAction(playerColor)
+end
+
+------------------------------------------------------
+-- SINGLE LINK BUTTON (double rail flow)
+------------------------------------------------------
+
+--- Called when the player clicks "Single Link" during a double rail flow.
+-- Executes the pending first link as a single rail action.
+function onSingleLinkOnly(player, value, id)
+    if not state or not state._pendingFirstLink then return end
+    local color = player.color
+    if not isCurrentPlayer(color) then return end
+
+    EventHandlers.executeSingleLink(color)
 end
