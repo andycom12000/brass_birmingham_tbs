@@ -31,6 +31,11 @@ Lang.strings = {
         player_scouted = "{player} scouted",
         player_developed = "{player} developed {count} tile(s)",
 
+        -- Income
+        income_collected = "{player} collected £{amount} income",
+        income_paid = "{player} paid £{amount} (negative income)",
+        income_shortfall = "{player} lost {vp} VP from income shortfall",
+
         -- Scoring
         scoring_start = "Scoring...",
         building_vp = "Building VP: {vp}",
@@ -93,6 +98,11 @@ Lang.strings = {
         player_loaned = "{player} 進行了貸款（£30，收入 -3）",
         player_scouted = "{player} 進行了偵查",
         player_developed = "{player} 升級了 {count} 張科技",
+
+        -- Income
+        income_collected = "{player} 收取了 £{amount} 收入",
+        income_paid = "{player} 支付了 £{amount}（負收入）",
+        income_shortfall = "{player} 因收入不足損失了 {vp} VP",
 
         -- Scoring
         scoring_start = "計分中...",

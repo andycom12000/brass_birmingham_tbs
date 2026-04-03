@@ -51,6 +51,7 @@ end
 
 -- Start a new round
 function TurnManager.startNewRound(state)
+    TurnManager.incomePhase(state)
     TurnManager.reorderTurnOrder(state)
     GameState.resetRoundSpending(state)
     state.round = state.round + 1

@@ -336,7 +336,20 @@ function afterAction(color)
     CardManager.refillHand(state, color)
 
     -- Advance turn
+    local oldRound = state.round
     TurnManager.endAction(state)
+    if state.round > oldRound then
+        -- New round started — announce income results
+        for _, c in ipairs(state.turnOrder) do
+            local p = GameState.getPlayer(state, c)
+            local income = IncomeTrack.levelToIncome(p.incomeLevel)
+            if income > 0 then
+                printToAll(Lang.format("income_collected", state.lang, { player = c, amount = income }))
+            elseif income < 0 then
+                printToAll(Lang.format("income_paid", state.lang, { player = c, amount = math.abs(income) }))
+            end
+        end
+    end
     broadcastCurrentPlayer()
 end
 
