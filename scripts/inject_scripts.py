@@ -479,10 +479,164 @@ CROWN_CALLBACK_SNIPPET = """
     Global.call('onPhysicalSetupComplete', {{playerCount = {player_count}}})
 """
 
+# Complete replacement script for crown buttons.
+# Preserves the original physical setup (deck placement, market tokens,
+# beer barrels) and appends our game state initialization callback.
+CROWN_FULL_SCRIPT = """
+function onload()
+    isButtonLocked = false
+    times = 1
+
+    fourP_Button  = getObjectFromGUID("3ba14f")
+    threeP_Button = getObjectFromGUID("9c5d5e")
+    towP_Button   = getObjectFromGUID("5f8b97")
+
+    deck        = getObjectFromGUID("{deck_guid}")
+    market_zone = getObjectFromGUID("319330")
+    barrel      = getObjectFromGUID("4be839")
+    point_pool  = Global.getSnapPoints()
+
+    local button = {{}}
+    button.tooltip = "{tooltip}"
+    button.height = 800
+    button.width = 800
+    button.font_size = 50
+    button.position = {{0, 0.1, 0}}
+    button.rotation = {{0, 0, 0}}
+    button.click_function = "on_Button_pressed"
+    button.function_owner = self
+    button.color = {{1, 1, 1, 0}}
+    self.createButton(button)
+end
+
+function on_Button_pressed()
+    if isButtonLocked == false then
+        startLuaCoroutine(self, "prepareGame")
+        isButtonLocked = true
+        self.editButton({{index=0, tooltip = "Please wait..."}})
+        broadcastToAll("Setting up {player_count}-player game", "Yellow")
+        {lock_others}
+    end
+end
+
+function prepareGame()
+    if times == 1 then
+        local m = getCardInZone(market_zone)
+        if m then m.shuffle() end
+    end
+    if deck then deck.shuffle() end
+    delay(20)
+    for _,point in pairs(point_pool) do
+        if point.tags[1] == "Deck" then
+            if deck then
+                deck.setPositionSmooth(point.position)
+                delay(5)
+                deck.setRotationSmooth(point.rotation)
+                delay(5)
+            end
+        elseif {market_tag_check} and times == 1 then
+            putMarketToken(point)
+        elseif {barrel_tag_check} then
+            putBarrelToken(point)
+        end
+    end
+
+    broadcastToAll("Setup complete!", "Green")
+
+    if times == 1 then
+        -- First click: canal era — trigger our game state initialization
+        Global.call('onPhysicalSetupComplete', {{playerCount = {player_count}}})
+        times = 2
+        isButtonLocked = false
+        self.editButton({{index=0, tooltip = "Prepare Rail Era"}})
+    else
+        self.editButton({{index=0, tooltip = "Start a new game"}})
+    end
+
+    return 1
+end
+
+function putMarketToken(point)
+    local m = getCardInZone(market_zone)
+    if not m then return end
+    local params = {{}}
+    params.position = point.position
+    params.rotation = point.rotation
+    params.smooth = true
+    if m.type == "Deck" then
+        m.takeObject(params)
+        delay(10)
+    elseif m.type == "Card" then
+        m.setPositionSmooth(point.position)
+        delay(5)
+        m.setRotationSmooth(point.rotation)
+        delay(5)
+    end
+end
+
+function putBarrelToken(point)
+    if not barrel then return end
+    local params = {{}}
+    params.position = point.position
+    params.smooth = true
+    barrel.takeObject(params)
+    delay(10)
+end
+
+function getCardInZone(zone)
+    if not zone then return nil end
+    for _,obj in ipairs(zone.getObjects()) do
+        if obj.type == "Card" or obj.type == "Deck" then
+            return obj
+        end
+    end
+    return nil
+end
+
+function LockButton()
+    isButtonLocked = true
+    return 1
+end
+
+function delay(frame)
+    for i = 1, frame do
+        coroutine.yield(0)
+    end
+end
+"""
+
 CROWN_LABELS = {
     "5f8b97": "2 Players",
     "9c5d5e": "3 Players",
     "3ba14f": "4 Players",
+}
+
+
+CROWN_CONFIGS = {
+    "5f8b97": {
+        "player_count": 2,
+        "deck_guid": "b6ff44",
+        "tooltip": "2 Players",
+        "market_tag_check": 'point.tags[3] == "M2"',
+        "barrel_tag_check": 'point.tags[3] == "B2"',
+        "lock_others": 'startLuaCoroutine(threeP_Button, "LockButton")\n        startLuaCoroutine(fourP_Button, "LockButton")',
+    },
+    "9c5d5e": {
+        "player_count": 3,
+        "deck_guid": "3895fe",
+        "tooltip": "3 Players",
+        "market_tag_check": 'point.tags[2] == "M3"',
+        "barrel_tag_check": 'point.tags[2] == "B3"',
+        "lock_others": 'startLuaCoroutine(fourP_Button, "LockButton")\n        startLuaCoroutine(towP_Button, "LockButton")',
+    },
+    "3ba14f": {
+        "player_count": 4,
+        "deck_guid": "bc3ba4",
+        "tooltip": "4 Players",
+        "market_tag_check": 'point.tags[1] == "M4"',
+        "barrel_tag_check": 'point.tags[1] == "B4"',
+        "lock_others": 'startLuaCoroutine(threeP_Button, "LockButton")\n        startLuaCoroutine(towP_Button, "LockButton")',
+    },
 }
 
 
@@ -492,32 +646,11 @@ def patch_crown_buttons(mod_data: dict) -> int:
         guid = obj.get("GUID")
 
         if guid in CROWN_BUTTON_GUIDS:
-            player_count = CROWN_BUTTON_GUIDS[guid]
+            config = CROWN_CONFIGS[guid]
 
-            # Replace the entire crown script with just our callback.
-            # The original script runs its own setup (dealing cards, etc.)
-            # which conflicts with our game state initialization.
-            # Use a transparent button so the original object appearance is preserved.
-            obj["LuaScript"] = f"""
-function onLoad()
-    self.createButton({{
-        click_function = "onClick",
-        function_owner = self,
-        label          = "",
-        position       = {{0, 0.5, 0}},
-        width          = 800,
-        height         = 800,
-        color          = {{1, 1, 1, 0}},
-        font_color     = {{0, 0, 0, 0}},
-    }})
-end
-
-function onClick(obj, playerColor)
-    Global.call('onPhysicalSetupComplete', {{playerCount = {player_count}}})
-    self.clearButtons()
-    self.setLock(true)
-end
-"""
+            # Replace with our combined script: original physical setup +
+            # our game state initialization callback.
+            obj["LuaScript"] = CROWN_FULL_SCRIPT.format(**config)
             obj["LuaScriptState"] = ""
 
             if guid in CROWN_LABELS:
