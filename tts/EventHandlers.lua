@@ -212,8 +212,13 @@ function EventHandlers.handleCardDrop(playerColor, cardObj)
     -- Deduct card from hand tracking
     GameState.playCard(state, playerColor)
 
-    -- Move card to discard pile
-    CardManager.discard(cardObj)
+    -- Move card to discard pile (or back to wild supply)
+    local discardResult = CardManager.discard(cardObj)
+    if discardResult == "wild_location" then
+        state.wildSupply.location = (state.wildSupply.location or 0) + 1
+    elseif discardResult == "wild_industry" then
+        state.wildSupply.industry = (state.wildSupply.industry or 0) + 1
+    end
 
     -- Highlight valid build and/or link spots based on the card played
     Highlights.showValidBuildSpots(state, playerColor, cardInfo)

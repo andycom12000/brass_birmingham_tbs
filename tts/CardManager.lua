@@ -71,13 +71,26 @@ function CardManager.parseCard(cardObj)
     return nil
 end
 
---- Move a card to the discard pile
+--- Move a card to the discard pile, or return it to its wild supply area.
+--- Wild cards are detected by name prefix (same logic as parseCard).
 -- @param cardObj TTS card object
+-- @return string|nil  "wild_location" or "wild_industry" if a wild card was returned, nil otherwise
 function CardManager.discard(cardObj)
+    local name = cardObj.getName()
+
+    if name:find("^Wild Location") then
+        CardManager.returnWildToSupply(cardObj, Constants.CardType.WILD_LOCATION)
+        return "wild_location"
+    elseif name:find("^Wild Industry") then
+        CardManager.returnWildToSupply(cardObj, Constants.CardType.WILD_INDUSTRY)
+        return "wild_industry"
+    end
+
     local discardZone = ObjectManager.getObject("discardZone")
     if discardZone then
         cardObj.setPositionSmooth(discardZone.getPosition() + Vector(0, 1, 0))
     end
+    return nil
 end
 
 --- Return a wild card to its supply pile
