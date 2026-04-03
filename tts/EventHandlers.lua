@@ -380,7 +380,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     Actions.removeTileFromUnbuilt(player, industryType, level)
 
     -- Create tile and place on slot
-    local tile = Tile.newWithResources(industryType, level)
+    local tile = Tile.newWithResources(industryType, level, state.era)
     slot.occupant = playerColor
     slot.tile = tile
 

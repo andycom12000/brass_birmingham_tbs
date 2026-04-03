@@ -293,8 +293,14 @@ function Actions.build(state, color, params)
 
     -- Initialise the tile with its resources (mirrors Tile.newWithResources logic):
     -- fill resource tokens and auto-flip breweries.
-    if tile.produces and tile.produces > 0 and tile.producesType then
-        for _ = 1, tile.produces do
+    -- For breweries, override produces based on era (canal=1, rail=2)
+    local produces = tile.produces or 0
+    if industryType == Constants.Industry.BREWERY then
+        produces = (state.era == Constants.Era.RAIL) and 2 or 1
+        tile.produces = produces
+    end
+    if produces > 0 and tile.producesType then
+        for _ = 1, produces do
             tile.resources[#tile.resources + 1] = tile.producesType
         end
     end

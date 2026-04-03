@@ -50,11 +50,18 @@ end
 --- Create a tile and immediately fill its resources
 --- Coal mines get N coal tokens, Iron works get N iron tokens, Breweries get N beer tokens
 --- Breweries auto-flip on build
+--- For breweries, resource count is era-based: canal=1, rail=2 (overrides BoardData.produces)
 --- @param industryType string  Constants.Industry value
 --- @param level number  integer
+--- @param era string|nil  Constants.Era value ("canal" or "rail"); defaults to "canal"
 --- @return table  A tile with resources initialized and flipped state
-function Tile.newWithResources(industryType, level)
+function Tile.newWithResources(industryType, level, era)
     local tile = Tile.new(industryType, level)
+
+    -- For breweries, override produces based on era (canal=1, rail=2)
+    if industryType == Constants.Industry.BREWERY then
+        tile.produces = (era == Constants.Era.RAIL) and 2 or 1
+    end
 
     -- Fill resources if tile produces something
     if tile.produces > 0 and tile.producesType then
