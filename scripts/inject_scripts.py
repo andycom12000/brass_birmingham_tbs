@@ -493,26 +493,32 @@ def patch_crown_buttons(mod_data: dict) -> int:
 
         if guid in CROWN_BUTTON_GUIDS:
             player_count = CROWN_BUTTON_GUIDS[guid]
-            script = obj.get("LuaScript", "")
-            callback = CROWN_CALLBACK_SNIPPET.format(player_count=player_count)
 
-            # Idempotency guard: don't inject twice
-            if "onPhysicalSetupComplete" in script:
-                if guid in CROWN_LABELS:
-                    obj["Nickname"] = CROWN_LABELS[guid]
-                patched += 1
-                continue
+            # Replace the entire crown script with just our callback.
+            # The original script runs its own setup (dealing cards, etc.)
+            # which conflicts with our game state initialization.
+            obj["LuaScript"] = f"""
+function onLoad()
+    self.createButton({{
+        click_function = "onClick",
+        function_owner = self,
+        label          = "{player_count} Players",
+        position       = {{0, 0.2, 0}},
+        width          = 1200,
+        height         = 600,
+        font_size      = 300,
+        color          = {{0.83, 0.77, 0.63}},
+        font_color     = {{0.1, 0.04, 0}},
+    }})
+end
 
-            # The main coroutine ends with "return 1\nend" — it's the FIRST
-            # occurrence of this pattern.  Helper functions (LockButton, delay)
-            # appear later.  Insert the callback just before "return 1".
-            marker = "return 1\nend"
-            idx = script.find(marker)
-            if idx != -1:
-                obj["LuaScript"] = script[:idx] + callback + script[idx:]
-            else:
-                # Fallback: append at the very end
-                obj["LuaScript"] = script + "\n" + callback
+function onClick(obj, playerColor)
+    Global.call('onPhysicalSetupComplete', {{playerCount = {player_count}}})
+    self.clearButtons()
+    self.setLock(true)
+end
+"""
+            obj["LuaScriptState"] = ""
 
             if guid in CROWN_LABELS:
                 obj["Nickname"] = CROWN_LABELS[guid]
