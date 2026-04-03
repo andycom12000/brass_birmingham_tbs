@@ -548,4 +548,14 @@ function Validation.canScout(state, color)
     return ok()
 end
 
+-- ============================================================
+-- 7. canPass
+-- ============================================================
+
+--- Can the player pass (discard a card without taking an action)?
+function Validation.canPass(state, color)
+    -- Pass is always valid if a card has been played (checked by TTS layer)
+    return ok()
+end
+
 return Validation

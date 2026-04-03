@@ -362,44 +362,14 @@ function onEndTurn(player, value, id)
         return
     end
 
-    -- Reset per-round spend tracking for this player
-    PLAYER_SPEND[color] = 0
-
-    -- Cancel any pending resource selection
-    EventHandlers.cancelPendingResource()
-
-    -- Clear any pending action
+    -- If a card is pending, treat End Turn as Pass
     if state._pendingCard then
-        Highlights.clearAll()
-        state._pendingCard = nil
+        onPassAction(color)
+        return
     end
 
-    -- Update deck empty flag
-    state.deckEmpty = CardManager.isDeckEmpty()
-
-    -- Check era end
-    if EraTransition.isEraOver(state) then
-        UIManager.hideEndTurnButton()
-        if state.era == Constants.Era.CANAL then
-            printToAll(Lang.get("era_transition", state.lang))
-            EraTransition.transition(state)
-            CardManager.rebuildDeckForRailEra(state)
-            CardManager.dealToAll(state)
-            UIManager.resetAllCounters(state.turnOrder)
-            PLAYER_SPEND = {}  -- reset spend tracking for new era
-            broadcastCurrentPlayer()
-            return
-        else
-            Scoring.scoreEndOfEra(state, true)
-            local ranking = Scoring.determineWinner(state)
-            announceResults(ranking)
-            return
-        end
-    end
-
-    -- Advance turn
-    TurnManager.endAction(state)
-    broadcastCurrentPlayer()
+    -- No card pending — tell them to play a card first
+    printToColor("Play a card first, then choose an action or pass.", color, {1, 0.5, 0})
 end
 
 ------------------------------------------------------
@@ -687,4 +657,16 @@ function onScoutAction(playerColor)
     else
         printToColor(result.error, playerColor, {1, 0, 0})
     end
+end
+
+function onPassAction(playerColor)
+    if not state or not isCurrentPlayer(playerColor) then return end
+    if not state._pendingCard then
+        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+        return
+    end
+    Highlights.clearAll()
+    state._pendingCard = nil
+    printToAll(playerColor .. " passed")
+    afterAction(playerColor)
 end

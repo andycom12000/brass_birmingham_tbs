@@ -334,9 +334,6 @@ function Actions.build(state, color, params)
     -- Auto-sell for coal mines and iron works (mandatory rule)
     Actions.autoSellToMarket(state, color, slot)
 
-    -- Step 10: Update handSize (player played a card)
-    GameState.playCard(state, color)
-
     return ok()
 end
 
@@ -413,9 +410,6 @@ function Actions.network(state, color, params)
     local linksPlaced = isDouble and 2 or 1
     player.linksRemaining = (player.linksRemaining or 0) - linksPlaced
 
-    -- Step 7: Update handSize
-    GameState.playCard(state, color)
-
     return ok()
 end
 
@@ -477,9 +471,6 @@ function Actions.sell(state, color, params)
         end
     end
 
-    -- Step 4: Update handSize
-    GameState.playCard(state, color)
-
     return ok()
 end
 
@@ -507,9 +498,6 @@ function Actions.develop(state, color, params)
         removeLowestDevelopable(player)
     end
 
-    -- Step 4: Update handSize
-    GameState.playCard(state, color)
-
     return ok()
 end
 
@@ -536,9 +524,6 @@ function Actions.loan(state, color)
     player.incomeLevel = newLevel
     player.incomeSpace = newSpace
 
-    -- Step 4: Update handSize (player played a card)
-    GameState.playCard(state, color)
-
     return ok()
 end
 
@@ -556,9 +541,9 @@ function Actions.scout(state, color)
 
     local player = GameState.getPlayer(state, color)
 
-    -- Steps 2 & 3: Net handSize change is -1 (lost 3 cards, gained 2 wilds).
-    -- The card played counts as -1, the 2 discarded are -2, gaining 2 wilds = +2.
-    GameState.playCard(state, color)       -- lose 1 (played card)
+    -- Steps 2 & 3: The played card deduction (-1) is handled by TTS layer
+    -- (handleCardDrop). Here we only handle the scout-specific exchange:
+    -- discard 2 cards, gain 2 wild cards (net 0 change from scout itself).
     player.handSize = player.handSize - 2  -- lose 2 (discarded)
     player.handSize = player.handSize + 2  -- gain 2 wild cards
     player.hasWilds = true
