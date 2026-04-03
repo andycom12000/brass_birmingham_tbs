@@ -27402,7 +27402,7 @@
       "HideWhenFaceDown": false,
       "Hands": false,
       "MeshIndex": 2,
-      "LuaScript": "\nfunction onLoad()\n    self.createButton({\n        click_function = \"onClick\",\n        function_owner = self,\n        label          = \"2 Players\",\n        position       = {0, 0.2, 0},\n        width          = 1200,\n        height         = 600,\n        font_size      = 300,\n        color          = {0.83, 0.77, 0.63},\n        font_color     = {0.1, 0.04, 0},\n    })\nend\n\nfunction onClick(obj, playerColor)\n    Global.call('onPhysicalSetupComplete', {playerCount = 2})\n    self.clearButtons()\n    self.setLock(true)\nend\n",
+      "LuaScript": "\nfunction onLoad()\n    self.createButton({\n        click_function = \"onClick\",\n        function_owner = self,\n        label          = \"\",\n        position       = {0, 0.5, 0},\n        width          = 800,\n        height         = 800,\n        color          = {1, 1, 1, 0},\n        font_color     = {0, 0, 0, 0},\n    })\nend\n\nfunction onClick(obj, playerColor)\n    Global.call('onPhysicalSetupComplete', {playerCount = 2})\n    self.clearButtons()\n    self.setLock(true)\nend\n",
       "LuaScriptState": "",
       "XmlUI": ""
     },
@@ -27448,7 +27448,7 @@
       "HideWhenFaceDown": false,
       "Hands": false,
       "MeshIndex": 3,
-      "LuaScript": "\nfunction onLoad()\n    self.createButton({\n        click_function = \"onClick\",\n        function_owner = self,\n        label          = \"3 Players\",\n        position       = {0, 0.2, 0},\n        width          = 1200,\n        height         = 600,\n        font_size      = 300,\n        color          = {0.83, 0.77, 0.63},\n        font_color     = {0.1, 0.04, 0},\n    })\nend\n\nfunction onClick(obj, playerColor)\n    Global.call('onPhysicalSetupComplete', {playerCount = 3})\n    self.clearButtons()\n    self.setLock(true)\nend\n",
+      "LuaScript": "\nfunction onLoad()\n    self.createButton({\n        click_function = \"onClick\",\n        function_owner = self,\n        label          = \"\",\n        position       = {0, 0.5, 0},\n        width          = 800,\n        height         = 800,\n        color          = {1, 1, 1, 0},\n        font_color     = {0, 0, 0, 0},\n    })\nend\n\nfunction onClick(obj, playerColor)\n    Global.call('onPhysicalSetupComplete', {playerCount = 3})\n    self.clearButtons()\n    self.setLock(true)\nend\n",
       "LuaScriptState": "",
       "XmlUI": ""
     },
@@ -27494,7 +27494,7 @@
       "HideWhenFaceDown": false,
       "Hands": false,
       "MeshIndex": 4,
-      "LuaScript": "\nfunction onLoad()\n    self.createButton({\n        click_function = \"onClick\",\n        function_owner = self,\n        label          = \"4 Players\",\n        position       = {0, 0.2, 0},\n        width          = 1200,\n        height         = 600,\n        font_size      = 300,\n        color          = {0.83, 0.77, 0.63},\n        font_color     = {0.1, 0.04, 0},\n    })\nend\n\nfunction onClick(obj, playerColor)\n    Global.call('onPhysicalSetupComplete', {playerCount = 4})\n    self.clearButtons()\n    self.setLock(true)\nend\n",
+      "LuaScript": "\nfunction onLoad()\n    self.createButton({\n        click_function = \"onClick\",\n        function_owner = self,\n        label          = \"\",\n        position       = {0, 0.5, 0},\n        width          = 800,\n        height         = 800,\n        color          = {1, 1, 1, 0},\n        font_color     = {0, 0, 0, 0},\n    })\nend\n\nfunction onClick(obj, playerColor)\n    Global.call('onPhysicalSetupComplete', {playerCount = 4})\n    self.clearButtons()\n    self.setLock(true)\nend\n",
       "LuaScriptState": "",
       "XmlUI": ""
     },

@@ -497,18 +497,18 @@ def patch_crown_buttons(mod_data: dict) -> int:
             # Replace the entire crown script with just our callback.
             # The original script runs its own setup (dealing cards, etc.)
             # which conflicts with our game state initialization.
+            # Use a transparent button so the original object appearance is preserved.
             obj["LuaScript"] = f"""
 function onLoad()
     self.createButton({{
         click_function = "onClick",
         function_owner = self,
-        label          = "{player_count} Players",
-        position       = {{0, 0.2, 0}},
-        width          = 1200,
-        height         = 600,
-        font_size      = 300,
-        color          = {{0.83, 0.77, 0.63}},
-        font_color     = {{0.1, 0.04, 0}},
+        label          = "",
+        position       = {{0, 0.5, 0}},
+        width          = 800,
+        height         = 800,
+        color          = {{1, 1, 1, 0}},
+        font_color     = {{0, 0, 0, 0}},
     }})
 end
 
