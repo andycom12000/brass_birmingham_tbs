@@ -1,6 +1,6 @@
 ---
 name: tts-xml-ui
-description: Use when writing or debugging Tabletop Simulator XML UI elements (Buttons, Panels, Text). Covers positioning, layout, visibility, onClick callbacks, and runtime manipulation via Lua.
+description: Use when writing or debugging Tabletop Simulator XML UI — screen-overlay Buttons, Panels, Text, HUD elements. Covers rectAlignment/offsetXY positioning, HorizontalLayout/VerticalLayout sizing, onClick callbacks, UI.setAttribute runtime changes, active/visibility toggling, and createButton for object-level UI. Use this whenever TTS UI elements are invisible, mispositioned, or onClick doesn't fire.
 ---
 
 # TTS XML UI Reference
@@ -111,6 +111,23 @@ UI.hide("myPanel")
 UI.show("myPanel")
 ```
 
+## Important Gotchas
+
+- `UI.setAttribute` values are **ALWAYS strings**: `"true"` not `true`, `"42"` not `42`
+- `padding` format: `"left right top bottom"` (NOT CSS order: top right bottom left)
+- `childAlignment` on layout groups: `UpperLeft`, `MiddleCenter`, `LowerRight` etc.
+- XML parse errors appear in **TTS chat** (red text with line/char position) — check there first if UI doesn't render
+- `UI.hide`/`UI.show` removes element from layout flow; `active="false"` keeps layout space but hides visually
+
+## Debugging Invisible UI
+
+1. Check TTS chat for XML parse errors (red text with line/char position)
+2. Verify `active="true"` on the element AND all parent Panels
+3. Check `color` attribute exists on Panels (no color = invisible)
+4. If inside layout group: use `preferredWidth`/`preferredHeight`
+5. If using `position`: STOP — use `rectAlignment` + `offsetXY` instead
+6. Check `visibility` attribute isn't restricting to other players
+
 ## Color Format
 
 `#RRGGBB` or `#RRGGBBAA` (with alpha). Examples:
@@ -170,7 +187,9 @@ self.createButton({
 
 This is separate from XML UI. Use for clickable physical objects (setup buttons, tokens).
 
-## deck.deal() and Hand Zones
+## Related: deck.deal() and Hand Zones
+
+Not part of XML UI, but commonly needed alongside it.
 
 ```lua
 deckObj.deal(count, playerColor)  -- deals cards to player's hand zone
