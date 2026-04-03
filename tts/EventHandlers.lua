@@ -815,215 +815,79 @@ end
 ------------------------------------------------------
 
 --- Handle a link (canal/rail) tile being dropped on the board.
+-- Uses centralized Validation.canNetwork() and Actions.network() for game logic.
 -- Requires a pending card (play a card first).
 -- Snaps to the nearest valid link point and executes the Network action.
 -- @param playerColor  TTS seat color string
 -- @param linkObj  TTS object representing a canal or rail tile
+-- @param meta  table with linkType field (Constants.Era.CANAL or Constants.Era.RAIL)
+--
+-- TODO: Double rail support (#10) — when placing the first rail link in Rail era,
+-- check if the player can afford double rail (£15 + 2 coal + 1 beer). If so,
+-- highlight available second links and wait. If a second link is placed, call
+-- Actions.network with secondLinkId. For now, only single link is supported.
 function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
     if not state then return end
+    if not state._pendingCard then
+        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
 
     local linkType = meta and meta.linkType or Constants.Era.CANAL
-    local isCanal = (linkType == Constants.Era.CANAL)
-    local isRail = (linkType == Constants.Era.RAIL)
 
-    -- Determine costs
-    local moneyCost = 0
-    local coalNeeded = 0
-    if isCanal then
-        moneyCost = Constants.LinkCost.CANAL  -- $3
-    else
-        moneyCost = Constants.LinkCost.SINGLE_RAIL  -- $5
-        coalNeeded = 1
-    end
-
-    -- Era check
-    if isCanal and state.era ~= Constants.Era.CANAL then
-        printToColor("Canal links can only be built in the Canal Era.", playerColor, {1, 0, 0})
-        rejectTile(linkObj, playerColor)
-        return
-    end
-    if isRail and state.era ~= Constants.Era.RAIL then
-        printToColor("Rail links can only be built in the Rail Era.", playerColor, {1, 0, 0})
-        rejectTile(linkObj, playerColor)
-        return
-    end
-
-    -- Money check
-    local player = GameState.getPlayer(state, playerColor)
-    local totalCost = moneyCost
-
-    -- Coal check for rail
-    if coalNeeded > 0 then
-        -- Find any city where the player has presence, for BFS coal search
-        local refCity = nil
-        for cName, cData in pairs(state.board.cities) do
-            if cData.slots then
-                for _, s in ipairs(cData.slots) do
-                    if s.occupant == playerColor then
-                        refCity = cName
-                        break
-                    end
-                end
-            end
-            if refCity then break end
-        end
-
-        -- Count ALL connected coal (not just nearest) for accurate market shortfall
-        local boardCoal = 0
-        if refCity then
-            boardCoal = Network.countConnectedCoal(state, refCity)
-        end
-
-        local coalFromMarket = math.max(0, coalNeeded - boardCoal)
-
-        -- Market connection check for coal
-        if coalFromMarket > 0 then
-            local hasMarket = false
-            if refCity then
-                hasMarket = Network.hasMarketConnection(state, playerColor, refCity)
-            end
-            if not hasMarket then
-                printToColor("Cannot build rail: no coal available (no board coal or market connection).", playerColor, {1, 0, 0})
-                rejectTile(linkObj, playerColor)
-                return
-            end
-        end
-
-        -- Add market coal cost
-        local coalMarketCost = Market.estimateCost(state, Constants.Resource.COAL, coalFromMarket)
-        totalCost = totalCost + coalMarketCost
-    end
-
-    -- Affordability check
-    if player.money < totalCost then
-        printToColor("Not enough money: need $" .. totalCost .. ", have $" .. player.money, playerColor, {1, 0, 0})
-        rejectTile(linkObj, playerColor)
-        return
-    end
-
-    -- === Passed all checks — commit ===
-
-    -- Deduct money (base cost only; market coal deducted by buyFromMarket)
-    GameState.spendMoney(state, playerColor, moneyCost)
-    updatePhysicalCounters(playerColor, moneyCost)
-
-    -- Consume coal for rail
-    if coalNeeded > 0 then
-        local refCity = nil
-        for cName, cData in pairs(state.board.cities) do
-            if cData.slots then
-                for _, s in ipairs(cData.slots) do
-                    if s.occupant == playerColor then refCity = cName; break end
-                end
-            end
-            if refCity then break end
-        end
-
-        local boardCoal = 0
-        local coalSources = {}
-        if refCity then
-            coalSources = Network.findNearestCoal(state, refCity) or {}
-            for _, src in ipairs(coalSources) do
-                boardCoal = boardCoal + #src.slot.tile.resources
-            end
-        end
-
-        local fromBoard = math.min(coalNeeded, boardCoal)
-        local fromMarket = coalNeeded - fromBoard
-
-        -- Consume from board
-        local remaining = fromBoard
-        for _, src in ipairs(coalSources) do
-            while remaining > 0 and #src.slot.tile.resources > 0 do
-                table.remove(src.slot.tile.resources, #src.slot.tile.resources)
-                Market.returnToMarket(state, Constants.Resource.COAL, 1)
-                if Actions.autoFlipIfEmpty(state, src.slot) then
-                    flipPhysicalTile(src.slotId, src.slot.occupant, src.slot.tile.incomeSpaces or 0)
-                end
-                remaining = remaining - 1
-            end
-            if remaining <= 0 then break end
-        end
-
-        -- Buy from market (deduct money + directly remove cube)
-        if fromMarket > 0 then
-            local marketData = Market.getMarketSupply(state, Constants.Resource.COAL)
-            if not marketData.cubeGUIDs then marketData.cubeGUIDs = {} end
-            local totalPrice = 0
-            for i = 1, fromMarket do
-                local price = Market.getPrice(state, Constants.Resource.COAL)
-                totalPrice = totalPrice + price
-                Market.buyFromMarket(state, playerColor, Constants.Resource.COAL, 1)
-
-                -- Directly remove market cube
-                local cubeGUID = nil
-                if #marketData.cubeGUIDs > 0 then
-                    cubeGUID = table.remove(marketData.cubeGUIDs, #marketData.cubeGUIDs)
-                end
-                if cubeGUID then
-                    local cubeObj = getObjectFromGUID(cubeGUID)
-                    if cubeObj then cubeObj.destruct() end
-                else
-                    -- Fallback: find cube near the now-empty track position
-                    local emptyIdx = marketData.supply + 1
-                    local trackPos = MarketLayout.getPosition(Constants.Resource.COAL, emptyIdx)
-                    if trackPos then
-                        for _, obj in ipairs(getAllObjects()) do
-                            if not obj.isDestroyed() and obj.getName() == Constants.ObjectName.COAL_CUBE then
-                                local opos = obj.getPosition()
-                                local dx = opos.x - trackPos.x
-                                local dz = opos.z - trackPos.z
-                                if math.sqrt(dx*dx + dz*dz) < 1.0 then
-                                    obj.destruct()
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            updatePhysicalCounters(playerColor, totalPrice)
-        end
-    end
-
-    -- Find which link this connects using link snap points
+    -- Find nearest link from snap map
     local dropPos = linkObj.getPosition()
     local snapInfo = SnapMap.findNearestPosition(dropPos, 4.0)
     local linkId = nil
-    local city1, city2 = nil, nil
-
     if snapInfo and snapInfo.type == "link" then
-        -- Direct match from link snap point
         linkId = snapInfo.id
-        local linkData = BoardData.links[linkId]
-        if linkData and linkData.cities then
-            city1 = linkData.cities[1]
-            city2 = linkData.cities[2]
-        end
     end
 
-    -- Fallback: if snap didn't match a valid link in game state, try by link ID variations
+    -- Fallback: if snap didn't match a valid link in game state, try reverse ordering
     if linkId and not state.board.links[linkId] then
-        -- Try reverse ordering
-        if city1 and city2 then
-            local rev = city2 .. "-" .. city1
+        local linkData = BoardData.links[linkId]
+        if linkData and linkData.cities then
+            local rev = linkData.cities[2] .. "-" .. linkData.cities[1]
             if state.board.links[rev] then
                 linkId = rev
             end
         end
     end
 
-    -- Record link ownership in game state
-    if linkId and state.board.links[linkId] then
-        state.board.links[linkId].owner = playerColor
-    elseif linkId then
-        -- SnapMap found a link ID but it doesn't exist in BoardData/game state
-        printToColor("[Warning] Link '" .. linkId .. "' not found in game state — canal/rail not tracked!", playerColor, {1, 0.5, 0})
-    else
-        printToColor("[Warning] No link snap found near drop position — canal/rail not tracked!", playerColor, {1, 0.5, 0})
+    if not linkId then
+        printToColor("No link found near drop position.", playerColor, {1, 0, 0})
+        rejectTile(linkObj, playerColor)
+        return
     end
 
-    -- Lower tile to board and lock
+    -- Validate using centralized validation
+    local v = Validation.canNetwork(state, playerColor, {
+        linkId = linkId,
+        double = false,
+    })
+    if not v.valid then
+        printToColor(v.reason, playerColor, {1, 0, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
+
+    -- Snapshot money before action for calculating total spent
+    local playerBefore = GameState.getPlayer(state, playerColor)
+    local moneyBefore = playerBefore.money
+
+    -- Execute action (state changes: money, coal, beer, link ownership, linksRemaining)
+    local result = Actions.network(state, playerColor, { linkId = linkId })
+    if not result.success then
+        printToColor(result.error, playerColor, {1, 0, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
+
+    -- Calculate how much money was actually spent (base cost + any market purchases)
+    local totalSpent = moneyBefore - playerBefore.money
+
+    -- Physical: position and lock tile
     linkObj.setPositionSmooth(Vector(dropPos.x, 1.05, dropPos.z), false, true)
     Wait.time(function()
         if linkObj and not linkObj.isDestroyed() then
@@ -1031,17 +895,23 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
         end
     end, 0.5)
 
+    -- Update physical counters with total money spent
+    updatePhysicalCounters(playerColor, totalSpent)
+
     -- Announce
+    local linkData = BoardData.links[linkId]
+    local isCanal = (linkType == Constants.Era.CANAL)
     local linkLabel = isCanal and "Canal" or "Rail"
-    local coalInfo = ""
-    if coalNeeded > 0 then
-        coalInfo = " + " .. coalNeeded .. " coal"
-    end
     local cityInfo = ""
-    if city1 and city2 then
-        cityInfo = " (" .. city1 .. " - " .. city2 .. ")"
+    if linkData and linkData.cities then
+        cityInfo = " (" .. linkData.cities[1] .. " - " .. linkData.cities[2] .. ")"
     end
-    printToAll(playerColor .. " built " .. linkLabel .. " link" .. cityInfo .. " ($" .. moneyCost .. coalInfo .. ")")
+    printToAll(playerColor .. " built " .. linkLabel .. " link" .. cityInfo)
+
+    -- Clear pending card and advance
+    Highlights.clearAll()
+    state._pendingCard = nil
+    afterAction(playerColor)
 end
 
 ------------------------------------------------------
