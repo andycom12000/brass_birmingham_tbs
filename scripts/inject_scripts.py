@@ -760,6 +760,19 @@ def lock_resource_cubes(mod_data: dict) -> int:
     return locked
 
 
+HAND_TRIGGER_GUIDS = {"8913e3", "38c677", "5c56af", "83dff2"}
+
+
+def enable_hand_zones(mod_data: dict) -> int:
+    """Enable Hands property on HandTrigger objects so TTS deals cards to them."""
+    enabled = 0
+    for obj in mod_data.get("ObjectStates", []):
+        if obj.get("GUID") in HAND_TRIGGER_GUIDS and obj.get("Name") == "HandTrigger":
+            obj["Hands"] = True
+            enabled += 1
+    return enabled
+
+
 # ---------------------------------------------------------------------------
 # Snap point tagging — map save-level snap points to city slot IDs
 # ---------------------------------------------------------------------------
@@ -943,6 +956,11 @@ def main():
     print("Locking coal/iron resource cubes...")
     n_cubes = lock_resource_cubes(mod_data)
     print(f"  Locked {n_cubes} resource cube(s).")
+
+    print()
+    print("Enabling hand zones...")
+    n_hands = enable_hand_zones(mod_data)
+    print(f"  Enabled {n_hands} hand zone(s).")
 
     # NOTE: Snap point city mapping is hardcoded in SnapMap.lua, NOT via TTS Tags.
     # TTS Tags restrict snapping to tagged objects only, breaking free snap behavior.

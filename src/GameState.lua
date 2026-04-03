@@ -159,7 +159,7 @@ function GameState.new(playerCount)
             spentThisRound     = 0,
             linksRemaining     = Constants.INITIAL_LINKS,
             hasWilds           = false,
-            handSize           = Constants.INITIAL_HAND_SIZE,
+            handSize           = 0,  -- filled by CardManager.dealFromDeck
             scoutUsedThisRound = false,
             unbuiltTiles       = buildUnbuiltTiles(),
         }
