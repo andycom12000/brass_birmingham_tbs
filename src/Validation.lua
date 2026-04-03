@@ -208,6 +208,15 @@ function Validation.canBuild(state, color, params)
         end
     end
 
+    -- ---- 5b. Farm brewery restriction ----
+    local city = state.board.cities[cityName]
+    if city and city.isFarmBrewery then
+        -- Farm breweries can only be built with Industry cards (brewery) or Wild Industry
+        if cardType ~= Constants.CardType.INDUSTRY and cardType ~= Constants.CardType.WILD_INDUSTRY then
+            return fail("Farm breweries can only be built with a Brewery industry card or Wild Industry card")
+        end
+    end
+
     -- ---- 6. Player has the tile available ----
     local stack = player.unbuiltTiles[industryType]
     if not stack or #stack == 0 then

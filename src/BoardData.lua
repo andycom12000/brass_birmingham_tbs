@@ -146,6 +146,20 @@ BoardData.cities = {
     Oxford       = { slots = {} },
     Warrington   = { slots = {} },
     Nottingham   = { slots = {} },
+
+    -- Farm Breweries (unnamed standalone brewery locations)
+    ["Farm Brewery 1"] = {
+        isFarmBrewery = true,
+        slots = {
+            { id = "FarmBrewery1_1", types = {I.BREWERY} },
+        }
+    },
+    ["Farm Brewery 2"] = {
+        isFarmBrewery = true,
+        slots = {
+            { id = "FarmBrewery2_1", types = {I.BREWERY} },
+        }
+    },
 }
 
 -- ============================================================
@@ -240,6 +254,12 @@ BoardData.links = {
 
     -- Walsall connections
     ["Walsall-Wolverhampton"]      = { cities = { "Walsall", "Wolverhampton" },       types = { E.RAIL } },
+
+    -- Farm Brewery connections
+    ["Farm Brewery 1-Kidderminster"] = { cities = { "Farm Brewery 1", "Kidderminster" }, types = { E.CANAL, E.RAIL } },
+    ["Farm Brewery 1-Worcester"]     = { cities = { "Farm Brewery 1", "Worcester" },     types = { E.CANAL, E.RAIL } },
+    ["Cannock-Farm Brewery 2"]       = { cities = { "Cannock", "Farm Brewery 2" },        types = { E.CANAL, E.RAIL } },
+    ["Farm Brewery 2-Walsall"]       = { cities = { "Farm Brewery 2", "Walsall" },        types = { E.CANAL, E.RAIL } },
 }
 
 -- ============================================================

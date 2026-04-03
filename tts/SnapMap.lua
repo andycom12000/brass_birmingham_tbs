@@ -115,6 +115,9 @@ function SnapMap.buildFromGlobal()
         -- Worcester (2 slots)
         { id = "Worcester_1", pos = Vector(-5.424, 0.96, -13.336) },
         { id = "Worcester_2", pos = Vector(-3.873, 0.96, -13.366) },
+        -- Farm Brewery snap points (estimated — may need TTS adjustment)
+        { id = "FarmBrewery1_1", pos = Vector(-5.660, 0.96, -11.170) },
+        { id = "FarmBrewery2_1", pos = Vector(0.130, 0.96, -0.180) },
     }
 
     local count = 0
@@ -147,6 +150,9 @@ function SnapMap.buildFromGlobal()
     for cityName, a in pairs(cityAccum) do
         SnapMap.byCityCenter[cityName] = Vector(a.sumX / a.n, 0.96, a.sumZ / a.n)
     end
+    -- Remove auto-parsed farm brewery entries (slot IDs don't match BoardData keys)
+    SnapMap.byCityCenter["FarmBrewery1"] = nil
+    SnapMap.byCityCenter["FarmBrewery2"] = nil
 
     -- Add merchant city centers (no building slots, but needed for link matching)
     -- Positions from tagged merchant snap points in the save file
@@ -155,6 +161,12 @@ function SnapMap.buildFromGlobal()
     SnapMap.byCityCenter["Oxford"]      = Vector(11.523, 0.96, -11.985)
     SnapMap.byCityCenter["Warrington"]  = Vector(-7.762, 0.96, 12.550)
     SnapMap.byCityCenter["Nottingham"]  = Vector(14.237, 0.96, 10.424)
+
+    -- Farm brewery city centers (estimated — may need TTS adjustment)
+    -- Slot IDs use "FarmBrewery1_1" so the auto-parser maps to "FarmBrewery1";
+    -- we override with the correct BoardData key here.
+    SnapMap.byCityCenter["Farm Brewery 1"] = Vector(-5.660, 0.96, -11.170)
+    SnapMap.byCityCenter["Farm Brewery 2"] = Vector(0.130, 0.96, -0.180)
 
     -- Link snap point positions → BoardData link IDs
     -- Re-mapped after city position corrections (2026-04-01)
