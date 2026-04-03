@@ -91,7 +91,7 @@ describe("Income Phase - Round Progression Integration", function()
         expect(p1.money).toBe(10 - 3)
     end)
 
-    it("should lose VP on income shortfall during round transition", function()
+    it("should return shortfall instead of immediately deducting VP", function()
         local state = GameState.new(2)
         local color1 = state.turnOrder[1]
         local p1 = GameState.getPlayer(state, color1)
@@ -102,9 +102,15 @@ describe("Income Phase - Round Progression Integration", function()
 
         exhaustRound(state)
 
-        -- Owed 5, had 2, shortfall = 3 VP lost
+        -- Owed 5, had 2, shortfall = 3 — stored for interactive resolution
         expect(p1.money).toBe(0)
-        expect(p1.vp).toBe(17)
+        -- VP should NOT be deducted yet (pending shortfall resolution)
+        expect(p1.vp).toBe(20)
+        -- Shortfall should be stored in state
+        expect(state._pendingShortfalls ~= nil).toBeTrue()
+        expect(#state._pendingShortfalls).toBe(1)
+        expect(state._pendingShortfalls[1].color).toBe(color1)
+        expect(state._pendingShortfalls[1].amount).toBe(3)
     end)
 
     it("should handle zero income without changing money", function()

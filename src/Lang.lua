@@ -36,6 +36,12 @@ Lang.strings = {
         income_paid = "{player} paid £{amount} (negative income)",
         income_shortfall = "{player} lost {vp} VP from income shortfall",
 
+        -- Shortfall tile removal
+        shortfall_owe = "{player} owes £{amount} — remove tiles or accept VP loss",
+        shortfall_removed = "{player} removed a tile (refund £{refund}, remaining debt: £{remaining})",
+        shortfall_vp_loss = "{player} accepted {vp} VP loss",
+        shortfall_no_tiles = "{player} lost {vp} VP (no tiles to remove)",
+
         -- Scoring
         scoring_start = "Scoring...",
         building_vp = "Building VP: {vp}",
@@ -103,6 +109,12 @@ Lang.strings = {
         income_collected = "{player} 收取了 £{amount} 收入",
         income_paid = "{player} 支付了 £{amount}（負收入）",
         income_shortfall = "{player} 因收入不足損失了 {vp} VP",
+
+        -- Shortfall tile removal
+        shortfall_owe = "{player} 欠 £{amount} — 移除磚塊或接受 VP 損失",
+        shortfall_removed = "{player} 移除了磚塊（退款 £{refund}，剩餘債務：£{remaining}）",
+        shortfall_vp_loss = "{player} 接受了 {vp} VP 損失",
+        shortfall_no_tiles = "{player} 損失了 {vp} VP（沒有可移除的磚塊）",
 
         -- Scoring
         scoring_start = "計分中...",
