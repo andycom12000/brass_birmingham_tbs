@@ -1,12 +1,41 @@
 <Ui>
-    <Button id="endTurnBtn" onClick="onEndTurn" position="0 350 0"
-            width="160" height="50" fontSize="18" fontStyle="Bold"
-            color="#8B2500" textColor="#FFD700" active="false">End Turn</Button>
-
+    <!-- Turn indicator -->
     <Panel id="turnPanel" position="0 405 0" width="350" height="40" color="#1A1A2EE0" active="false">
         <Text id="turnText" text="" fontSize="15" color="#FFFFFF" alignment="MiddleCenter"/>
     </Panel>
 
+    <!-- End Turn / Pass button -->
+    <Button id="endTurnBtn" onClick="onEndTurn" position="0 350 0"
+            width="160" height="50" fontSize="18" fontStyle="Bold"
+            color="#8B2500" textColor="#FFD700" active="false">End Turn</Button>
+
+    <!-- Action buttons (shown after playing a card) -->
+    <Panel id="actionPanel" position="0 290 0" width="500" height="50" color="#1A1A2E00" active="false">
+        <HorizontalLayout spacing="8" padding="5 5 5 5">
+            <Button id="sellBtn" onClick="onSellBtn" width="80" height="40"
+                    fontSize="13" color="#4A7C59" textColor="#FFFFFF">Sell</Button>
+            <Button id="develop1Btn" onClick="onDevelop1Btn" width="95" height="40"
+                    fontSize="13" color="#5B6A8A" textColor="#FFFFFF">Develop 1</Button>
+            <Button id="develop2Btn" onClick="onDevelop2Btn" width="95" height="40"
+                    fontSize="13" color="#5B6A8A" textColor="#FFFFFF">Develop 2</Button>
+            <Button id="loanBtn" onClick="onLoanBtn" width="80" height="40"
+                    fontSize="13" color="#8B6914" textColor="#FFFFFF">Loan</Button>
+            <Button id="scoutBtn" onClick="onScoutBtn" width="80" height="40"
+                    fontSize="13" color="#6B4C8A" textColor="#FFFFFF">Scout</Button>
+        </HorizontalLayout>
+    </Panel>
+
+    <!-- Single Link button (double rail flow) -->
+    <Button id="singleLinkBtn" onClick="onSingleLinkOnly" position="0 240 0"
+            width="180" height="40" fontSize="14" fontStyle="Bold"
+            color="#2E5090" textColor="#FFFFFF" active="false">Single Link Only</Button>
+
+    <!-- Accept VP Loss button (income shortfall) -->
+    <Button id="acceptVPLossBtn" onClick="onAcceptVPLossBtn" position="0 240 0"
+            width="200" height="40" fontSize="14" fontStyle="Bold"
+            color="#8B2500" textColor="#FFFFFF" active="false">Accept VP Loss</Button>
+
+    <!-- Setup panel -->
     <Panel id="setupPanel" position="0 0 0" width="400" height="200" color="#2A1A0AF0" active="true">
         <VerticalLayout spacing="15" padding="20 20 20 20">
             <Text text="BRASS: BIRMINGHAM" fontSize="22" color="#D4C5A0" fontStyle="Bold"/>
@@ -19,6 +48,7 @@
         </VerticalLayout>
     </Panel>
 
+    <!-- Language toggle -->
     <Button id="langToggle" onClick="toggleLanguage" position="-600 -420 0"
             width="80" height="28" fontSize="11" color="#8B7355" textColor="#D4C5A0">EN / ZH</Button>
 </Ui>

@@ -235,6 +235,9 @@ function EventHandlers.handleCardDrop(playerColor, cardObj)
     -- Highlight valid build and/or link spots based on the card played
     Highlights.showValidBuildSpots(state, playerColor, cardInfo)
 
+    -- Show action buttons (Sell, Develop, Loan, Scout)
+    UIManager.showActionPanel()
+
     printToColor(
         "Card played. Drop a building or link tile on a highlighted spot, or use the action buttons.",
         playerColor
@@ -823,6 +826,7 @@ function EventHandlers._finishBuild(playerColor, meta, totalSpent)
 
     if state._pendingCard then
         Highlights.clearAll()
+        UIManager.hideActionPanel()
         state._pendingCard = nil
         afterAction(playerColor)
     end
@@ -911,6 +915,7 @@ local function executeSingleLinkAction(playerColor, linkId, linkObj, dropPos, li
 
     -- Clear pending card and advance
     Highlights.clearAll()
+    UIManager.hideActionPanel()
     state._pendingCard = nil
     afterAction(playerColor)
 end
@@ -1002,6 +1007,7 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
 
         -- Clear pending card and advance
         Highlights.clearAll()
+        UIManager.hideActionPanel()
         state._pendingCard = nil
         afterAction(playerColor)
         return

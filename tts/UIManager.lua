@@ -46,15 +46,34 @@ function UIManager.updateLanguage(lang)
     UI.setAttribute("endTurnBtn", "text", btnText)
 end
 
+--- Show the action button panel (after a card is played).
+function UIManager.showActionPanel()
+    UI.setAttribute("actionPanel", "active", "true")
+end
+
+--- Hide the action button panel.
+function UIManager.hideActionPanel()
+    UI.setAttribute("actionPanel", "active", "false")
+end
+
 --- Show the "Single Link" button during double rail flow.
--- @param playerColor string  TTS seat color (used for visibility filtering if needed)
-function UIManager.showSingleLinkButton(playerColor)
+function UIManager.showSingleLinkButton()
     UI.setAttribute("singleLinkBtn", "active", "true")
 end
 
 --- Hide the "Single Link" button.
 function UIManager.hideSingleLinkButton()
     UI.setAttribute("singleLinkBtn", "active", "false")
+end
+
+--- Show the "Accept VP Loss" button during shortfall resolution.
+function UIManager.showAcceptVPLossButton()
+    UI.setAttribute("acceptVPLossBtn", "active", "true")
+end
+
+--- Hide the "Accept VP Loss" button.
+function UIManager.hideAcceptVPLossButton()
+    UI.setAttribute("acceptVPLossBtn", "active", "false")
 end
 
 return UIManager

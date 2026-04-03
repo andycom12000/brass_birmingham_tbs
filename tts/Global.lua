@@ -430,6 +430,7 @@ function _startShortfallResolution()
     Highlights.showResourceCandidates(candidates, "shortfall", function(slotId)
         onShortfallTileClicked(sf.color, slotId)
     end)
+    UIManager.showAcceptVPLossButton()
 end
 
 function onShortfallTileClicked(playerColor, slotId)
@@ -474,6 +475,7 @@ function onShortfallTileClicked(playerColor, slotId)
     if cs.remaining <= 0 then
         -- Shortfall fully resolved
         Highlights.clearResourceCandidates()
+        UIManager.hideAcceptVPLossButton()
         state._currentShortfall = nil
         state._shortfallIndex = state._shortfallIndex + 1
         _startShortfallResolution()
@@ -483,13 +485,13 @@ function onShortfallTileClicked(playerColor, slotId)
         if #newRemovable == 0 then
             -- No more tiles — take remaining VP loss
             Highlights.clearResourceCandidates()
+            UIManager.hideAcceptVPLossButton()
             TurnManager.resolveShortfallAsVP(state, playerColor, cs.remaining)
             printToAll(Lang.format("shortfall_no_tiles", state.lang, { player = playerColor, vp = cs.remaining }))
             state._currentShortfall = nil
             state._shortfallIndex = state._shortfallIndex + 1
             _startShortfallResolution()
         end
-        -- Otherwise, keep highlights up for the player to click more tiles
     end
 end
 
@@ -499,6 +501,7 @@ function onAcceptVPLoss(player, value, id)
     if cs.color ~= player.color then return end
 
     Highlights.clearResourceCandidates()
+    UIManager.hideAcceptVPLossButton()
     TurnManager.resolveShortfallAsVP(state, cs.color, cs.remaining)
     printToAll(Lang.format("shortfall_vp_loss", state.lang, { player = cs.color, vp = cs.remaining }))
     state._currentShortfall = nil
@@ -639,6 +642,14 @@ end
 ------------------------------------------------------
 
 ------------------------------------------------------
+-- SETUP BUTTONS (wired from UI.xml)
+------------------------------------------------------
+
+function onSetup2P() onPhysicalSetupComplete({playerCount = 2}) end
+function onSetup3P() onPhysicalSetupComplete({playerCount = 3}) end
+function onSetup4P() onPhysicalSetupComplete({playerCount = 4}) end
+
+------------------------------------------------------
 -- CHAT COMMANDS (for debugging / manual init)
 ------------------------------------------------------
 
@@ -748,6 +759,7 @@ end
 --- Finish a button-triggered action: clear state, announce, advance turn.
 local function finishButtonAction(playerColor, message)
     Highlights.clearAll()
+    UIManager.hideActionPanel()
     state._pendingCard = nil
     printToAll(message)
     afterAction(playerColor)
@@ -806,11 +818,122 @@ function onPassAction(playerColor)
 end
 
 ------------------------------------------------------
+-- UI BUTTON CALLBACKS (TTS buttons pass player, value, id)
+------------------------------------------------------
+
+function onLoanBtn(player) onLoanAction(player.color) end
+function onScoutBtn(player) onScoutAction(player.color) end
+function onDevelop1Btn(player) onDevelopAction(player.color, 1) end
+function onDevelop2Btn(player) onDevelopAction(player.color, 2) end
+
+function onSellBtn(player)
+    local color = player.color
+    if not requirePendingCard(color) then return end
+    -- Show sellable buildings as clickable markers
+    _startSellFlow(color)
+end
+
+function onAcceptVPLossBtn(player)
+    onAcceptVPLoss(player)
+end
+
+------------------------------------------------------
+-- SELL FLOW (select buildings to sell)
+------------------------------------------------------
+
+function _startSellFlow(playerColor)
+    local sellable = {}
+    GameState.forEachSlot(state, function(cityName, slot)
+        if slot.occupant == playerColor and slot.tile
+           and not slot.tile.flipped
+           and helpers.tableContains(Constants.SELLABLE_INDUSTRIES, slot.tile.type) then
+            -- Check merchant connectivity
+            if Network.isConnectedToMerchant(state, playerColor, cityName) then
+                sellable[#sellable + 1] = {
+                    slotId = slot.id,
+                    cityName = cityName,
+                }
+            end
+        end
+    end)
+
+    if #sellable == 0 then
+        printToColor("No sellable buildings connected to a merchant.", playerColor, {1, 0.5, 0})
+        return
+    end
+
+    -- Store sell state
+    state._pendingSell = {
+        playerColor = playerColor,
+        selectedSlots = {},
+    }
+
+    -- Show sellable buildings as clickable markers
+    local candidates = {}
+    for _, s in ipairs(sellable) do
+        local pos = SnapMap.getPositionForSlot(s.slotId)
+        if pos then
+            candidates[#candidates + 1] = {
+                slotId = s.slotId,
+                cityName = s.cityName,
+                cubesAvailable = 0,
+            }
+        end
+    end
+
+    Highlights.showResourceCandidates(candidates, "sell", function(slotId)
+        _onSellBuildingClicked(playerColor, slotId)
+    end)
+    printToColor("Click a building to sell it.", playerColor, {0.2, 0.8, 0.2})
+end
+
+function _onSellBuildingClicked(playerColor, slotId)
+    if not state or not state._pendingSell then return end
+    if state._pendingSell.playerColor ~= playerColor then return end
+
+    local cityName = GameState.getCityForSlot(state, slotId)
+    local merchantName = Network.findConnectedMerchant(state, cityName)
+
+    local result = Actions.sell(state, playerColor, {
+        slotIds = { slotId },
+        merchantName = merchantName,
+    })
+
+    if result.success then
+        -- Flip the physical tile on the board
+        local slot = GameState.getSlot(state, slotId)
+        if slot and slot.tile then
+            local snapPos = SnapMap.getPositionForSlot(slotId)
+            if snapPos then
+                for _, obj in ipairs(getAllObjects()) do
+                    if not obj.isDestroyed() and obj.getLock and obj.getLock() then
+                        local opos = obj.getPosition()
+                        local dx = opos.x - snapPos.x
+                        local dz = opos.z - snapPos.z
+                        if math.sqrt(dx*dx + dz*dz) < 1.0 then
+                            obj.flip()
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+        Highlights.clearResourceCandidates()
+        state._pendingSell = nil
+        finishButtonAction(playerColor, Lang.format("player_sold", state.lang, {
+            player = playerColor, industry = "", city = cityName or "",
+        }))
+    else
+        printToColor(result.error, playerColor, {1, 0, 0})
+    end
+end
+
+------------------------------------------------------
 -- SINGLE LINK BUTTON (double rail flow)
 ------------------------------------------------------
 
 --- Called when the player clicks "Single Link" during a double rail flow.
--- Executes the pending first link as a single rail action.
 function onSingleLinkOnly(player, value, id)
     if not state or not state._pendingFirstLink then return end
     local color = player.color
