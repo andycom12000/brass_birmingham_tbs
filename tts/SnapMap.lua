@@ -284,15 +284,9 @@ end
 function SnapMap.findNearestPosition(worldPos, threshold)
     local nearest = nil
     local nearestDist = threshold or 2.0
-    local bestSlot = nil
-    local bestDist = 999
 
     for slotId, data in pairs(SnapMap.bySlotId) do
         local dist = SnapMap._distance(worldPos, data.position)
-        if dist < bestDist then
-            bestDist = dist
-            bestSlot = slotId
-        end
         if dist < nearestDist then
             nearestDist = dist
             nearest = { type = "slot", id = slotId }
@@ -307,9 +301,6 @@ function SnapMap.findNearestPosition(worldPos, threshold)
         end
     end
 
-    if printToAll then
-        printToAll("[SnapMap] nearest=" .. tostring(bestSlot) .. " dist=" .. string.format("%.2f", bestDist) .. " matched=" .. tostring(nearest ~= nil))
-    end
     return nearest
 end
 

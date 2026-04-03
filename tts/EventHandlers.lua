@@ -819,6 +819,7 @@ function EventHandlers._finishBuild(playerColor, meta, totalSpent)
     printToAll(playerColor .. " built " .. label .. " ($" .. totalSpent .. " total)")
 
     state._pendingResource = nil
+    _pickupPositions = {}  -- clear to prevent memory leak
 
     if state._pendingCard then
         Highlights.clearAll()

@@ -173,15 +173,6 @@ function onPhysicalSetupComplete(params)
     -- Build snap point mappings (hardcoded positions, no board object needed)
     SnapMap.buildFromGlobal()
 
-    -- Debug: check Nuneaton
-    local nc = state.board.cities["Nuneaton"]
-    printToAll("[DBG] Nuneaton in state=" .. tostring(nc ~= nil))
-    if nc and nc.slots then
-        printToAll("[DBG] Nuneaton slots=" .. #nc.slots)
-    end
-    local nsc = SnapMap.byCityCenter["Nuneaton"]
-    printToAll("[DBG] Nuneaton in SnapMap=" .. tostring(nsc ~= nil))
-
     -- Configure UI
     UIManager.hideSetup()
     UIManager.configureForPlayerCount(playerCount)
@@ -592,7 +583,7 @@ COLOR_TO_MONEY_GUID = {
     ["White"]  = "4d732a",
 }
 
-STARTING_MONEY = 17
+STARTING_MONEY = Constants.INITIAL_MONEY
 
 -- Push a value to a MrStump counter object (set description + call customSet)
 function setCounterValue(guid, value)
@@ -741,99 +732,77 @@ function toggleLanguage()
 end
 
 ------------------------------------------------------
--- SELL / DEVELOP / LOAN / SCOUT (button-triggered actions)
--- These are called from TTS context menu or buttons
+-- SELL / DEVELOP / LOAN / SCOUT / PASS (button-triggered actions)
 ------------------------------------------------------
 
-function onSellAction(playerColor, slotIds, merchantName)
-    if not state or not isCurrentPlayer(playerColor) then return end
+--- Guard: check current player and pending card. Returns false if blocked.
+local function requirePendingCard(playerColor)
+    if not state or not isCurrentPlayer(playerColor) then return false end
     if not state._pendingCard then
         printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        return
+        return false
     end
-    local result = Actions.sell(state, playerColor, {
-        slotIds = slotIds,
-        merchantName = merchantName,
-    })
+    return true
+end
+
+--- Finish a button-triggered action: clear state, announce, advance turn.
+local function finishButtonAction(playerColor, message)
+    Highlights.clearAll()
+    state._pendingCard = nil
+    printToAll(message)
+    afterAction(playerColor)
+end
+
+function onSellAction(playerColor, slotIds, merchantName)
+    if not requirePendingCard(playerColor) then return end
+    local result = Actions.sell(state, playerColor, { slotIds = slotIds, merchantName = merchantName })
     if result.success then
-        Highlights.clearAll()
-        state._pendingCard = nil
-        printToAll(Lang.format("player_sold", state.lang, { player = playerColor, industry = "", city = "" }))
-        afterAction(playerColor)
+        finishButtonAction(playerColor, Lang.format("player_sold", state.lang, { player = playerColor, industry = "", city = "" }))
     else
         printToColor(result.error, playerColor, {1, 0, 0})
     end
 end
 
 function onDevelopAction(playerColor, count)
-    if not state or not isCurrentPlayer(playerColor) then return end
-    if not state._pendingCard then
-        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        return
-    end
+    if not requirePendingCard(playerColor) then return end
     local result = Actions.develop(state, playerColor, { count = count or 1 })
     if result.success then
-        Highlights.clearAll()
-        state._pendingCard = nil
-        printToAll(Lang.format("player_developed", state.lang, { player = playerColor, count = count or 1 }))
-        afterAction(playerColor)
+        finishButtonAction(playerColor, Lang.format("player_developed", state.lang, { player = playerColor, count = count or 1 }))
     else
         printToColor(result.error, playerColor, {1, 0, 0})
     end
 end
 
 function onLoanAction(playerColor)
-    if not state or not isCurrentPlayer(playerColor) then return end
-    if not state._pendingCard then
-        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        return
-    end
+    if not requirePendingCard(playerColor) then return end
     local result = Actions.loan(state, playerColor)
     if result.success then
-        Highlights.clearAll()
-        state._pendingCard = nil
-        -- Spawn £30 money at player area
         local board = ObjectManager.getPlayerBoard(playerColor)
         if board then
             local pos = board.getPosition() + Vector(5, 1, 0)
             ObjectManager.spawnMoney(15, pos)
             ObjectManager.spawnMoney(15, pos + Vector(1, 0, 0))
         end
-        printToAll(Lang.format("player_loaned", state.lang, { player = playerColor }))
-        afterAction(playerColor)
+        finishButtonAction(playerColor, Lang.format("player_loaned", state.lang, { player = playerColor }))
     else
         printToColor(result.error, playerColor, {1, 0, 0})
     end
 end
 
 function onScoutAction(playerColor)
-    if not state or not isCurrentPlayer(playerColor) then return end
-    if not state._pendingCard then
-        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        return
-    end
+    if not requirePendingCard(playerColor) then return end
     local result = Actions.scout(state, playerColor)
     if result.success then
-        Highlights.clearAll()
-        state._pendingCard = nil
         CardManager.giveWilds(playerColor)
-        printToAll(Lang.format("player_scouted", state.lang, { player = playerColor }))
-        afterAction(playerColor)
+        finishButtonAction(playerColor, Lang.format("player_scouted", state.lang, { player = playerColor }))
     else
         printToColor(result.error, playerColor, {1, 0, 0})
     end
 end
 
 function onPassAction(playerColor)
-    if not state or not isCurrentPlayer(playerColor) then return end
-    if not state._pendingCard then
-        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        return
-    end
-    Highlights.clearAll()
-    state._pendingCard = nil
-    printToAll(playerColor .. " passed")
-    afterAction(playerColor)
+    if not requirePendingCard(playerColor) then return end
+    finishButtonAction(playerColor, playerColor .. " passed")
 end
 
 ------------------------------------------------------

@@ -285,33 +285,14 @@ function Actions.build(state, color, params)
     end
 
     -- Step 2: Remove tile from player's unbuiltTiles
-    local tile = Actions.removeTileFromUnbuilt(player, industryType, level)
-    if not tile then
+    if not Actions.removeTileFromUnbuilt(player, industryType, level) then
         return fail("Could not find tile " .. industryType .. " level " .. level
                     .. " in unbuiltTiles (internal error)")
     end
 
-    -- Initialise the tile with its resources (mirrors Tile.newWithResources logic):
-    -- fill resource tokens and auto-flip breweries.
-    -- For breweries, override produces based on era (canal=1, rail=2)
-    local produces = tile.produces or 0
-    if industryType == Constants.Industry.BREWERY then
-        produces = (state.era == Constants.Era.RAIL) and 2 or 1
-        tile.produces = produces
-    end
-    if produces > 0 and tile.producesType then
-        for _ = 1, produces do
-            tile.resources[#tile.resources + 1] = tile.producesType
-        end
-    end
-    -- Breweries auto-flip immediately on placement
-    if industryType == Constants.Industry.BREWERY then
-        tile.flipped = true
-    end
-
-    -- Step 3: Place tile on board slot
+    -- Step 3: Place tile on board slot (with resources and auto-flip)
     slot.occupant = color
-    slot.tile     = tile
+    slot.tile     = Tile.newWithResources(industryType, level, state.era)
 
     -- Step 4: Deduct money cost
     GameState.spendMoney(state, color, costData.money)
@@ -324,11 +305,9 @@ function Actions.build(state, color, params)
     local ironNeeded = costData.iron or 0
     consumeIron(state, color, ironNeeded)
 
-    -- Step 8: For breweries — income advance on placement (flipped = already done above)
-    -- Breweries award income when they are sold/flipped; since they flip on build,
-    -- we advance income now.
+    -- Breweries auto-flip on build; advance income immediately
     if industryType == Constants.Industry.BREWERY then
-        Actions.advanceIncome(state, color, tile.incomeSpaces)
+        Actions.advanceIncome(state, color, slot.tile.incomeSpaces)
     end
 
     -- Auto-sell for coal mines and iron works (mandatory rule)
@@ -541,11 +520,8 @@ function Actions.scout(state, color)
 
     local player = GameState.getPlayer(state, color)
 
-    -- Steps 2 & 3: The played card deduction (-1) is handled by TTS layer
-    -- (handleCardDrop). Here we only handle the scout-specific exchange:
-    -- discard 2 cards, gain 2 wild cards (net 0 change from scout itself).
-    player.handSize = player.handSize - 2  -- lose 2 (discarded)
-    player.handSize = player.handSize + 2  -- gain 2 wild cards
+    -- Card deduction (-1) handled by TTS layer. Scout discards 2 and gains
+    -- 2 wilds (net 0 handSize change), so only the flag matters here.
     player.hasWilds = true
 
     -- Step 4: Decrease wildSupply

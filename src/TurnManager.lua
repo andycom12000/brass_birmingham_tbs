@@ -50,22 +50,17 @@ end
 --- Returns a list of { slotId, cityName, industryType, level, refund }
 function TurnManager.getRemovableTiles(state, color)
     local tiles = {}
-    for cityName, city in pairs(state.board.cities) do
-        if city.slots then
-            for _, slot in ipairs(city.slots) do
-                if slot.occupant == color and slot.tile then
-                    local refund = TurnManager.calculateTileRefund(slot.tile.type, slot.tile.level)
-                    tiles[#tiles + 1] = {
-                        slotId = slot.id,
-                        cityName = cityName,
-                        industryType = slot.tile.type,
-                        level = slot.tile.level,
-                        refund = refund,
-                    }
-                end
-            end
+    GameState.forEachSlot(state, function(cityName, slot)
+        if slot.occupant == color and slot.tile then
+            tiles[#tiles + 1] = {
+                slotId = slot.id,
+                cityName = cityName,
+                industryType = slot.tile.type,
+                level = slot.tile.level,
+                refund = TurnManager.calculateTileRefund(slot.tile.type, slot.tile.level),
+            }
         end
-    end
+    end)
     return tiles
 end
 

@@ -42,7 +42,7 @@ function UIManager.configureForPlayerCount(playerCount)
 end
 
 function UIManager.updateLanguage(lang)
-    local btnText = (lang == "zh-TW") and "End Turn" or "End Turn"
+    local btnText = (lang == "zh-TW") and "結束回合" or "End Turn"
     UI.setAttribute("endTurnBtn", "text", btnText)
 end
 
