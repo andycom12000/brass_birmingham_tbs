@@ -70,8 +70,14 @@ function onSave()
         -- Temporarily remove non-serializable fields (Vectors, TTS objects)
         local pendingBackup = state._pendingResource
         local animBackup = state._animating
+        local shortfallBackup = state._pendingShortfalls
+        local shortfallIdxBackup = state._shortfallIndex
+        local currentShortfallBackup = state._currentShortfall
         state._pendingResource = nil
         state._animating = nil
+        state._pendingShortfalls = nil
+        state._shortfallIndex = nil
+        state._currentShortfall = nil
 
         -- cubeGUIDs are fine (string arrays), but remove any Vector refs
         -- that might have leaked into market data
@@ -83,6 +89,9 @@ function onSave()
         -- Restore transient fields
         state._pendingResource = pendingBackup
         state._animating = animBackup
+        state._pendingShortfalls = shortfallBackup
+        state._shortfallIndex = shortfallIdxBackup
+        state._currentShortfall = currentShortfallBackup
 
         if ok then
             return encoded
@@ -265,12 +274,17 @@ end
 ------------------------------------------------------
 
 function onResourceMarkerClicked(obj, playerColor)
-    if not state or not state._pendingResource then return end
+    if not state then return end
     local notes = obj.getGMNotes()
     if notes and notes ~= "" then
         local ok, meta = pcall(JSON.decode, notes)
         if ok and meta and meta.slotId then
-            EventHandlers.onResourceCandidateClicked(playerColor, meta.slotId)
+            -- Route to shortfall handler if a shortfall is active
+            if state._currentShortfall then
+                onShortfallTileClicked(playerColor, meta.slotId)
+            elseif state._pendingResource then
+                EventHandlers.onResourceCandidateClicked(playerColor, meta.slotId)
+            end
         end
     end
 end
@@ -349,6 +363,12 @@ function afterAction(color)
                 printToAll(Lang.format("income_paid", state.lang, { player = c, amount = math.abs(income) }))
             end
         end
+
+        -- Handle income shortfalls (interactive tile removal)
+        if state._pendingShortfalls and #state._pendingShortfalls > 0 then
+            _startShortfallResolution()
+            return  -- Don't broadcastCurrentPlayer yet
+        end
     end
     broadcastCurrentPlayer()
 end
@@ -361,6 +381,135 @@ function broadcastCurrentPlayer()
     UIManager.showTurnIndicator(turnText .. " — " .. actionsText)
     UIManager.showEndTurnButton()
     printToAll(turnText)
+end
+
+------------------------------------------------------
+-- INCOME SHORTFALL RESOLUTION
+------------------------------------------------------
+
+function _startShortfallResolution()
+    if not state._pendingShortfalls then
+        broadcastCurrentPlayer()
+        return
+    end
+    local sf = state._pendingShortfalls[state._shortfallIndex]
+    if not sf then
+        -- All shortfalls resolved
+        state._pendingShortfalls = nil
+        state._shortfallIndex = nil
+        broadcastCurrentPlayer()
+        return
+    end
+
+    local removable = TurnManager.getRemovableTiles(state, sf.color)
+    if #removable == 0 then
+        -- No tiles to remove — take VP loss
+        TurnManager.resolveShortfallAsVP(state, sf.color, sf.amount)
+        printToAll(Lang.format("shortfall_no_tiles", state.lang, { player = sf.color, vp = sf.amount }))
+        state._shortfallIndex = state._shortfallIndex + 1
+        _startShortfallResolution()
+        return
+    end
+
+    -- Show shortfall UI
+    printToAll(Lang.format("shortfall_owe", state.lang, { player = sf.color, amount = sf.amount }))
+
+    -- Store current shortfall state for click handling
+    state._currentShortfall = {
+        color = sf.color,
+        remaining = sf.amount,
+    }
+
+    -- Highlight removable tiles using the resource candidate system
+    local candidates = {}
+    for _, tile in ipairs(removable) do
+        local pos = SnapMap.getPositionForSlot(tile.slotId)
+        if pos then
+            candidates[#candidates + 1] = {
+                slotId = tile.slotId,
+                cityName = tile.cityName,
+                cubesAvailable = tile.refund,
+            }
+        end
+    end
+
+    Highlights.showResourceCandidates(candidates, "shortfall", function(slotId)
+        onShortfallTileClicked(sf.color, slotId)
+    end)
+end
+
+function onShortfallTileClicked(playerColor, slotId)
+    if not state or not state._currentShortfall then return end
+    local cs = state._currentShortfall
+    if cs.color ~= playerColor then return end
+
+    local refund = TurnManager.removeTileForDebt(state, playerColor, slotId)
+    if refund == 0 then return end
+
+    -- Apply refund: reduce remaining debt, give surplus as money
+    local surplus = refund - cs.remaining
+    if surplus > 0 then
+        GameState.gainMoney(state, playerColor, surplus)
+        cs.remaining = 0
+    else
+        cs.remaining = cs.remaining - refund
+    end
+
+    -- Remove the physical tile from the board
+    local snapPos = SnapMap.getPositionForSlot(slotId)
+    if snapPos then
+        for _, obj in ipairs(getAllObjects()) do
+            if not obj.isDestroyed() and obj.getLock and obj.getLock() then
+                local opos = obj.getPosition()
+                local dx = opos.x - snapPos.x
+                local dz = opos.z - snapPos.z
+                if math.sqrt(dx*dx + dz*dz) < 1.0 then
+                    obj.destruct()
+                    break
+                end
+            end
+        end
+    end
+
+    printToAll(Lang.format("shortfall_removed", state.lang, {
+        player = playerColor,
+        refund = refund,
+        remaining = math.max(0, cs.remaining),
+    }))
+
+    if cs.remaining <= 0 then
+        -- Shortfall fully resolved
+        Highlights.clearResourceCandidates()
+        state._currentShortfall = nil
+        state._shortfallIndex = state._shortfallIndex + 1
+        _startShortfallResolution()
+    else
+        -- Update highlights (remove destroyed tile from candidates)
+        local newRemovable = TurnManager.getRemovableTiles(state, playerColor)
+        if #newRemovable == 0 then
+            -- No more tiles — take remaining VP loss
+            Highlights.clearResourceCandidates()
+            TurnManager.resolveShortfallAsVP(state, playerColor, cs.remaining)
+            printToAll(Lang.format("shortfall_no_tiles", state.lang, { player = playerColor, vp = cs.remaining }))
+            state._currentShortfall = nil
+            state._shortfallIndex = state._shortfallIndex + 1
+            _startShortfallResolution()
+        end
+        -- Otherwise, keep highlights up for the player to click more tiles
+    end
+end
+
+function onAcceptVPLoss(player, value, id)
+    if not state or not state._currentShortfall then return end
+    local cs = state._currentShortfall
+    if cs.color ~= player.color then return end
+
+    Highlights.clearResourceCandidates()
+    TurnManager.resolveShortfallAsVP(state, cs.color, cs.remaining)
+    printToAll(Lang.format("shortfall_vp_loss", state.lang, { player = cs.color, vp = cs.remaining }))
+    state._currentShortfall = nil
+    state._shortfallIndex = state._shortfallIndex + 1
+    _startShortfallResolution()
 end
 
 ------------------------------------------------------
