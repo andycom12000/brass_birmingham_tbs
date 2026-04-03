@@ -253,15 +253,15 @@ describe("Validation.canNetwork - network adjacency", function()
 end)
 
 -- ============================================================
--- Actions.network — playCard called
+-- Actions.network — playCard NOT called (handled by TTS layer)
 -- ============================================================
 
 describe("Actions.network - playCard integration", function()
-    it("decrements handSize by 1", function()
+    it("does NOT decrement handSize (card deduction handled by TTS layer)", function()
         local state = newState()
         local player = GameState.getPlayer(state, "White")
         local before = player.handSize
         Actions.network(state, "White", { linkId = "Birmingham-Dudley" })
-        expect(player.handSize).toBe(before - 1)
+        expect(player.handSize).toBe(before)
     end)
 end)
