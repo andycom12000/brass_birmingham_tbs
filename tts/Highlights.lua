@@ -185,6 +185,63 @@ function Highlights.showSellableBuildings(state, color)
     end
 end
 
+--- Show valid second link positions for double rail.
+-- After the first rail link is placed, highlights links the player could build
+-- as a second link in a double rail action.
+-- @param state Game state object
+-- @param color Player color string
+-- @param firstLinkId string  The already-placed first link's ID
+function Highlights.showValidSecondLinks(state, color, firstLinkId)
+    Highlights.clearAll()
+
+    local validLinks = {}
+
+    -- The first link is not yet owned in state (it's pending), so we need to
+    -- temporarily check as if it were owned to see network adjacency for 2nd link.
+    -- However, for validation we just check each unowned link for availability.
+    -- The second link must be: unowned, available in rail era, and touching the
+    -- player's network (which includes the first link's cities since it's pending).
+
+    -- Temporarily set the first link as owned for network adjacency checks
+    local firstLink = state.board.links[firstLinkId]
+    local originalOwner = firstLink and firstLink.owner
+    if firstLink then
+        firstLink.owner = color
+    end
+
+    for linkId, link in pairs(state.board.links) do
+        -- Skip already-owned links and the first link itself
+        if not link.owner and linkId ~= firstLinkId then
+            local linkParams = {
+                linkId = linkId,
+                double = false,  -- validate as a single (availability + network check)
+            }
+
+            local result = Validation.canNetwork(state, color, linkParams)
+            if result.valid then
+                validLinks[#validLinks + 1] = linkId
+
+                local snapPos = SnapMap.getPositionForLink(linkId)
+                if snapPos then
+                    Highlights._spawnMarker(snapPos, {0.2, 0.8, 1})  -- cyan/light blue
+                end
+            end
+        end
+    end
+
+    -- Restore the first link's original owner
+    if firstLink then
+        firstLink.owner = originalOwner
+    end
+
+    -- Brief feedback
+    if #validLinks == 0 then
+        printToColor("No valid second link positions — click 'Single Link' to build one rail.", color, {1, 1, 0})
+    else
+        printToColor("Found " .. #validLinks .. " valid second link spot(s). (Cyan markers)", color, {0.2, 0.8, 1})
+    end
+end
+
 --- Clear all active highlights and temporary markers
 -- Removes all spawned markers and highlights from objects
 function Highlights.clearAll()

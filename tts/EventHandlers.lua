@@ -124,6 +124,18 @@ function EventHandlers.onObjectPickUp(playerColor, obj)
         EventHandlers.cancelPendingResource()
     end
 
+    -- Cancel pending double rail if the player picks up the first rail tile
+    if state._pendingFirstLink and state._pendingFirstLink.playerColor == playerColor then
+        if obj and not obj.isDestroyed() and state._pendingFirstLink.tileObj == obj then
+            -- Player picked up the pending first link tile — cancel double rail
+            state._pendingFirstLink = nil
+            Highlights.clearAll()
+            UIManager.hideSingleLinkButton()
+            printToColor("Double rail cancelled.", playerColor, {1, 1, 0})
+            -- Don't reject — player is holding the tile
+        end
+    end
+
     if not (state._pendingCard and state._pendingPlayer == playerColor) then return end
 
     local objType, _ = EventHandlers.identifyObject(obj)
@@ -819,30 +831,11 @@ end
 -- LINK TILE DROP
 ------------------------------------------------------
 
---- Handle a link (canal/rail) tile being dropped on the board.
--- Uses centralized Validation.canNetwork() and Actions.network() for game logic.
--- Requires a pending card (play a card first).
--- Snaps to the nearest valid link point and executes the Network action.
--- @param playerColor  TTS seat color string
--- @param linkObj  TTS object representing a canal or rail tile
--- @param meta  table with linkType field (Constants.Era.CANAL or Constants.Era.RAIL)
---
--- TODO: Double rail support (#10) — when placing the first rail link in Rail era,
--- check if the player can afford double rail (£15 + 2 coal + 1 beer). If so,
--- highlight available second links and wait. If a second link is placed, call
--- Actions.network with secondLinkId. For now, only single link is supported.
-function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
-    if not state then return end
-    if not state._pendingCard then
-        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
-        rejectTile(linkObj, playerColor)
-        return
-    end
-
-    local linkType = meta and meta.linkType or Constants.Era.CANAL
-
-    -- Find nearest link from snap map
-    local dropPos = linkObj.getPosition()
+--- Resolve a linkId from a drop position using SnapMap.
+-- Handles reverse ordering fallback for BoardData consistency.
+-- @param dropPos Vector  TTS world position where tile was dropped
+-- @return string|nil  linkId or nil if no link found
+local function resolveLinkId(dropPos)
     local snapInfo = SnapMap.findNearestPosition(dropPos, 4.0)
     local linkId = nil
     if snapInfo and snapInfo.type == "link" then
@@ -860,26 +853,33 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
         end
     end
 
-    if not linkId then
-        printToColor("No link found near drop position.", playerColor, {1, 0, 0})
-        rejectTile(linkObj, playerColor)
-        return
-    end
+    return linkId
+end
 
-    -- Validate using centralized validation
-    local v = Validation.canNetwork(state, playerColor, {
-        linkId = linkId,
-        double = false,
-    })
-    if not v.valid then
-        printToColor(v.reason, playerColor, {1, 0, 0})
-        rejectTile(linkObj, playerColor)
-        return
-    end
+--- Position and lock a link tile at its drop position.
+-- @param linkObj TTS object
+-- @param dropPos Vector  TTS world position
+local function positionAndLockLink(linkObj, dropPos)
+    linkObj.setPositionSmooth(Vector(dropPos.x, 1.05, dropPos.z), false, true)
+    Wait.time(function()
+        if linkObj and not linkObj.isDestroyed() then
+            linkObj.setLock(true)
+        end
+    end, 0.5)
+end
 
+--- Execute a single rail/canal link action and finish the turn.
+-- Used for canal links, single rail when double is not affordable,
+-- and the executeSingleLink public function.
+-- @param playerColor string  TTS seat color
+-- @param linkId string  The link to build
+-- @param linkObj TTS object  The link tile
+-- @param dropPos Vector  TTS world position
+-- @param linkType string  Constants.Era.CANAL or Constants.Era.RAIL
+local function executeSingleLinkAction(playerColor, linkId, linkObj, dropPos, linkType)
     -- Snapshot money before action for calculating total spent
-    local playerBefore = GameState.getPlayer(state, playerColor)
-    local moneyBefore = playerBefore.money
+    local playerData = GameState.getPlayer(state, playerColor)
+    local moneyBefore = playerData.money
 
     -- Execute action (state changes: money, coal, beer, link ownership, linksRemaining)
     local result = Actions.network(state, playerColor, { linkId = linkId })
@@ -890,15 +890,10 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
     end
 
     -- Calculate how much money was actually spent (base cost + any market purchases)
-    local totalSpent = moneyBefore - playerBefore.money
+    local totalSpent = moneyBefore - playerData.money
 
     -- Physical: position and lock tile
-    linkObj.setPositionSmooth(Vector(dropPos.x, 1.05, dropPos.z), false, true)
-    Wait.time(function()
-        if linkObj and not linkObj.isDestroyed() then
-            linkObj.setLock(true)
-        end
-    end, 0.5)
+    positionAndLockLink(linkObj, dropPos)
 
     -- Update physical counters with total money spent
     updatePhysicalCounters(playerColor, totalSpent)
@@ -917,6 +912,215 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
     Highlights.clearAll()
     state._pendingCard = nil
     afterAction(playerColor)
+end
+
+--- Handle a link (canal/rail) tile being dropped on the board.
+-- Uses centralized Validation.canNetwork() and Actions.network() for game logic.
+-- Requires a pending card (play a card first).
+-- Snaps to the nearest valid link point and executes the Network action.
+--
+-- Double rail support: In Rail era, if the player can afford double rail
+-- (£15 + 2 coal + 1 beer), the first link is stored as pending and valid
+-- second link positions are highlighted. The player can then place a second
+-- rail tile or click "Single Link" to build only one.
+--
+-- @param playerColor  TTS seat color string
+-- @param linkObj  TTS object representing a canal or rail tile
+-- @param meta  table with linkType field (Constants.Era.CANAL or Constants.Era.RAIL)
+function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
+    if not state then return end
+    if not state._pendingCard then
+        printToColor("Play a card first.", playerColor, {1, 0.5, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
+
+    local linkType = meta and meta.linkType or Constants.Era.CANAL
+    local dropPos = linkObj.getPosition()
+
+    -- ================================================================
+    -- Case B: Pending first link exists — this is the second rail tile
+    -- ================================================================
+    if state._pendingFirstLink then
+        local secondLinkId = resolveLinkId(dropPos)
+        if not secondLinkId then
+            printToColor("No link found near drop position.", playerColor, {1, 0, 0})
+            rejectTile(linkObj, playerColor)
+            return
+        end
+
+        local firstLink = state._pendingFirstLink
+        state._pendingFirstLink = nil
+
+        -- Snapshot money before action
+        local playerData = GameState.getPlayer(state, playerColor)
+        local moneyBefore = playerData.money
+
+        -- Execute double rail action
+        local result = Actions.network(state, playerColor, {
+            linkId = firstLink.linkId,
+            secondLinkId = secondLinkId,
+        })
+
+        if not result.success then
+            printToColor(result.error, playerColor, {1, 0, 0})
+            -- Unlock and reject first tile too
+            if firstLink.tileObj and not firstLink.tileObj.isDestroyed() then
+                firstLink.tileObj.setLock(false)
+                rejectTile(firstLink.tileObj, playerColor)
+            end
+            rejectTile(linkObj, playerColor)
+            Highlights.clearAll()
+            return
+        end
+
+        local totalSpent = moneyBefore - playerData.money
+
+        -- Physical: position and lock both tiles
+        positionAndLockLink(linkObj, dropPos)
+        -- First tile already positioned; ensure it stays locked
+        if firstLink.tileObj and not firstLink.tileObj.isDestroyed() then
+            firstLink.tileObj.setLock(true)
+        end
+
+        -- Update physical counters
+        updatePhysicalCounters(playerColor, totalSpent)
+
+        -- Announce double rail
+        local firstLinkData = BoardData.links[firstLink.linkId]
+        local secondLinkData = BoardData.links[secondLinkId]
+        local cityInfo1 = ""
+        if firstLinkData and firstLinkData.cities then
+            cityInfo1 = firstLinkData.cities[1] .. " - " .. firstLinkData.cities[2]
+        end
+        local cityInfo2 = ""
+        if secondLinkData and secondLinkData.cities then
+            cityInfo2 = secondLinkData.cities[1] .. " - " .. secondLinkData.cities[2]
+        end
+        printToAll(playerColor .. " built Double Rail (" .. cityInfo1 .. " + " .. cityInfo2 .. ")")
+
+        -- Clear pending card and advance
+        Highlights.clearAll()
+        state._pendingCard = nil
+        afterAction(playerColor)
+        return
+    end
+
+    -- ================================================================
+    -- Case A: No pending first link — this is the first (or only) link
+    -- ================================================================
+    local linkId = resolveLinkId(dropPos)
+    if not linkId then
+        printToColor("No link found near drop position.", playerColor, {1, 0, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
+
+    -- For Rail era links, check if double rail is possible
+    if state.era == Constants.Era.RAIL and linkType == Constants.Era.RAIL then
+        local vDouble = Validation.canNetwork(state, playerColor, {
+            linkId = linkId,
+            double = true,
+        })
+
+        if vDouble.valid then
+            -- Player CAN afford double rail — enter pending state
+            -- First validate single too (to make sure the link itself is valid)
+            local vSingle = Validation.canNetwork(state, playerColor, {
+                linkId = linkId,
+                double = false,
+            })
+            if not vSingle.valid then
+                printToColor(vSingle.reason, playerColor, {1, 0, 0})
+                rejectTile(linkObj, playerColor)
+                return
+            end
+
+            -- Store pending first link
+            state._pendingFirstLink = {
+                linkId = linkId,
+                tileObj = linkObj,
+                dropPos = dropPos,
+                playerColor = playerColor,
+            }
+
+            -- Position and lock the first tile (don't execute action yet)
+            positionAndLockLink(linkObj, dropPos)
+
+            -- Show valid second link positions
+            Highlights.showValidSecondLinks(state, playerColor, linkId)
+
+            -- Show Single Link button
+            UIManager.showSingleLinkButton(playerColor)
+
+            -- Message
+            printToColor(
+                "Place a second rail tile for double rail (£" .. Constants.LinkCost.DOUBLE_RAIL
+                .. " + 2 coal + 1 beer), or click 'Single Link' for single rail (£"
+                .. Constants.LinkCost.SINGLE_RAIL .. " + 1 coal)",
+                playerColor, {0.2, 0.8, 1}
+            )
+            return
+        end
+
+        -- Cannot afford double rail — fall through to single rail
+    end
+
+    -- Single link (canal or rail when double is not affordable)
+    -- Validate single link
+    local v = Validation.canNetwork(state, playerColor, {
+        linkId = linkId,
+        double = false,
+    })
+    if not v.valid then
+        printToColor(v.reason, playerColor, {1, 0, 0})
+        rejectTile(linkObj, playerColor)
+        return
+    end
+
+    executeSingleLinkAction(playerColor, linkId, linkObj, dropPos, linkType)
+end
+
+------------------------------------------------------
+-- DOUBLE RAIL: Execute single link from pending state
+------------------------------------------------------
+
+--- Execute the pending first link as a single rail action.
+-- Called when the player clicks "Single Link" or the flow is cancelled.
+-- @param playerColor string  TTS seat color
+function EventHandlers.executeSingleLink(playerColor)
+    if not state or not state._pendingFirstLink then return end
+    local firstLink = state._pendingFirstLink
+    state._pendingFirstLink = nil
+    Highlights.clearAll()
+    UIManager.hideSingleLinkButton()
+
+    executeSingleLinkAction(
+        playerColor,
+        firstLink.linkId,
+        firstLink.tileObj,
+        firstLink.dropPos,
+        Constants.Era.RAIL
+    )
+end
+
+--- Cancel the pending double rail flow.
+-- Unlocks and returns the first tile, clears highlights.
+-- @param playerColor string  TTS seat color
+function EventHandlers.cancelPendingDoubleRail(playerColor)
+    if not state or not state._pendingFirstLink then return end
+    local firstLink = state._pendingFirstLink
+    state._pendingFirstLink = nil
+    Highlights.clearAll()
+    UIManager.hideSingleLinkButton()
+
+    -- Unlock and reject the first tile
+    if firstLink.tileObj and not firstLink.tileObj.isDestroyed() then
+        firstLink.tileObj.setLock(false)
+        rejectTile(firstLink.tileObj, playerColor)
+    end
+
+    printToColor("Double rail cancelled.", playerColor, {1, 1, 0})
 end
 
 ------------------------------------------------------
