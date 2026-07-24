@@ -1,4 +1,5 @@
 local helpers    = require("src/helpers")
+local GameState  = require("src/GameState")
 local Actions    = require("src/Actions")
 
 --- ActionEngine — the single commit seam for every player action.
@@ -23,8 +24,10 @@ local Actions    = require("src/Actions")
 local ActionEngine = {}
 
 -- Registry of synchronous executors. Each returns { success, error }.
--- Build is intentionally absent: it commits through beginAction()/commit().
+-- Build is atomic in the pure tier, so it is registered here too; the TTS
+-- layer still drives its interactive path via beginAction()/commit().
 local EXECUTORS = {
+    build   = function(state, color, params) return Actions.build(state, color, params) end,
     network = function(state, color, params) return Actions.network(state, color, params) end,
     sell    = function(state, color, params) return Actions.sell(state, color, params) end,
     develop = function(state, color, params) return Actions.develop(state, color, params) end,
@@ -99,6 +102,50 @@ function ActionEngine.execute(state, actionName, color, params)
         snapshot = snapshot,
     })
     return result
+end
+
+--- Restore the live state, in place, from a pre-execution snapshot.
+--- The state table identity is preserved (callers hold a reference to it):
+--- every key is replaced with a deep copy of the snapshot's value, then the
+--- flat slot/city indices are rebuilt so they alias the restored slot tables.
+function ActionEngine.restore(state, snapshot)
+    for k in pairs(state) do
+        state[k] = nil
+    end
+    for k, v in pairs(snapshot) do
+        state[k] = helpers.deepCopy(v)
+    end
+    GameState.rebuildIndices(state)
+end
+
+--- Undo the last committed action (single-step). Restores the logical state
+--- from the commit's pre-execution snapshot, consumes the commit (so undo is
+--- single-step and cannot be repeated), and fires the post-commit hook so live
+--- scoring/projection recompute against the restored state.
+--- @return table  { success, error, undone (action name), color }
+function ActionEngine.undo(state)
+    local record = ActionEngine._lastCommit
+    if not record then
+        return { success = false, error = "Nothing to undo" }
+    end
+
+    ActionEngine.restore(state, record.snapshot)
+    ActionEngine._lastCommit = nil  -- single-step: the undo is consumed
+
+    if ActionEngine._postCommitHook then
+        ActionEngine._postCommitHook(state, {
+            action = "undo",
+            color  = record.color,
+            undone = record.action,
+        })
+    end
+
+    return { success = true, error = "", undone = record.action, color = record.color }
+end
+
+--- True when an undo is currently available (a commit is pending and unlocked).
+function ActionEngine.canUndo()
+    return ActionEngine._lastCommit ~= nil
 end
 
 return ActionEngine

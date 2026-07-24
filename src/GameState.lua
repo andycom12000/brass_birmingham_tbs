@@ -202,6 +202,17 @@ function GameState.new(playerCount)
     }
 end
 
+--- Rebuild the flat slotIndex and cityIndex from board.cities so they alias
+--- the current slot tables. Required after restoring state from a snapshot
+--- (single-step undo, issue #9): a deep-copied snapshot has its own detached
+--- index tables, so the live indices must be re-pointed at the restored slots
+--- for GameState.getSlot()/getCityForSlot() to return the same objects that
+--- board.cities holds.
+function GameState.rebuildIndices(state)
+    state.slotIndex = buildSlotIndex(state.board.cities)
+    state.cityIndex = buildCityIndex(state.board.cities)
+end
+
 --- Get player data by color.
 --- Raises an error if the color is not in the game.
 function GameState.getPlayer(state, color)
