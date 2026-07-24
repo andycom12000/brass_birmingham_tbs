@@ -28,6 +28,8 @@
 #include tts/EventHandlers
 #include tts/MarketLayout
 #include tts/IncomeLayout
+#include tts/ScoreTrackLayout
+#include tts/ScoreTracker
 #include tts/ResourceAnimation
 
 ------------------------------------------------------
@@ -45,6 +47,12 @@ PLAYER_SPEND = {}
 ------------------------------------------------------
 
 function onLoad(save_state)
+    -- Register the single post-commit hook (issues #10/#11). Module-level
+    -- ActionEngine state does not survive a Lua VM reload, so this must be
+    -- re-registered on every onLoad. This is the ONLY setPostCommitHook
+    -- call anywhere in the codebase.
+    ActionEngine.setPostCommitHook(onActionCommitted)
+
     -- Force-load XML UI from Lua (TTS does not parse XmlUI from saves)
     UIManager.initXmlUI()
 
@@ -65,6 +73,7 @@ function onLoad(save_state)
                 UIManager.hideAcceptVPLossButton()
                 UIManager.configureForPlayerCount(state.playerCount)
                 UIManager.updateLanguage(state.lang)
+                onActionCommitted(state, { action = "load" })
             end, function() return not UI.loading end)
             broadcastCurrentPlayer()
 
@@ -250,6 +259,9 @@ function onPhysicalSetupComplete(params)
     end, function() return not UI.loading end)
     broadcastCurrentPlayer()
 
+    -- Markers start at VP 0 / panel shows all-zero projections (issues #10/#11).
+    onActionCommitted(state, { action = "setup" })
+
     printToAll(Lang.format("game_started", state.lang, { count = playerCount }))
     printToAll(Lang.get("canal_era", state.lang))
 end
@@ -407,7 +419,11 @@ function afterAction(color)
     if EraTransition.isEraOver(state) then
         if state.era == Constants.Era.CANAL then
             printToAll(Lang.get("era_transition", state.lang))
-            EraTransition.transition(state)
+            local eraResults = EraTransition.transition(state)
+            announceEraScoring(eraResults)
+            -- Era-end scoring isn't wrapped by ActionEngine.commit, so sync
+            -- markers/panel directly (issues #10/#11).
+            onActionCommitted(state, { action = "era_end" })
             CardManager.rebuildDeckForRailEra(state)
             CardManager.dealToAll(state)
             UIManager.resetAllCounters(state.turnOrder)
@@ -417,7 +433,9 @@ function afterAction(color)
             return
         else
             -- Game over — final scoring
-            Scoring.scoreEndOfEra(state, true)
+            local finalResults = Scoring.scoreEndOfEra(state, true)
+            announceEraScoring(finalResults)
+            onActionCommitted(state, { action = "era_end" })
             local ranking = Scoring.determineWinner(state)
             announceResults(ranking)
             return
@@ -476,6 +494,47 @@ function broadcastCurrentPlayer()
         UIManager.hideUndoButton()
     end
     printToAll(turnText)
+end
+
+------------------------------------------------------
+-- LIVE SCORING (issues #10 / #11)
+------------------------------------------------------
+
+--- Single post-commit hook aggregator — the only function ever passed to
+--- ActionEngine.setPostCommitHook() (registered once, in onLoad). Runs
+--- after every committed action AND every undo (record.action == "undo"),
+--- so physical score markers and the projected VP panel always reflect the
+--- live logical state. Also invoked directly (not via the hook) right
+--- after era-end scoring, since era transitions and game-end scoring are
+--- not themselves wrapped by ActionEngine.commit.
+---
+--- Order matters: (a) confirmed-VP marker sync (#10) before (b) projected
+--- panel refresh (#11), so the panel's "Confirmed" column always matches
+--- marker position.
+function onActionCommitted(state, record)
+    if not state then return end
+    ScoreTracker.syncMarkers(state)
+    UIManager.refreshProjectedPanel(state)
+end
+
+--- Announce each player's era-end scoring breakdown (issue #10: "計分播報
+--- 要指出得分來源"). Called for both the Canal->Rail transition (no income)
+--- and the final Rail-era game-end scoring (income included).
+function announceEraScoring(results)
+    if not state or not results then return end
+    for _, color in ipairs(state.turnOrder) do
+        local r = results[color]
+        if r then
+            printToAll(Lang.format("era_scoring_breakdown", state.lang, {
+                player    = color,
+                buildings = r.buildingVP,
+                links     = r.linkVP,
+                income    = r.incomeVP,
+                total     = r.totalEraVP,
+                vp        = r.totalVP,
+            }))
+        end
+    end
 end
 
 ------------------------------------------------------
@@ -995,6 +1054,10 @@ function toggleLanguage()
     if not state then return end
     state.lang = (state.lang == "en") and "zh-TW" or "en"
     UIManager.updateLanguage(state.lang)
+    -- updateLanguage() rebuilds the whole XML from scratch; re-push the
+    -- projected VP panel immediately so its numbers re-localize instead of
+    -- staying blank/stale until the next action (issue #11).
+    UIManager.refreshProjectedPanel(state)
     printToAll("Language: " .. (state.lang == "en" and "English" or "Traditional Chinese"))
 end
 
@@ -1063,10 +1126,26 @@ local function finishButtonAction(playerColor, message)
     afterAction(playerColor)
 end
 
+--- Announce a merchant's VP bonus when it fires, so the score source is
+--- clear at the moment the marker moves (issue #10). Static reference
+--- data (state.board.merchants[...].bonus never changes), so it's safe to
+--- read after the sell has already committed.
+local function announceMerchantVPBonus(playerColor, merchantName)
+    if not merchantName then return end
+    local merchant = state.board.merchants[merchantName]
+    local bonus = merchant and merchant.bonus
+    if bonus and bonus.type == "vp" and (bonus.value or 0) > 0 then
+        printToAll(Lang.format("merchant_vp_bonus", state.lang, {
+            player = playerColor, vp = bonus.value, merchant = merchantName,
+        }))
+    end
+end
+
 function onSellAction(playerColor, slotIds, merchantName)
     if not requirePendingCard(playerColor) then return end
     local result = ActionEngine.execute(state, "sell", playerColor, { slotIds = slotIds, merchantName = merchantName })
     if result.success then
+        announceMerchantVPBonus(playerColor, merchantName)
         finishButtonAction(playerColor, Lang.format("player_sold", state.lang, { player = playerColor, industry = "", city = "" }))
     else
         printToColor(result.error, playerColor, {1, 0, 0})
@@ -1397,6 +1476,7 @@ function _onSellBuildingClicked(playerColor, slotId)
 
         Highlights.clearResourceCandidates()
         state._pendingSell = nil
+        announceMerchantVPBonus(playerColor, merchantName)
         finishButtonAction(playerColor, Lang.format("player_sold", state.lang, {
             player = playerColor, industry = "", city = cityName or "",
         }))

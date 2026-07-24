@@ -78,6 +78,8 @@ SRC_MODULES = [
     ("EventHandlers",     PROJECT_ROOT / "tts" / "EventHandlers.lua"),
     ("MarketLayout",       PROJECT_ROOT / "tts" / "MarketLayout.lua"),
     ("IncomeLayout",       PROJECT_ROOT / "tts" / "IncomeLayout.lua"),
+    ("ScoreTrackLayout",   PROJECT_ROOT / "tts" / "ScoreTrackLayout.lua"),
+    ("ScoreTracker",       PROJECT_ROOT / "tts" / "ScoreTracker.lua"),
     ("ResourceAnimation",  PROJECT_ROOT / "tts" / "ResourceAnimation.lua"),
 ]
 

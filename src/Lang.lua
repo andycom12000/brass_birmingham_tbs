@@ -64,6 +64,12 @@ Lang.strings = {
         total_vp = "Total: {vp} VP",
         winner = "{player} wins!",
         tie = "Shared victory!",
+        merchant_vp_bonus = "{player} gained {vp} VP from the {merchant} merchant bonus",
+        era_scoring_breakdown = "{player} scored {total} VP (Buildings {buildings} + Links {links} + Income {income}) — total {vp} VP",
+
+        -- Projected VP panel (issue #11)
+        proj_vp_title = "Projected VP",
+        proj_vp_row = "{player}: {total}  (Confirmed {confirmed} / Bldg {buildings} / Link {links} / Income {income})",
 
         -- Era transition
         era_transition = "Era transition: Canal → Rail",
@@ -152,6 +158,12 @@ Lang.strings = {
         total_vp = "總分：{vp} 分",
         winner = "{player} 獲勝！",
         tie = "共同勝利！",
+        merchant_vp_bonus = "{player} 從 {merchant} 商人加成獲得 {vp} VP",
+        era_scoring_breakdown = "{player} 獲得 {total} 分（建築 {buildings} + 連結 {links} + 收入 {income}）— 總分 {vp} 分",
+
+        -- Projected VP panel (issue #11)
+        proj_vp_title = "投影分數",
+        proj_vp_row = "{player}：{total}　（已確認 {confirmed} / 建築 {buildings} / 連結 {links} / 收入 {income}）",
 
         -- Era transition
         era_transition = "時代轉換：運河 → 鐵路",

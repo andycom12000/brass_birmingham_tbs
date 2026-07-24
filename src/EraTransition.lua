@@ -30,9 +30,13 @@ end
 --- Handles scoring, board cleanup, era switch, and player reset.
 ---
 --- @param state table  Game state
+--- @return table  Canal-era scoring results, per Scoring.scoreEndOfEra
+---   (issue #10: callers use this to announce the VP source breakdown and
+---   to sync physical score markers, since this transition isn't itself
+---   wrapped by ActionEngine.commit).
 function EraTransition.transition(state)
     -- 1. Score canal era (mid-game scoring: buildings + links, no income)
-    Scoring.scoreEndOfEra(state, false)
+    local results = Scoring.scoreEndOfEra(state, false)
 
     -- 2. Remove ALL placed links (during canal era, only canal links can be placed)
     for linkId, link in pairs(state.board.links) do
@@ -94,6 +98,8 @@ function EraTransition.transition(state)
     -- 12. Set actions for first turn (rail era has NO first-round exception — always 2 actions)
     state.currentPlayerIdx = 1
     state.actionsRemaining = 2
+
+    return results
 end
 
 return EraTransition
