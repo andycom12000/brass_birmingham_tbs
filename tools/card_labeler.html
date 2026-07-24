@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>Brass Birmingham 卡牌標註工具</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+  min-height: 100vh;
+}
+
+/* Top bar */
+#topbar {
+  background: #0f3460;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid #333;
+}
+#topbar h1 {
+  font-size: 18px;
+  white-space: nowrap;
+}
+#topbar button, #topbar label {
+  padding: 8px 16px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2a2a4a;
+  color: #eee;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+#topbar button:hover, #topbar label:hover {
+  background: #3a3a6a;
+}
+#topbar .spacer { flex: 1; }
+#image-status {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* Grid container */
+#grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+  padding: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* Card cell */
+.card-cell {
+  background: #16213e;
+  border: 2px solid #333;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s;
+}
+.card-cell.prefilled {
+  border-color: #2ecc71;
+}
+.card-cell.uncertain {
+  border-color: #f39c12;
+  box-shadow: 0 0 8px rgba(243, 156, 18, 0.3);
+}
+.card-cell.unused {
+  border-color: #222;
+  opacity: 0.35;
+}
+.card-cell.unused .card-img-wrap {
+  filter: grayscale(1) brightness(0.4);
+}
+
+/* Card image */
+.card-img-wrap {
+  position: relative;
+  width: 100%;
+  padding-top: 140.4%; /* 702/500 ratio */
+  background: #111;
+  overflow: hidden;
+}
+.card-img-wrap canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Card info section */
+.card-info {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-pos {
+  font-weight: bold;
+  font-size: 14px;
+  color: #ffd700;
+}
+.card-count {
+  color: #888;
+  font-size: 11px;
+}
+.card-mapping {
+  color: #8be;
+  font-size: 12px;
+  min-height: 18px;
+}
+.card-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.card-controls select {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #444;
+  border-radius: 3px;
+  background: #1a1a2e;
+  color: #eee;
+  font-size: 11px;
+}
+.card-controls select:focus {
+  border-color: #ffd700;
+  outline: none;
+}
+
+/* Edit toggle */
+.edit-btn {
+  background: none;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.edit-btn:hover {
+  color: #ffd700;
+  border-color: #ffd700;
+}
+
+/* Modal */
+#modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  justify-content: center;
+  align-items: center;
+}
+#modal-overlay.show {
+  display: flex;
+}
+#modal {
+  background: #16213e;
+  border: 1px solid #555;
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+#modal h2 {
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+#modal textarea {
+  flex: 1;
+  min-height: 400px;
+  background: #1a1a2e;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  resize: vertical;
+}
+#modal .modal-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+#modal button {
+  padding: 8px 16px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2a2a4a;
+  color: #eee;
+  cursor: pointer;
+  font-size: 13px;
+}
+#modal button:hover {
+  background: #3a3a6a;
+}
+#modal button.primary {
+  background: #0f3460;
+  border-color: #1a6;
+}
+
+/* File input hidden */
+#file-input {
+  display: none;
+}
+
+/* Legend */
+#legend {
+  display: flex;
+  gap: 16px;
+  padding: 12px 24px;
+  font-size: 12px;
+  color: #aaa;
+  border-bottom: 1px solid #222;
+  background: #16213e;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 2px solid;
+}
+.legend-swatch.green { border-color: #2ecc71; background: rgba(46,204,113,0.15); }
+.legend-swatch.orange { border-color: #f39c12; background: rgba(243,156,18,0.15); }
+.legend-swatch.gray { border-color: #444; background: rgba(100,100,100,0.15); opacity: 0.5; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>Brass Birmingham 卡牌標註工具</h1>
+  <div class="spacer"></div>
+  <span id="image-status">尚未載入圖片</span>
+  <label for="file-input">📂 選擇卡牌圖片</label>
+  <input type="file" id="file-input" accept="image/*">
+  <button id="btn-export" onclick="exportMapping()">匯出 Python Dict</button>
+  <button id="btn-clear" onclick="clearStorage()">清除儲存</button>
+</div>
+
+<div id="legend">
+  <div class="legend-item"><div class="legend-swatch green"></div> 已預填標註</div>
+  <div class="legend-item"><div class="legend-swatch orange"></div> 需要確認</div>
+  <div class="legend-item"><div class="legend-swatch gray"></div> 未使用位置</div>
+</div>
+
+<div id="grid"></div>
+
+<div id="modal-overlay" onclick="closeModal(event)">
+  <div id="modal">
+    <h2>匯出結果 — CARD_GRID_MAP</h2>
+    <textarea id="export-text" readonly></textarea>
+    <div class="modal-actions">
+      <button onclick="copyExport()">複製到剪貼簿</button>
+      <button onclick="closeModal()">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Constants ───────────────────────────────────────────────────────
+const COLS = 7, ROWS = 5;
+const CARD_W = 500, CARD_H = 702;
+const SHEET_W = 3500, SHEET_H = 3510;
+
+const USED_POSITIONS = new Set([
+  0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+  23,24,25,26,27,28,
+  30,31,32
+]);
+
+const UNUSED_POSITIONS = new Set([21, 22, 29, 33, 34]);
+
+const DECK_COUNTS = {
+  0:3, 3:3, 4:3, 5:3, 6:3, 7:2, 8:1, 9:2, 10:2, 11:4, 12:5,
+  13:2, 14:2, 15:1, 16:3, 17:3, 18:2, 19:2, 20:2,
+  23:2, 24:3, 25:2, 26:2, 27:2, 28:2,
+  30:1, 31:1, 32:1
+};
+
+const PRE_FILLED = {
+  0:  { cardType: "location", value: "Derby" },
+  1:  { cardType: "wild_location", value: null },
+  2:  { cardType: "wild_industry", value: null },
+  4:  { cardType: "location", value: "Birmingham" },
+  7:  { cardType: "location", value: "Stone" },
+  8:  { cardType: "location", value: "Walsall" },
+  9:  { cardType: "location", value: "Burton-on-Trent" },
+  10: { cardType: "location", value: "Wolverhampton" },
+  13: { cardType: "location", value: "Stafford" },
+  14: { cardType: "location", value: "Cannock" },
+  15: { cardType: "location", value: "Tamworth" },
+  16: { cardType: "location", value: "Stoke-on-Trent" },
+  17: { cardType: "location", value: "Coventry" },
+  19: { cardType: "location", value: "Dudley" },
+  23: { cardType: "location", value: "Uttoxeter" },
+  24: { cardType: "location", value: "Coalbrookdale" },
+  25: { cardType: "location", value: "Kidderminster" },
+  26: { cardType: "location", value: "Worcester" },
+  27: { cardType: "location", value: "Leek" },
+  28: { cardType: "location", value: "Belper" },
+  31: { cardType: "location", value: "Redditch" },
+  32: { cardType: "location", value: "Nuneaton" },
+};
+
+const UNCERTAIN_POSITIONS = new Set([3, 5, 6, 11, 12, 18, 20, 30]);
+
+const CITY_NAMES = [
+  "Belper", "Birmingham", "Burton-on-Trent", "Cannock", "Coalbrookdale",
+  "Coventry", "Derby", "Dudley", "Kidderminster", "Leek", "Nuneaton",
+  "Redditch", "Stafford", "Stoke-on-Trent", "Stone", "Tamworth",
+  "Uttoxeter", "Walsall", "Wolverhampton", "Worcester"
+];
+
+const INDUSTRY_TYPES = [
+  "cotton", "coal", "iron", "brewery", "manufacturer", "pottery"
+];
+
+const CARD_TYPES = [
+  { value: "location",      label: "地點 (Location)" },
+  { value: "industry",      label: "產業 (Industry)" },
+  { value: "wild_location", label: "萬用地點 (Wild Location)" },
+  { value: "wild_industry", label: "萬用產業 (Wild Industry)" },
+];
+
+// ─── State ───────────────────────────────────────────────────────────
+let cardImage = null;
+let mappings = {}; // pos -> { cardType, value }
+let editingCells = new Set(); // positions currently in edit mode
+
+function initMappings() {
+  // Start with pre-filled
+  for (const [pos, data] of Object.entries(PRE_FILLED)) {
+    mappings[pos] = { ...data };
+  }
+  // Load from localStorage, overriding pre-filled
+  const saved = localStorage.getItem('brass_card_labeler_mappings');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      for (const [pos, data] of Object.entries(parsed)) {
+        mappings[pos] = data;
+      }
+    } catch(e) {
+      console.warn('Failed to parse saved mappings:', e);
+    }
+  }
+}
+
+function saveMappings() {
+  localStorage.setItem('brass_card_labeler_mappings', JSON.stringify(mappings));
+}
+
+// ─── Image Loading ───────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const img = new Image();
+    img.onload = function() {
+      cardImage = img;
+      document.getElementById('image-status').textContent =
+        `已載入: ${file.name} (${img.width}x${img.height})`;
+      renderAllCardImages();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// Try loading default image
+function tryLoadDefault() {
+  const img = new Image();
+  img.onload = function() {
+    cardImage = img;
+    document.getElementById('image-status').textContent =
+      `已載入: card_sheet.jpg (${img.width}x${img.height})`;
+    renderAllCardImages();
+  };
+  img.onerror = function() {
+    document.getElementById('image-status').textContent =
+      '未找到 card_sheet.jpg，請手動選擇圖片檔';
+  };
+  img.src = 'card_sheet.jpg';
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  for (let pos = 0; pos < ROWS * COLS; pos++) {
+    const row = Math.floor(pos / COLS);
+    const col = pos % COLS;
+    const isUsed = USED_POSITIONS.has(pos);
+    const isUncertain = UNCERTAIN_POSITIONS.has(pos) && !(pos in mappings && !UNCERTAIN_POSITIONS.has(pos));
+    const isPrefilled = (pos in PRE_FILLED);
+
+    const cell = document.createElement('div');
+    cell.className = 'card-cell';
+    cell.id = `cell-${pos}`;
+
+    if (!isUsed) {
+      cell.classList.add('unused');
+    } else if (isUncertain && !(pos in mappings)) {
+      cell.classList.add('uncertain');
+    } else if (pos in mappings) {
+      // Check if it was originally uncertain and now has user data
+      if (UNCERTAIN_POSITIONS.has(pos)) {
+        cell.classList.add('prefilled'); // user has filled it
+      } else {
+        cell.classList.add('prefilled');
+      }
+    }
+
+    // Card image area
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'card-img-wrap';
+    const canvas = document.createElement('canvas');
+    canvas.id = `canvas-${pos}`;
+    canvas.width = CARD_W;
+    canvas.height = CARD_H;
+    imgWrap.appendChild(canvas);
+    cell.appendChild(imgWrap);
+
+    // Info section
+    if (isUsed) {
+      const info = document.createElement('div');
+      info.className = 'card-info';
+      info.id = `info-${pos}`;
+      info.innerHTML = buildInfoHTML(pos);
+      cell.appendChild(info);
+    } else {
+      const info = document.createElement('div');
+      info.className = 'card-info';
+      info.innerHTML = `<div class="card-header"><span class="card-pos">#${pos}</span></div>
+                         <div class="card-mapping" style="color:#666;">未使用</div>`;
+      cell.appendChild(info);
+    }
+
+    grid.appendChild(cell);
+  }
+}
+
+function buildInfoHTML(pos) {
+  const mapping = mappings[pos];
+  const count = DECK_COUNTS[pos];
+  const isEditing = editingCells.has(pos);
+
+  let html = `<div class="card-header">
+    <span class="card-pos">#${pos}</span>`;
+  if (count !== undefined) {
+    html += `<span class="card-count">4P 數量: ${count}</span>`;
+  }
+  html += `</div>`;
+
+  if (isEditing) {
+    // Edit mode
+    const currentType = mapping ? mapping.cardType : '';
+    const currentValue = mapping ? mapping.value : '';
+
+    html += `<div class="card-controls">
+      <select id="type-${pos}" onchange="onTypeChange(${pos})">
+        <option value="">— 選擇類型 —</option>`;
+    for (const ct of CARD_TYPES) {
+      html += `<option value="${ct.value}" ${currentType === ct.value ? 'selected' : ''}>${ct.label}</option>`;
+    }
+    html += `</select>`;
+
+    html += buildValueSelect(pos, currentType, currentValue);
+
+    html += `<button class="edit-btn" onclick="confirmEdit(${pos})" style="color:#2ecc71; border-color:#2ecc71;">✓ 確認</button>`;
+    html += `</div>`;
+  } else {
+    // Display mode
+    if (mapping) {
+      const label = formatMapping(mapping);
+      html += `<div class="card-mapping">${label}</div>`;
+    } else {
+      html += `<div class="card-mapping" style="color:#f39c12;">⚠ 未標註</div>`;
+    }
+    html += `<button class="edit-btn" onclick="startEdit(${pos})">✎ 編輯</button>`;
+  }
+
+  return html;
+}
+
+function buildValueSelect(pos, cardType, currentValue) {
+  if (!cardType || cardType === 'wild_location' || cardType === 'wild_industry') {
+    return '';
+  }
+
+  if (cardType === 'location') {
+    let html = `<select id="value-${pos}">
+      <option value="">— 選擇城市 —</option>`;
+    for (const opt of CITY_NAMES) {
+      html += `<option value="${opt}" ${currentValue === opt ? 'selected' : ''}>${opt}</option>`;
+    }
+    html += `</select>`;
+    return html;
+  }
+
+  if (cardType === 'industry') {
+    // Multi-select checkboxes for industry types (supports dual-industry cards)
+    const selected = Array.isArray(currentValue) ? currentValue : (currentValue ? [currentValue] : []);
+    let html = `<div id="value-${pos}" class="industry-checks" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">`;
+    for (const opt of INDUSTRY_TYPES) {
+      const checked = selected.includes(opt) ? 'checked' : '';
+      html += `<label style="font-size:11px;display:flex;align-items:center;gap:2px;cursor:pointer;">
+        <input type="checkbox" value="${opt}" ${checked} style="margin:0;"> ${opt}
+      </label>`;
+    }
+    html += `</div>`;
+    html += `<div style="font-size:10px;color:#888;margin-top:2px;">可複選（雙產業卡）</div>`;
+    return html;
+  }
+
+  return '';
+}
+
+function formatMapping(m) {
+  if (!m) return '';
+  const typeLabels = {
+    location: '地點',
+    industry: '產業',
+    wild_location: '萬用地點',
+    wild_industry: '萬用產業',
+  };
+  const tl = typeLabels[m.cardType] || m.cardType;
+  if (m.value) {
+    const display = Array.isArray(m.value) ? m.value.join(' + ') : m.value;
+    return `${tl}: ${display}`;
+  }
+  return tl;
+}
+
+function renderAllCardImages() {
+  if (!cardImage) return;
+  for (let pos = 0; pos < ROWS * COLS; pos++) {
+    renderCardImage(pos);
+  }
+}
+
+function renderCardImage(pos) {
+  if (!cardImage) return;
+  const canvas = document.getElementById(`canvas-${pos}`);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const row = Math.floor(pos / COLS);
+  const col = pos % COLS;
+  const sx = col * CARD_W;
+  const sy = row * CARD_H;
+  ctx.clearRect(0, 0, CARD_W, CARD_H);
+  ctx.drawImage(cardImage, sx, sy, CARD_W, CARD_H, 0, 0, CARD_W, CARD_H);
+}
+
+// ─── Edit Actions ────────────────────────────────────────────────────
+function startEdit(pos) {
+  editingCells.add(pos);
+  refreshCell(pos);
+}
+
+function confirmEdit(pos) {
+  const typeEl = document.getElementById(`type-${pos}`);
+  const cardType = typeEl ? typeEl.value : '';
+
+  if (cardType) {
+    let value = null;
+    if (cardType === 'location') {
+      const valueEl = document.getElementById(`value-${pos}`);
+      value = valueEl ? valueEl.value : null;
+    } else if (cardType === 'industry') {
+      // Read checked industry checkboxes
+      const container = document.getElementById(`value-${pos}`);
+      if (container) {
+        const checked = [...container.querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
+        value = checked.length > 0 ? checked : null;
+      }
+    }
+    mappings[pos] = { cardType, value };
+    saveMappings();
+  }
+
+  editingCells.delete(pos);
+  refreshCell(pos);
+}
+
+function onTypeChange(pos) {
+  const typeEl = document.getElementById(`type-${pos}`);
+  const cardType = typeEl.value;
+  const currentValue = mappings[pos] ? mappings[pos].value : '';
+
+  // Re-render just the value select
+  const info = document.getElementById(`info-${pos}`);
+  if (info) {
+    // Store the type selection, rebuild info
+    // Temporarily update mapping for rendering
+    const tempMapping = { cardType: cardType, value: currentValue };
+    mappings[pos] = tempMapping;
+    info.innerHTML = buildInfoHTML(pos);
+    editingCells.add(pos); // keep in editing
+    info.innerHTML = buildInfoHTML(pos);
+  }
+}
+
+function refreshCell(pos) {
+  const cell = document.getElementById(`cell-${pos}`);
+  if (!cell) return;
+
+  // Update border class
+  cell.classList.remove('prefilled', 'uncertain');
+  if (USED_POSITIONS.has(pos)) {
+    if (pos in mappings) {
+      cell.classList.add('prefilled');
+    } else if (UNCERTAIN_POSITIONS.has(pos)) {
+      cell.classList.add('uncertain');
+    }
+  }
+
+  const info = document.getElementById(`info-${pos}`);
+  if (info) {
+    info.innerHTML = buildInfoHTML(pos);
+  }
+}
+
+// ─── Export ──────────────────────────────────────────────────────────
+function exportMapping() {
+  let lines = ['CARD_GRID_MAP = {'];
+
+  // Collect all used positions sorted
+  const allPos = [...USED_POSITIONS].sort((a, b) => a - b);
+
+  for (const pos of allPos) {
+    const m = mappings[pos];
+    if (m) {
+      let valStr;
+      if (!m.value) {
+        valStr = 'None';
+      } else if (Array.isArray(m.value)) {
+        // Industry: list of types, e.g. ["cotton", "manufacturer"]
+        valStr = '[' + m.value.map(v => `"${v}"`).join(', ') + ']';
+      } else {
+        // Location: single city name string
+        valStr = `"${m.value}"`;
+      }
+      const pad = pos < 10 ? ' ' : '';
+      lines.push(`    ${pad}${pos}: ("${m.cardType}",${' '.repeat(Math.max(1, 16 - m.cardType.length))}${valStr}),`);
+    } else {
+      lines.push(`    # ${pos}: (未標註)`);
+    }
+  }
+
+  lines.push('}');
+
+  const text = lines.join('\n');
+  document.getElementById('export-text').value = text;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function copyExport() {
+  const ta = document.getElementById('export-text');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(ta.value).then(() => {
+    alert('已複製到剪貼簿！');
+  }).catch(() => {
+    // fallback
+    document.execCommand('copy');
+    alert('已複製到剪貼簿！');
+  });
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('show');
+  }
+}
+
+function clearStorage() {
+  if (!confirm('確定要清除所有已儲存的標註嗎？這會還原回預設值。')) return;
+  localStorage.removeItem('brass_card_labeler_mappings');
+  mappings = {};
+  editingCells.clear();
+  initMappings();
+  buildGrid();
+  renderAllCardImages();
+}
+
+// ─── Init ────────────────────────────────────────────────────────────
+initMappings();
+buildGrid();
+tryLoadDefault();
+
+// Keyboard shortcut: Escape closes modal
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeModal();
+  }
+});
+</script>
+</body>
+</html>

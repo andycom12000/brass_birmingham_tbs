@@ -25,12 +25,12 @@ body { font-family: 'Segoe UI', sans-serif; background:#1a1a2e; color:#eee; disp
 }
 .marker {
   position:absolute;
-  width:22px; height:22px;
-  border-radius:50%;
+  width:24px; height:24px;
+  border-radius:3px;
   border:2px solid #fff;
   cursor:grab;
   display:flex; align-items:center; justify-content:center;
-  font-size:9px; font-weight:bold; color:#fff;
+  font-size:8px; font-weight:bold; color:#fff;
   text-shadow:0 0 3px #000;
   transform:translate(-50%,-50%);
   z-index:10;
@@ -39,10 +39,10 @@ body { font-family: 'Segoe UI', sans-serif; background:#1a1a2e; color:#eee; disp
 .marker:hover { box-shadow:0 0 8px 2px rgba(255,255,255,0.6); z-index:20; }
 .marker.selected { box-shadow:0 0 12px 3px #ffd700; z-index:30; border-color:#ffd700; }
 .marker.link-marker {
-  width:14px; height:14px;
+  width:10px; height:10px;
   border-radius:2px;
   opacity:0.5;
-  font-size:7px;
+  font-size:6px;
   z-index:5;
   border:1px solid #888;
 }
@@ -172,6 +172,28 @@ body { font-family: 'Segoe UI', sans-serif; background:#1a1a2e; color:#eee; disp
 /* Link marker selected */
 .marker.link-marker.selected { opacity:1 !important; box-shadow:0 0 10px 3px #ffd700; border-color:#ffd700 !important; z-index:25; }
 .marker.link-marker.has-market { border-color:#f9a825 !important; }
+
+/* Discard pile markers */
+.marker.discard-marker {
+  width:44px; height:60px;
+  border-radius:4px;
+  border:2px dashed #ff6b6b;
+  background:rgba(30,30,30,0.85);
+  font-size:10px;
+  z-index:12;
+  opacity:0.9;
+}
+.marker.discard-marker:hover { opacity:1; box-shadow:0 0 10px 2px rgba(255,107,107,0.6); }
+.marker.discard-marker.selected { border-color:#ffd700; border-style:solid; box-shadow:0 0 12px 3px #ffd700; z-index:30; }
+
+/* Discard list */
+.discard-item { padding:8px 10px; margin-bottom:4px; border-radius:4px; cursor:pointer; border:1px solid transparent; font-size:12px; display:flex; align-items:center; gap:8px; }
+.discard-item:hover { background:rgba(255,255,255,0.05); }
+.discard-item.selected { border-color:#ffd700; background:rgba(255,215,0,0.1); }
+.discard-color { width:14px; height:14px; border-radius:3px; border:1px solid #888; flex-shrink:0; }
+.discard-info { flex:1; }
+.discard-player { font-weight:bold; }
+.discard-pos { font-size:10px; color:#666; }
 </style>
 </head>
 <body>
@@ -198,9 +220,11 @@ body { font-family: 'Segoe UI', sans-serif; background:#1a1a2e; color:#eee; disp
   <div class="tab-bar">
     <div class="tab-btn active" data-tab="slots">建築格 (Slots)</div>
     <div class="tab-btn" data-tab="links">路線 (Links)</div>
+    <div class="tab-btn" data-tab="discards">棄牌區 (Discard)</div>
   </div>
   <div id="slot-list"></div>
   <div id="link-list" style="display:none;flex:1;overflow-y:auto;padding:8px;"></div>
+  <div id="discard-list" style="display:none;flex:1;overflow-y:auto;padding:8px;"></div>
   <div id="detail-panel">
     <h3 id="detail-title">Slot Detail</h3>
     <div class="field">
@@ -241,6 +265,17 @@ body { font-family: 'Segoe UI', sans-serif; background:#1a1a2e; color:#eee; disp
     <div class="field">
       <label>Snap 索引</label>
       <input type="text" id="link-detail-idx" readonly style="width:100%;padding:4px 8px;border-radius:3px;border:1px solid #555;background:#1a1a3e;color:#eee;font-size:12px;">
+    </div>
+  </div>
+  <div id="discard-detail-panel" style="display:none;border-top:1px solid #333;padding:12px;background:#0f3460;">
+    <h3 id="discard-detail-title" style="margin-bottom:8px;font-size:14px;color:#ff6b6b;">Discard Detail</h3>
+    <div class="field">
+      <label>玩家</label>
+      <input type="text" id="discard-detail-player" readonly style="width:100%;padding:4px 8px;border-radius:3px;border:1px solid #555;background:#1a1a3e;color:#eee;font-size:12px;">
+    </div>
+    <div class="field">
+      <label>位置（拖曳地圖上的方塊調整）</label>
+      <input type="text" id="discard-detail-pos" readonly style="width:100%;padding:4px 8px;border-radius:3px;border:1px solid #555;background:#1a1a3e;color:#eee;font-size:12px;">
     </div>
   </div>
 </div>
@@ -441,6 +476,20 @@ const BOARDDATA_TYPES = {};
 
 const MERCHANT_CITIES = new Set(["Shrewsbury","Gloucester","Oxford","Warrington","Nottingham"]);
 
+// Per-player discard pile positions (initial estimates — drag to adjust)
+const PLAYER_COLORS = {
+  White:  '#e0e0e0',
+  Orange: '#ff9800',
+  Purple: '#9c27b0',
+  Yellow: '#ffeb3b',
+};
+const INITIAL_DISCARD_PILES = [
+  { player: 'White',  x:  15, z: -20 },
+  { player: 'Orange', x:  15, z:  20 },
+  { player: 'Purple', x: -15, z:  20 },
+  { player: 'Yellow', x: -15, z: -20 },
+];
+
 // All known cities (longest first for greedy parsing of hyphenated IDs)
 const ALL_CITY_NAMES = ["Burton-on-Trent","Stoke-on-Trent","Coalbrookdale","Kidderminster","Wolverhampton","Shrewsbury","Birmingham","Nottingham","Gloucester","Warrington","Nuneaton","Tamworth","Uttoxeter","Stafford","Coventry","Redditch","Worcester","Cannock","Walsall","Dudley","Oxford","Derby","Stone","Belper","Leek"];
 
@@ -482,6 +531,8 @@ let links = CURRENT_LINKS.map(lnk => {
 });
 let selectedSlotIdx = -1;
 let selectedLinkIdx = -1;
+let selectedDiscardIdx = -1;
+let discardPiles = JSON.parse(JSON.stringify(INITIAL_DISCARD_PILES));
 let activeTab = 'slots';
 let showGrid = true;
 let showLinks = true;
@@ -492,7 +543,7 @@ let swapMode = false;
 let swapFirstCity = null; // city name of first click
 
 // Board view transform
-const WORLD_MIN = -17, WORLD_MAX = 17;
+const WORLD_MIN = -25, WORLD_MAX = 25;
 const WORLD_SIZE = WORLD_MAX - WORLD_MIN;
 const BOARD_PX = 900;
 const SCALE = BOARD_PX / WORLD_SIZE;
@@ -605,6 +656,7 @@ function init() {
   renderMarkers();
   renderSlotList();
   renderLinkList();
+  renderDiscardList();
   updateTransform();
 }
 
@@ -618,7 +670,7 @@ function drawGrid() {
   if (!showGrid) return;
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
-  for (let w = -16; w <= 16; w += 2) {
+  for (let w = -24; w <= 24; w += 2) {
     const p = worldToScreen(w, 0);
     ctx.beginPath(); ctx.moveTo(p.x, 0); ctx.lineTo(p.x, BOARD_PX); ctx.stroke();
     const p2 = worldToScreen(0, w);
@@ -632,7 +684,7 @@ function drawGrid() {
   // Labels
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px monospace';
-  for (let w = -16; w <= 16; w += 4) {
+  for (let w = -24; w <= 24; w += 4) {
     const px = worldToScreen(w, 0);
     ctx.fillText(w.toString(), px.x+2, o.y-3);
     const pz = worldToScreen(0, w);
@@ -646,15 +698,18 @@ function drawGrid() {
 let markerEls = [];
 let labelEls = [];
 let linkMarkerEls = [];
+let discardMarkerEls = [];
 
 function renderMarkers() {
   // Clear existing
   markerEls.forEach(el => el.remove());
   labelEls.forEach(el => el.remove());
   linkMarkerEls.forEach(el => el.remove());
+  discardMarkerEls.forEach(el => el.remove());
   markerEls = [];
   labelEls = [];
   linkMarkerEls = [];
+  discardMarkerEls = [];
 
   // Slot markers
   const citySlots = {};
@@ -740,20 +795,39 @@ function renderMarkers() {
       linkMarkerEls.push(el);
     });
   }
+
+  // Discard pile markers
+  discardPiles.forEach((dp, di) => {
+    const p = worldToScreen(dp.x, dp.z);
+    const el = document.createElement('div');
+    let cls = 'marker discard-marker';
+    if (di === selectedDiscardIdx) cls += ' selected';
+    el.className = cls;
+    el.style.borderColor = PLAYER_COLORS[dp.player] || '#ff6b6b';
+    el.style.left = p.x + 'px';
+    el.style.top = p.y + 'px';
+    el.textContent = dp.player.substring(0, 2);
+    el.title = `${dp.player} 棄牌區\n(${dp.x.toFixed(3)}, ${dp.z.toFixed(3)})`;
+    el.dataset.discardIdx = di;
+    el.addEventListener('mousedown', onDiscardMarkerMouseDown);
+    boardContainer.appendChild(el);
+    discardMarkerEls.push(el);
+  });
 }
 
 // ============================================================
 // DRAG MARKERS
 // ============================================================
-let dragging = null;
+let dragging = null; // { el, idx, kind: 'slot'|'link'|'discard' }
 let dragOffsetX = 0, dragOffsetY = 0;
 let dragStartTime = 0;
 
-function onMarkerMouseDown(e) {
+function startDrag(e, kind) {
   e.stopPropagation();
-  const idx = parseInt(e.target.dataset.slotIdx);
+  const key = kind === 'slot' ? 'slotIdx' : kind === 'link' ? 'linkIdx' : 'discardIdx';
+  const idx = parseInt(e.target.dataset[key]);
   if (isNaN(idx)) return;
-  dragging = { el: e.target, idx };
+  dragging = { el: e.target, idx, kind };
   dragStartTime = Date.now();
   const rect = boardContainer.getBoundingClientRect();
   const currentLeft = parseFloat(e.target.style.left);
@@ -763,6 +837,9 @@ function onMarkerMouseDown(e) {
   e.target.style.cursor = 'grabbing';
 }
 
+function onMarkerMouseDown(e) { startDrag(e, 'slot'); }
+function onDiscardMarkerMouseDown(e) { startDrag(e, 'discard'); }
+
 document.addEventListener('mousemove', (e) => {
   if (!dragging) return;
   const rect = boardContainer.getBoundingClientRect();
@@ -770,13 +847,17 @@ document.addEventListener('mousemove', (e) => {
   const sy = (e.clientY - dragOffsetY - rect.top) / zoom;
   dragging.el.style.left = sx + 'px';
   dragging.el.style.top = sy + 'px';
-  // Update world coords
   const w = screenToWorld(sx, sy);
-  const slot = slots[dragging.idx];
-  if (slot) {
-    slot.x = Math.round(w.x * 1000) / 1000;
-    slot.z = Math.round(w.z * 1000) / 1000;
-    document.getElementById('detail-pos').value = `(${slot.x.toFixed(3)}, ${slot.z.toFixed(3)})`;
+  const rx = Math.round(w.x * 1000) / 1000;
+  const rz = Math.round(w.z * 1000) / 1000;
+  if (dragging.kind === 'slot') {
+    const slot = slots[dragging.idx];
+    if (slot) { slot.x = rx; slot.z = rz; }
+    document.getElementById('detail-pos').value = `(${rx.toFixed(3)}, ${rz.toFixed(3)})`;
+  } else if (dragging.kind === 'discard') {
+    const dp = discardPiles[dragging.idx];
+    if (dp) { dp.x = rx; dp.z = rz; }
+    document.getElementById('discard-detail-pos').value = `(${rx.toFixed(3)}, ${rz.toFixed(3)})`;
   }
 });
 
@@ -784,12 +865,12 @@ document.addEventListener('mouseup', (e) => {
   if (!dragging) return;
   dragging.el.style.cursor = 'grab';
   const elapsed = Date.now() - dragStartTime;
-  if (elapsed < 200) {
-    // Click: select
-    selectSlot(dragging.idx);
-  } else {
-    // Drag completed: update sidebar
-    updateSlotListItem(dragging.idx);
+  if (dragging.kind === 'slot') {
+    if (elapsed < 200) selectSlot(dragging.idx);
+    else updateSlotListItem(dragging.idx);
+  } else if (dragging.kind === 'discard') {
+    if (elapsed < 200) selectDiscard(dragging.idx);
+    else updateDiscardListItem(dragging.idx);
   }
   dragging = null;
 });
@@ -916,11 +997,15 @@ function selectSlot(idx) {
     }
   }
 
-  // Deselect link
+  // Deselect link & discard
   selectedLinkIdx = -1;
+  selectedDiscardIdx = -1;
   document.getElementById('link-detail-panel').style.display = 'none';
+  document.getElementById('discard-detail-panel').style.display = 'none';
   linkMarkerEls.forEach(el => el.classList.remove('selected'));
   document.querySelectorAll('#link-list .link-item').forEach(el => el.classList.remove('selected'));
+  discardMarkerEls.forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('#discard-list .discard-item').forEach(el => el.classList.remove('selected'));
 
   selectedSlotIdx = idx;
   const s = slots[idx];
@@ -1043,6 +1128,66 @@ document.addEventListener('mouseup', (e) => {
 });
 
 // ============================================================
+// DISCARD LIST (sidebar)
+// ============================================================
+const discardList = document.getElementById('discard-list');
+
+function renderDiscardList() {
+  discardList.innerHTML = '';
+  discardPiles.forEach((dp, i) => {
+    const el = document.createElement('div');
+    el.className = 'discard-item' + (i === selectedDiscardIdx ? ' selected' : '');
+    el.innerHTML = `
+      <div class="discard-color" style="background:${PLAYER_COLORS[dp.player]||'#888'}"></div>
+      <div class="discard-info">
+        <div class="discard-player">${dp.player} 棄牌區</div>
+        <div class="discard-pos">(${dp.x.toFixed(3)}, ${dp.z.toFixed(3)})</div>
+      </div>`;
+    el.addEventListener('click', () => selectDiscard(i));
+    discardList.appendChild(el);
+  });
+}
+
+function updateDiscardListItem(idx) {
+  const items = discardList.querySelectorAll('.discard-item');
+  if (items[idx]) {
+    const dp = discardPiles[idx];
+    items[idx].querySelector('.discard-pos').textContent = `(${dp.x.toFixed(3)}, ${dp.z.toFixed(3)})`;
+  }
+}
+
+function selectDiscard(idx) {
+  selectedSlotIdx = -1;
+  selectedLinkIdx = -1;
+  selectedDiscardIdx = idx;
+  const dp = discardPiles[idx];
+
+  // Update markers
+  renderMarkers();
+
+  // Update list
+  discardList.querySelectorAll('.discard-item').forEach((el, i) => el.classList.toggle('selected', i === idx));
+
+  // Switch to discards tab
+  if (activeTab !== 'discards') switchTab('discards');
+
+  // Scroll into view
+  const listItem = discardList.querySelectorAll('.discard-item')[idx];
+  if (listItem) listItem.scrollIntoView({block:'nearest'});
+
+  // Show detail panel
+  const panel = document.getElementById('discard-detail-panel');
+  panel.style.display = 'block';
+  document.getElementById('discard-detail-title').textContent = dp.player + ' 棄牌區';
+  document.getElementById('discard-detail-player').value = dp.player;
+  document.getElementById('discard-detail-pos').value = `(${dp.x.toFixed(3)}, ${dp.z.toFixed(3)})`;
+
+  // Hide other panels
+  detailPanel.style.display = 'none';
+  document.getElementById('link-detail-panel').style.display = 'none';
+}
+
+// ============================================================
 // LINK LIST (sidebar)
 // ============================================================
 const linkList = document.getElementById('link-list');
@@ -1092,11 +1237,15 @@ const LINK_PROP_DEFS = [
 ];
 
 function selectLink(idx) {
-  // Deselect slot
+  // Deselect slot & discard
   selectedSlotIdx = -1;
+  selectedDiscardIdx = -1;
   detailPanel.style.display = 'none';
+  document.getElementById('discard-detail-panel').style.display = 'none';
   markerEls.forEach(el => el.classList.remove('selected'));
   slotList.querySelectorAll('.slot-item').forEach(el => el.classList.remove('selected'));
+  discardMarkerEls.forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('#discard-list .discard-item').forEach(el => el.classList.remove('selected'));
 
   selectedLinkIdx = idx;
   const lnk = links[idx];
@@ -1154,6 +1303,7 @@ function switchTab(tab) {
   });
   slotList.style.display = tab === 'slots' ? '' : 'none';
   linkList.style.display = tab === 'links' ? '' : 'none';
+  discardList.style.display = tab === 'discards' ? '' : 'none';
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1329,6 +1479,16 @@ document.getElementById('btn-export').addEventListener('click', () => {
     if (lnk.rail) types.push('E.RAIL');
     lines.push(`    ["${key}"] = { cities = { "${sorted[0]}", "${sorted[1]}" }, types = { ${types.join(', ')} } },`);
   });
+
+  // Discard pile positions
+  lines.push('');
+  lines.push('    -- Per-player discard pile positions');
+  lines.push('    -- Generated by snap_editor.html');
+  lines.push('    local DISCARD_POSITIONS = {');
+  discardPiles.forEach(dp => {
+    lines.push(`        { player = "${dp.player}", pos = Vector(${dp.x.toFixed(3)}, 1.0, ${dp.z.toFixed(3)}) },`);
+  });
+  lines.push('    }');
 
   document.getElementById('export-text').value = lines.join('\n');
   document.getElementById('export-modal').classList.add('show');
