@@ -1,6 +1,7 @@
 local Constants   = require("src/Constants")
 local BoardData   = require("src/BoardData")
 local GameState   = require("src/GameState")
+local Tile        = require("src/Tile")
 local Network     = require("src/Network")
 local Market      = require("src/Market")
 local IncomeTrack = require("src/IncomeTrack")
