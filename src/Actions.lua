@@ -508,6 +508,22 @@ function Actions.loan(state, color)
 end
 
 -- ============================================================
+-- 6b. Pass
+-- ============================================================
+
+--- Execute the Pass action.
+--- Passing takes no game-state effect beyond consuming the action; the
+--- discard-a-card requirement is fulfilled by the TTS card layer. The full
+--- guided discard flow is added in issue #6.
+function Actions.pass(state, color, params)
+    local v = Validation.canPass(state, color)
+    if not v.valid then
+        return fail(v.reason)
+    end
+    return ok()
+end
+
+-- ============================================================
 -- 6. Scout
 -- ============================================================
 

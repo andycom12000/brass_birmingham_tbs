@@ -66,6 +66,7 @@ SRC_MODULES = [
     ("TurnManager",   PROJECT_ROOT / "src" / "TurnManager.lua"),
     ("Validation",    PROJECT_ROOT / "src" / "Validation.lua"),
     ("Actions",       PROJECT_ROOT / "src" / "Actions.lua"),
+    ("ActionEngine",  PROJECT_ROOT / "src" / "ActionEngine.lua"),
     ("Scoring",       PROJECT_ROOT / "src" / "Scoring.lua"),
     ("EraTransition", PROJECT_ROOT / "src" / "EraTransition.lua"),
     ("Lang",          PROJECT_ROOT / "src" / "Lang.lua"),

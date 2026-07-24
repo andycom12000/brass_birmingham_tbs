@@ -906,7 +906,7 @@ end
 
 function onSellAction(playerColor, slotIds, merchantName)
     if not requirePendingCard(playerColor) then return end
-    local result = Actions.sell(state, playerColor, { slotIds = slotIds, merchantName = merchantName })
+    local result = ActionEngine.execute(state, "sell", playerColor, { slotIds = slotIds, merchantName = merchantName })
     if result.success then
         finishButtonAction(playerColor, Lang.format("player_sold", state.lang, { player = playerColor, industry = "", city = "" }))
     else
@@ -1040,7 +1040,7 @@ function _onDevelopTileDropped(playerColor, tileObj, meta, inBag)
         end
         local ironFromMarket = math.max(0, count - boardIron)
 
-        local result = Actions.develop(state, playerColor, { count = count })
+        local result = ActionEngine.execute(state, "develop", playerColor, { count = count })
         if result.success then
             -- Physically remove iron cubes from the market track
             if ironFromMarket > 0 then
@@ -1056,7 +1056,7 @@ end
 
 function onLoanAction(playerColor)
     if not requirePendingCard(playerColor) then return end
-    local result = Actions.loan(state, playerColor)
+    local result = ActionEngine.execute(state, "loan", playerColor, {})
     if result.success then
         updateSpendCounterFromState(playerColor)
         moveIncomeMarker(playerColor)
@@ -1116,7 +1116,7 @@ function _onScoutCardDiscarded(playerColor, cardObj)
     if pending.cardsDiscarded >= pending.required then
         -- All discards done — execute scout action
         state._pendingScout = nil
-        local result = Actions.scout(state, playerColor)
+        local result = ActionEngine.execute(state, "scout", playerColor, {})
         if result.success then
             local dealt = CardManager.giveWilds(playerColor)
             -- Restore handSize: discards decremented it by 2, wilds add back
@@ -1211,7 +1211,7 @@ function _onSellBuildingClicked(playerColor, slotId)
     local cityName = GameState.getCityForSlot(state, slotId)
     local merchantName = Network.findConnectedMerchant(state, cityName)
 
-    local result = Actions.sell(state, playerColor, {
+    local result = ActionEngine.execute(state, "sell", playerColor, {
         slotIds = { slotId },
         merchantName = merchantName,
     })

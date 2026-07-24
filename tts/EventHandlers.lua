@@ -176,6 +176,9 @@ function EventHandlers.cancelPendingResource()
     if not state or not state._pendingResource then return end
     Highlights.clearResourceCandidates()
     state._pendingResource = nil
+    -- Abandon the uncommitted build snapshot so it never lingers in later
+    -- snapshots or gets mistaken for a committed action.
+    state._buildSnapshot = nil
 end
 
 ------------------------------------------------------
@@ -420,6 +423,11 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     end
 
     -- === All checks passed -- commit state changes ===
+
+    -- Capture the pre-execution snapshot for the ActionEngine commit seam.
+    -- Build resolves interactively (animated resource consumption across drop
+    -- events), so it snapshots here and finalises in _finishBuild via commit().
+    state._buildSnapshot = ActionEngine.beginAction(state)
 
     -- Deduct ONLY base building cost (market costs deducted by buyFromMarket later)
     if cost > 0 then
@@ -831,10 +839,24 @@ function EventHandlers._finishBuild(playerColor, meta, totalSpent)
     _pickupPositions = {}  -- clear to prevent memory leak
 
     if state._pendingCard then
+        -- Commit the build through the single ActionEngine seam: fires the
+        -- post-commit hook exactly once with the fully-resolved post-build
+        -- state, and records the snapshot for single-step undo (issue #9).
+        if state._buildSnapshot then
+            ActionEngine.commit(state, {
+                action   = "build",
+                color    = playerColor,
+                params   = meta,
+                snapshot = state._buildSnapshot,
+            })
+        end
+        state._buildSnapshot = nil
         Highlights.clearAll()
         UIManager.hideActionPanel()
         state._pendingCard = nil
         afterAction(playerColor)
+    else
+        state._buildSnapshot = nil
     end
 end
 
@@ -889,7 +911,8 @@ local function executeSingleLinkAction(playerColor, linkId, linkObj, dropPos, li
     local moneyBefore = playerData.money
 
     -- Execute action (state changes: money, coal, beer, link ownership, linksRemaining)
-    local result = Actions.network(state, playerColor, { linkId = linkId })
+    -- Routed through the ActionEngine commit seam (snapshot + post-commit hook).
+    local result = ActionEngine.execute(state, "network", playerColor, { linkId = linkId })
     if not result.success then
         printToColor(result.error, playerColor, {1, 0, 0})
         rejectTile(linkObj, playerColor)
@@ -964,8 +987,8 @@ function EventHandlers.handleLinkDrop(playerColor, linkObj, meta)
         local playerData = GameState.getPlayer(state, playerColor)
         local moneyBefore = playerData.money
 
-        -- Execute double rail action
-        local result = Actions.network(state, playerColor, {
+        -- Execute double rail action (one Network action -> one commit)
+        local result = ActionEngine.execute(state, "network", playerColor, {
             linkId = firstLink.linkId,
             secondLinkId = secondLinkId,
         })
