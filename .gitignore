@@ -1,2 +1,5 @@
 # Large reference images (used by tools/snap_editor.html)
 tools/*.jpg
+
+# Python bytecode
+__pycache__/
