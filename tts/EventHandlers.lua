@@ -226,6 +226,35 @@ end
 -- CARD DROP
 ------------------------------------------------------
 
+--- Reject a card that CardManager.parseCard() could not identify.
+-- Card recognition is a build-time invariant: scripts/inject_scripts.py tags
+-- every real card's GMNotes with a cardType before the save ships, so a parse
+-- failure here means the tagging pipeline missed this object -- a pipeline
+-- bug, not a normal player action. Fail loudly: bounce the card back without
+-- discarding it or entering the action flow, and report enough detail
+-- (GUID + whatever face metadata TTS exposes) to locate the offending object.
+-- @param playerColor  TTS seat color string
+-- @param cardObj      TTS card object that failed to parse
+local function rejectUnrecognizedCard(playerColor, cardObj)
+    local guid  = cardObj.getGUID()
+    local name  = cardObj.getName() or ""
+    local desc  = cardObj.getDescription() or ""
+    local memo  = (cardObj.getMemo and cardObj.getMemo()) or ""
+    local notes = cardObj.getGMNotes() or ""
+
+    local locale = state and state.lang
+    local message = Lang.get("card_unrecognized", locale)
+    local detail = string.format(
+        "GUID=%s name=%q description=%q memo=%q GMNotes=%q",
+        guid, name, desc, memo, notes
+    )
+
+    printToColor(message .. " (" .. detail .. ")", playerColor, {1, 0, 0})
+    printToAll("[ERROR] " .. message .. " " .. detail)
+
+    rejectTile(cardObj, playerColor)
+end
+
 --- Handle a card being dropped by the current player.
 -- Any card drop from the current player is treated as playing a card.
 -- (isCurrentPlayer check is done by the caller onObjectDrop)
@@ -237,15 +266,16 @@ function EventHandlers.handleCardDrop(playerColor, cardObj)
     -- Parse card metadata (GMNotes or name fallback)
     local cardInfo = CardManager.parseCard(cardObj)
     if not cardInfo then
-        -- Unrecognized card: still allow non-build actions
-        printToColor("[DEBUG] Card not recognized: '" .. (cardObj.getName() or "")
-            .. "' GMNotes='" .. (cardObj.getGMNotes() or "") .. "'", playerColor, {1, 1, 0})
-        cardInfo = { cardType = "unknown" }
-    else
-        printToAll("[DEBUG] Card parsed: cardType=" .. tostring(cardInfo.cardType)
-            .. " location=" .. tostring(cardInfo.location)
-            .. " industryType=" .. tostring(cardInfo.industryType))
+        -- Unrecognized card: reject loudly. No discard, no highlights, no
+        -- action buttons, no pending-action state -- the drop is a no-op
+        -- from the game's perspective apart from the error report.
+        rejectUnrecognizedCard(playerColor, cardObj)
+        return
     end
+
+    printToAll("[DEBUG] Card parsed: cardType=" .. tostring(cardInfo.cardType)
+        .. " location=" .. tostring(cardInfo.location)
+        .. " industryType=" .. tostring(cardInfo.industryType))
 
     -- Starting a new action closes the previous action's undo window
     -- (draws its deferred card and locks its undo) — issue #9.
@@ -273,12 +303,10 @@ function EventHandlers.handleCardDrop(playerColor, cardObj)
         state.wildSupply.industry = (state.wildSupply.industry or 0) + 1
     end
 
-    -- Highlight valid build and/or link spots (skip for unknown cards)
-    if cardInfo.cardType ~= "unknown" then
-        local ok2, err2 = pcall(Highlights.showValidBuildSpots, state, playerColor, cardInfo)
-        if not ok2 then
-            printToAll("[ERROR] Highlights.showValidBuildSpots failed: " .. tostring(err2))
-        end
+    -- Highlight valid build and/or link spots
+    local ok2, err2 = pcall(Highlights.showValidBuildSpots, state, playerColor, cardInfo)
+    if not ok2 then
+        printToAll("[ERROR] Highlights.showValidBuildSpots failed: " .. tostring(err2))
     end
 
     -- Show action buttons (Sell, Develop, Loan, Scout)

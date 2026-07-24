@@ -491,6 +491,57 @@ def tag_all_cards(mod_data: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Card recognition invariant check (issue #3)
+# ---------------------------------------------------------------------------
+#
+# tts/CardManager.parseCard() treats a card as recognized only if its GMNotes
+# decodes to a table with a `cardType` field (or, failing that, its name
+# matches a legacy naming pattern). Card recognition is meant to be a
+# build-time invariant: every real, dealable Card object should come out of
+# tag_all_cards() with a cardType already stamped on it. If one doesn't, the
+# CARD_GRID_MAP is missing an entry (or a sheet ID changed) and the shipped
+# save would silently contain a card EventHandlers can't recognize.
+#
+# This check walks the same object tree as tag_all_cards(), but only
+# individual "Card" objects (never "Deck"/"DeckCustom" containers, which are
+# never themselves dropped/played — TTS always deals out individual Cards).
+# For every Card whose GMNotes claims {"type": "card"}, cardType must be
+# present. Anything else fails the build loudly instead of shipping a card
+# CardManager.parseCard() would silently reject at runtime.
+
+
+def validate_card_metadata(mod_data: dict) -> list:
+    """
+    Verify the build-time invariant that every individual Card object tagged
+    as a game card has a parseable cardType in its GMNotes.
+    Returns a list of (guid, card_id, nickname) tuples for any violations
+    (empty list means the invariant holds).
+    """
+    violations = []
+
+    def _walk(obj: dict) -> None:
+        if obj.get("Name") == "Card":
+            notes_str = obj.get("GMNotes", "")
+            if notes_str:
+                try:
+                    notes = json.loads(notes_str)
+                except (ValueError, TypeError):
+                    notes = None
+                if isinstance(notes, dict) and notes.get("type") == "card":
+                    if not notes.get("cardType"):
+                        violations.append(
+                            (obj.get("GUID"), obj.get("CardID"), obj.get("Nickname", ""))
+                        )
+        for contained in obj.get("ContainedObjects", []):
+            _walk(contained)
+
+    for obj in mod_data.get("ObjectStates", []):
+        _walk(obj)
+
+    return violations
+
+
+# ---------------------------------------------------------------------------
 # Money counter patcher — inject getCount() into existing MrStump scripts
 # ---------------------------------------------------------------------------
 
@@ -1121,6 +1172,31 @@ def main():
     print("Tagging cards and tiles with GMNotes metadata...")
     n_tagged = tag_all_cards(mod_data)
     print(f"  Tagged {n_tagged} object(s).")
+
+    # 4c2. Verify the card-recognition invariant (issue #3): every individual
+    # Card object tagged as a game card must carry a parseable cardType, or
+    # tts/CardManager.parseCard() will silently reject it at runtime.
+    print()
+    print("Verifying card recognition invariant (all cards parseable)...")
+    violations = validate_card_metadata(mod_data)
+    if violations:
+        print(
+            f"  ERROR: {len(violations)} card(s) tagged as type=card have no "
+            "cardType — CardManager.parseCard() would reject them at runtime:",
+            file=sys.stderr,
+        )
+        for guid, card_id, nickname in violations:
+            print(
+                f"    GUID={guid} CardID={card_id} Nickname={nickname!r}",
+                file=sys.stderr,
+            )
+        print(
+            "  Fix CARD_GRID_MAP (or the sheet ID it's keyed from) so every "
+            "dealable card resolves to a cardType, then re-run this script.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print("  OK — every tagged card has a parseable cardType.")
 
     # 4d. Patch money counter objects to expose getCount()
     print()
