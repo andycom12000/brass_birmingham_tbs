@@ -91,14 +91,40 @@ function EventHandlers.onObjectDrop(playerColor, droppedObject)
     local objType, meta = EventHandlers.identifyObject(droppedObject)
     if not objType then return end
 
+    -- Reject all game actions from non-current player
+    if not isCurrentPlayer(playerColor) then
+        printToColor("Not your turn.", playerColor, {1, 0.5, 0})
+        rejectTile(droppedObject, playerColor)
+        return
+    end
+
+    -- Pending scout discard: intercept card drops before normal card-play handling
+    if state._pendingScout and objType == "card" then
+        _onScoutCardDiscarded(playerColor, droppedObject)
+        return
+    end
+
+    -- Pending develop: intercept building tile drops near any trash can
+    if state._pendingDevelop and objType == "building_tile" then
+        local dropPos = droppedObject.getPosition()
+        local nearest = ObjectManager.getNearestTrashCan(dropPos)
+        if nearest then
+            local trashPos = nearest.getPosition()
+            local dx = dropPos.x - trashPos.x
+            local dz = dropPos.z - trashPos.z
+            if math.sqrt(dx * dx + dz * dz) < 4.0 then
+                _onDevelopTileDropped(playerColor, droppedObject, meta)
+            end
+        end
+        return
+    end
+
     if objType == "building_tile" then
         EventHandlers.handleTilePlaced(playerColor, droppedObject, meta)
     elseif objType == "link_tile" then
         EventHandlers.handleLinkDrop(playerColor, droppedObject, meta)
     elseif objType == "card" then
-        if isCurrentPlayer(playerColor) then
-            EventHandlers.handleCardDrop(playerColor, droppedObject)
-        end
+        EventHandlers.handleCardDrop(playerColor, droppedObject)
     end
 end
 
@@ -172,6 +198,7 @@ function EventHandlers.identifyObject(obj)
         if ok and meta then
             if meta.type == "tile" then return "building_tile", meta end
             if meta.type == "card" then return "card", meta end
+            if meta.type == "link" then return "link_tile", meta end
         end
     end
 
@@ -195,27 +222,26 @@ end
 -- CARD DROP
 ------------------------------------------------------
 
---- Handle a card being dropped anywhere on the table.
--- Ignores the drop if the card is not near the discard zone.
--- On success: stores pending card state and shows highlighted valid spots.
+--- Handle a card being dropped by the current player.
+-- Any card drop from the current player is treated as playing a card.
+-- (isCurrentPlayer check is done by the caller onObjectDrop)
 -- @param playerColor  TTS seat color string
 -- @param cardObj  TTS card object
 function EventHandlers.handleCardDrop(playerColor, cardObj)
-    -- Must land near the discard zone
-    local discardZone = ObjectManager.getObject("discardZone")
-    if not discardZone then return end
+    printToAll("[DEBUG] handleCardDrop called for " .. playerColor)
 
-    local cardPos  = cardObj.getPosition()
-    local zonePos  = discardZone.getPosition()
-    local dist = math.sqrt(
-        (cardPos.x - zonePos.x)^2 + (cardPos.z - zonePos.z)^2
-    )
-
-    if dist > 5 then return end  -- not near discard zone -- ignore
-
-    -- Parse card name into structured info
+    -- Parse card metadata (GMNotes or name fallback)
     local cardInfo = CardManager.parseCard(cardObj)
-    if not cardInfo then return end
+    if not cardInfo then
+        -- Unrecognized card: still allow non-build actions
+        printToColor("[DEBUG] Card not recognized: '" .. (cardObj.getName() or "")
+            .. "' GMNotes='" .. (cardObj.getGMNotes() or "") .. "'", playerColor, {1, 1, 0})
+        cardInfo = { cardType = "unknown" }
+    else
+        printToAll("[DEBUG] Card parsed: cardType=" .. tostring(cardInfo.cardType)
+            .. " location=" .. tostring(cardInfo.location)
+            .. " industryType=" .. tostring(cardInfo.industryType))
+    end
 
     -- Record pending action state
     state._pendingCard   = cardInfo
@@ -225,18 +251,30 @@ function EventHandlers.handleCardDrop(playerColor, cardObj)
     GameState.playCard(state, playerColor)
 
     -- Move card to discard pile (or back to wild supply)
-    local discardResult = CardManager.discard(cardObj)
+    local ok, discardResult = pcall(CardManager.discard, cardObj, playerColor)
+    if not ok then
+        printToAll("[ERROR] CardManager.discard failed: " .. tostring(discardResult))
+        discardResult = nil
+    end
     if discardResult == "wild_location" then
         state.wildSupply.location = (state.wildSupply.location or 0) + 1
     elseif discardResult == "wild_industry" then
         state.wildSupply.industry = (state.wildSupply.industry or 0) + 1
     end
 
-    -- Highlight valid build and/or link spots based on the card played
-    Highlights.showValidBuildSpots(state, playerColor, cardInfo)
+    -- Highlight valid build and/or link spots (skip for unknown cards)
+    if cardInfo.cardType ~= "unknown" then
+        local ok2, err2 = pcall(Highlights.showValidBuildSpots, state, playerColor, cardInfo)
+        if not ok2 then
+            printToAll("[ERROR] Highlights.showValidBuildSpots failed: " .. tostring(err2))
+        end
+    end
 
     -- Show action buttons (Sell, Develop, Loan, Scout)
-    UIManager.showActionPanel()
+    local ok3, err3 = pcall(UIManager.showActionPanel)
+    if not ok3 then
+        printToAll("[ERROR] UIManager.showActionPanel failed: " .. tostring(err3))
+    end
 
     printToColor(
         "Card played. Drop a building or link tile on a highlighted spot, or use the action buttons.",
@@ -318,11 +356,12 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     -- Full game-rule validation via Validation.canBuild (when card flow active)
     if state._pendingCard then
         local v = Validation.canBuild(state, playerColor, {
-            cardType     = state._pendingCard.cardType,
-            location     = state._pendingCard.location or cityName,
-            industryType = meta.industry,
-            level        = meta.level,
-            slotId       = buildSlotId,
+            cardType          = state._pendingCard.cardType,
+            location          = state._pendingCard.location or cityName,
+            industryType      = meta.industry,
+            level             = meta.level,
+            slotId            = buildSlotId,
+            cardIndustryTypes = state._pendingCard.industryTypes,
         })
         if not v.valid then
             printToColor(v.reason, playerColor, {1, 0, 0})
@@ -341,6 +380,7 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
         end
     end
 
+    local cachedCoalSources = {}
     -- Coal requires knowing the city for BFS connectivity
     local boardCoal = 0
     if coalNeeded > 0 then
@@ -349,8 +389,10 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
             rejectTile(tileObj, playerColor)
             return
         end
-        -- Count ALL connected coal (not just nearest) for accurate market shortfall
-        boardCoal = Network.countConnectedCoal(state, cityName)
+        cachedCoalSources = Network.findNearestCoal(state, cityName) or {}
+        for _, src in ipairs(cachedCoalSources) do
+            boardCoal = boardCoal + #src.slot.tile.resources
+        end
     end
 
     local ironFromMarket = math.max(0, ironNeeded - boardIron)
@@ -405,17 +447,13 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     slot.tile = tile
 
     -- Move tile to the matched slot's snap position.
-    -- Wait 2 frames for TTS snap to settle, then setPosition + lock.
+    -- Lock FIRST to prevent TTS built-in snap from overriding our position.
     local snapPos = SnapMap.getPositionForSlot(buildSlotId)
     local targetPos = snapPos
-        and Vector(snapPos.x, 1.05, snapPos.z)
+        and Vector(snapPos.x, snapPos.y + 0.09, snapPos.z)
         or  Vector(buildPos.x, 1.05, buildPos.z)
-    Wait.frames(function()
-        if tileObj and not tileObj.isDestroyed() then
-            tileObj.setPosition(targetPos)
-            tileObj.setLock(true)
-        end
-    end, 2)
+    tileObj.setLock(true)
+    tileObj.setPosition(targetPos)
 
     -- Brewery income on placement (breweries auto-flip and give income immediately)
     if industryType == Constants.Industry.BREWERY and tile then
@@ -631,15 +669,12 @@ end
 -- MARKET PURCHASE HELPER
 ------------------------------------------------------
 
---- Buy resources from the market, deducting money and queuing animations.
+--- Buy resources from the market, deducting money and removing physical cubes.
 -- @param pending table  The _pendingResource state table
 -- @param resourceType string  Constants.Resource.COAL or Constants.Resource.IRON
 function EventHandlers._buyMarketResources(pending, resourceType)
     local fromMarket = (resourceType == Constants.Resource.IRON) and pending.ironFromMarket or pending.coalFromMarket
     if fromMarket <= 0 then return end
-
-    local marketData = Market.getMarketSupply(state, resourceType)
-    if not marketData.cubeGUIDs then marketData.cubeGUIDs = {} end
 
     local totalPrice = 0
     for _ = 1, fromMarket do
@@ -649,37 +684,8 @@ function EventHandlers._buyMarketResources(pending, resourceType)
         -- State: buy from market (deducts money, decreases supply)
         Market.buyFromMarket(state, pending.playerColor, resourceType, 1)
 
-        -- Visual: directly remove the most expensive market cube
-        local cubeGUID = nil
-        if #marketData.cubeGUIDs > 0 then
-            cubeGUID = table.remove(marketData.cubeGUIDs, #marketData.cubeGUIDs)
-        end
-        if cubeGUID then
-            local cubeObj = getObjectFromGUID(cubeGUID)
-            if cubeObj then cubeObj.destruct() end
-        else
-            -- Fallback: find cube near the now-empty track position
-            local emptyIdx = marketData.supply + 1
-            local trackPos = MarketLayout.getPosition(resourceType, emptyIdx)
-            if trackPos then
-                for _, obj in ipairs(getAllObjects()) do
-                    if not obj.isDestroyed() then
-                        local name = obj.getName() or ""
-                        local isMatch = (resourceType == Constants.Resource.COAL and name == Constants.ObjectName.COAL_CUBE)
-                                     or (resourceType == Constants.Resource.IRON and name == Constants.ObjectName.IRON_CUBE)
-                        if isMatch then
-                            local opos = obj.getPosition()
-                            local dx = opos.x - trackPos.x
-                            local dz = opos.z - trackPos.z
-                            if math.sqrt(dx*dx + dz*dz) < 1.0 then
-                                obj.destruct()
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-        end
+        -- Physical: remove the cube that just became empty
+        _removeMarketCubesPhysical(resourceType, 1)
     end
 
     pending.totalSpent = pending.totalSpent + totalPrice
@@ -865,12 +871,8 @@ end
 -- @param linkObj TTS object
 -- @param dropPos Vector  TTS world position
 local function positionAndLockLink(linkObj, dropPos)
-    linkObj.setPositionSmooth(Vector(dropPos.x, 1.05, dropPos.z), false, true)
-    Wait.time(function()
-        if linkObj and not linkObj.isDestroyed() then
-            linkObj.setLock(true)
-        end
-    end, 0.5)
+    linkObj.setLock(true)
+    linkObj.setPosition(Vector(dropPos.x, 1.05, dropPos.z))
 end
 
 --- Execute a single rail/canal link action and finish the turn.

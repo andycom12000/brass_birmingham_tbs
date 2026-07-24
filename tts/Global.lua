@@ -27,6 +27,7 @@
 #include tts/UIManager
 #include tts/EventHandlers
 #include tts/MarketLayout
+#include tts/IncomeLayout
 #include tts/ResourceAnimation
 
 ------------------------------------------------------
@@ -44,6 +45,9 @@ PLAYER_SPEND = {}
 ------------------------------------------------------
 
 function onLoad(save_state)
+    -- Force-load XML UI from Lua (TTS does not parse XmlUI from saves)
+    UIManager.initXmlUI()
+
     if save_state and save_state ~= "" then
         local saved = JSON.decode(save_state)
         if saved then
@@ -53,17 +57,59 @@ function onLoad(save_state)
             -- Rebuild snap map
             SnapMap.buildFromGlobal()
 
-            UIManager.hideSetup()
-            UIManager.configureForPlayerCount(state.playerCount)
-            UIManager.updateLanguage(state.lang)
+            -- Wait for XML UI loading to complete before hiding elements
+            Wait.condition(function()
+                UIManager.hideSetup()
+                UIManager.hideActionPanel()
+                UIManager.hideSingleLinkButton()
+                UIManager.hideAcceptVPLossButton()
+                UIManager.configureForPlayerCount(state.playerCount)
+                UIManager.updateLanguage(state.lang)
+            end, function() return not UI.loading end)
             broadcastCurrentPlayer()
 
             printToAll(Lang.get("game_loaded", state.lang))
         end
     else
-        UIManager.showSetup()
+        -- Wait for XML UI loading, then show setup (hide others)
+        Wait.condition(function()
+            UIManager.hideActionPanel()
+            UIManager.hideSingleLinkButton()
+            UIManager.hideAcceptVPLossButton()
+            UIManager.showEndTurnButton()
+            UIManager.showSetup()
+        end, function() return not UI.loading end)
+    end
+
+    -- Label the trash can object (works for both fresh and saved games)
+    Wait.time(function() setupTrashCanLabels() end, 1)
+end
+
+function setupTrashCanLabels()
+    if #ObjectManager.guids.trashCans == 0 then
+        ObjectManager.scanTable()
+    end
+
+    for _, guid in ipairs(ObjectManager.guids.trashCans) do
+        local obj = getObjectFromGUID(guid)
+        if obj then
+            obj.clearButtons()
+            obj.createButton({
+                click_function = "onTrashCanClick",
+                function_owner = Global,
+                label          = "Develop",
+                position       = {0, 1.5, 0},
+                rotation       = {0, 0, 0},
+                width          = 0,
+                height         = 0,
+                font_size      = 200,
+                font_color     = {1, 1, 1},
+            })
+        end
     end
 end
+
+function onTrashCanClick() end
 
 function onSave()
     if state then
@@ -74,12 +120,16 @@ function onSave()
         local shortfallIdxBackup = state._shortfallIndex
         local currentShortfallBackup = state._currentShortfall
         local pendingFirstLinkBackup = state._pendingFirstLink
+        local pendingScoutBackup = state._pendingScout
+        local pendingDevelopBackup = state._pendingDevelop
         state._pendingResource = nil
         state._animating = nil
         state._pendingShortfalls = nil
         state._shortfallIndex = nil
         state._currentShortfall = nil
         state._pendingFirstLink = nil
+        state._pendingScout = nil
+        state._pendingDevelop = nil
 
         -- cubeGUIDs are fine (string arrays), but remove any Vector refs
         -- that might have leaked into market data
@@ -95,6 +145,8 @@ function onSave()
         state._shortfallIndex = shortfallIdxBackup
         state._currentShortfall = currentShortfallBackup
         state._pendingFirstLink = pendingFirstLinkBackup
+        state._pendingScout = pendingScoutBackup
+        state._pendingDevelop = pendingDevelopBackup
 
         if ok then
             return encoded
@@ -173,10 +225,15 @@ function onPhysicalSetupComplete(params)
     -- Build snap point mappings (hardcoded positions, no board object needed)
     SnapMap.buildFromGlobal()
 
-    -- Configure UI
-    UIManager.hideSetup()
-    UIManager.configureForPlayerCount(playerCount)
-    UIManager.showEndTurnButton()
+    -- Configure UI (wait for XML UI loading to finish)
+    Wait.condition(function()
+        UIManager.hideSetup()
+        UIManager.hideActionPanel()
+        UIManager.hideSingleLinkButton()
+        UIManager.hideAcceptVPLossButton()
+        UIManager.configureForPlayerCount(playerCount)
+        UIManager.showEndTurnButton()
+    end, function() return not UI.loading end)
     broadcastCurrentPlayer()
 
     printToAll(Lang.format("game_started", state.lang, { count = playerCount }))
@@ -300,6 +357,18 @@ function onObjectLeaveContainer(container, obj)
     if obj and not obj.isDestroyed() then
         -- Save the container's position as the "home" for this object
         EventHandlers.savePickupPosition(obj.getGUID(), container.getPosition())
+    end
+end
+
+-- Detect building tiles dropped into the trash can (Bag) during Develop
+function onObjectEnterContainer(container, obj)
+    if not state or not state._pendingDevelop then return end
+    if not obj or obj.isDestroyed() then return end
+    if not ObjectManager.isTrashCan(container.getGUID()) then return end
+
+    local meta = ObjectManager.parseMeta(obj)
+    if meta and meta.type == "tile" then
+        _onDevelopTileDropped(state._pendingDevelop.playerColor, obj, meta, true)
     end
 end
 
@@ -586,6 +655,15 @@ COLOR_TO_MONEY_GUID = {
     ["White"]  = "4d732a",
 }
 
+-- Maps TTS seat color to income marker GUID
+-- Income markers are backgammon_piece_white objects identified by ColorDiffuse
+COLOR_TO_INCOME_GUID = {
+    ["Yellow"] = "8ef975",
+    ["Orange"] = "c13f31",
+    ["White"]  = "8f36d3",
+    ["Purple"] = "c5d022",
+}
+
 STARTING_MONEY = Constants.INITIAL_MONEY
 
 -- Push a value to a MrStump counter object (set description + call customSet)
@@ -615,25 +693,44 @@ function updateSpendCounterFromState(color)
     local p = GameState.getPlayer(state, color)
     if not p then return end
 
-    local spent = p.spentThisRound or 0
-    local spendGUID = COLOR_TO_SPEND_GUID[color]
+    -- Update money counter (MrStump script with customSet)
     local moneyGUID = COLOR_TO_MONEY_GUID[color]
-
-    -- Update spend tracker display
-    if spendGUID then
-        setCounterValue(spendGUID, spent)
-    end
-
-    -- Update money counter display (remaining = current money)
     if moneyGUID then
         setCounterValue(moneyGUID, p.money or 0)
+    end
+
+    -- Update spend tracker (no Lua script — use TTS Counter API)
+    local spendGUID = COLOR_TO_SPEND_GUID[color]
+    if spendGUID then
+        local spendObj = getObjectFromGUID(spendGUID)
+        if spendObj and spendObj.Counter then
+            spendObj.Counter.setValue(p.spentThisRound or 0)
+        end
     end
 end
 
 -- Reset all spend counters to 0 (new round)
 function resetAllSpendCounters()
     for color, guid in pairs(COLOR_TO_SPEND_GUID) do
-        setCounterValue(guid, 0)
+        local obj = getObjectFromGUID(guid)
+        if obj and obj.Counter then
+            obj.Counter.setValue(0)
+        end
+    end
+end
+
+-- Move a player's income marker to the correct board position
+function moveIncomeMarker(color)
+    if not state then return end
+    local player = GameState.getPlayer(state, color)
+    if not player then return end
+    local guid = COLOR_TO_INCOME_GUID[color]
+    if not guid then return end
+    local obj = getObjectFromGUID(guid)
+    if not obj then return end
+    local pos = IncomeLayout.getPosition(player.incomeLevel, player.incomeSpace)
+    if pos then
+        obj.setPositionSmooth(pos)
     end
 end
 
@@ -742,6 +839,48 @@ function toggleLanguage()
     printToAll("Language: " .. (state.lang == "en" and "English" or "Traditional Chinese"))
 end
 
+--- Physically remove cubes from the market track after a state change.
+--- Shared by Build (_buyMarketResources) and Develop flows.
+--- Call AFTER Market.buyFromMarket has already decreased supply in state.
+--- @param resourceType string  "coal" or "iron"
+--- @param count number  how many cubes to remove
+function _removeMarketCubesPhysical(resourceType, count)
+    local marketData = (resourceType == Constants.Resource.IRON)
+        and state.ironMarket or state.coalMarket
+    if not marketData then return end
+    if not marketData.cubeGUIDs then marketData.cubeGUIDs = {} end
+
+    local cubeName = (resourceType == Constants.Resource.COAL)
+        and Constants.ObjectName.COAL_CUBE or Constants.ObjectName.IRON_CUBE
+
+    for i = 1, count do
+        local slotIdx = marketData.supply + i
+        local cubeGUID = marketData.cubeGUIDs[slotIdx]
+
+        if cubeGUID then
+            local cubeObj = getObjectFromGUID(cubeGUID)
+            if cubeObj and not cubeObj.isDestroyed() then cubeObj.destruct() end
+            marketData.cubeGUIDs[slotIdx] = nil
+        else
+            -- Fallback: find cube nearest to the now-empty track position
+            local trackPos = MarketLayout.getPosition(resourceType, slotIdx)
+            if trackPos then
+                for _, obj in ipairs(getAllObjects()) do
+                    if not obj.isDestroyed() and obj.getName() == cubeName then
+                        local opos = obj.getPosition()
+                        local dx = opos.x - trackPos.x
+                        local dz = opos.z - trackPos.z
+                        if math.sqrt(dx * dx + dz * dz) < 1.0 then
+                            obj.destruct()
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 ------------------------------------------------------
 -- SELL / DEVELOP / LOAN / SCOUT / PASS (button-triggered actions)
 ------------------------------------------------------
@@ -777,11 +916,141 @@ end
 
 function onDevelopAction(playerColor, count)
     if not requirePendingCard(playerColor) then return end
-    local result = Actions.develop(state, playerColor, { count = count or 1 })
-    if result.success then
-        finishButtonAction(playerColor, Lang.format("player_developed", state.lang, { player = playerColor, count = count or 1 }))
-    else
-        printToColor(result.error, playerColor, {1, 0, 0})
+    count = count or 1
+
+    -- Validate: check iron availability (board + market w/ money)
+    local v = Validation.canDevelop(state, playerColor, { count = count })
+    if not v.valid then
+        printToColor(v.reason, playerColor, {1, 0, 0})
+        return
+    end
+
+    -- Enter pending develop flow — player must drag tiles to trash can
+    state._pendingDevelop = {
+        playerColor = playerColor,
+        count = count,
+        tilesReceived = 0,
+    }
+
+    for _, guid in ipairs(ObjectManager.guids.trashCans) do
+        local obj = getObjectFromGUID(guid)
+        if obj then Highlights.highlightObject(obj, "Green") end
+    end
+
+    UIManager.hideActionPanel()
+    printToColor(
+        Lang.format("develop_trash_prompt", state.lang, { count = count }),
+        playerColor, {0.4, 0.6, 0.8}
+    )
+end
+
+--- Called when a building tile is dropped near/into the trash can during Develop.
+--- @param playerColor string
+--- @param tileObj TTS object
+--- @param meta table|nil  pre-parsed GMNotes (avoids re-decode if caller already has it)
+--- @param inBag boolean  true if tile entered the bag (onObjectEnterContainer path)
+function _onDevelopTileDropped(playerColor, tileObj, meta, inBag)
+    local pending = state._pendingDevelop
+    if not pending then return end
+    if pending.playerColor ~= playerColor then
+        printToColor("Not your develop action.", playerColor, {1, 0.5, 0})
+        return
+    end
+
+    -- Guard against double-fire (onObjectDrop + onObjectEnterContainer)
+    local guid = tileObj and not tileObj.isDestroyed() and tileObj.getGUID()
+    if not guid then return end
+    if pending._processedGUIDs and pending._processedGUIDs[guid] then return end
+    pending._processedGUIDs = pending._processedGUIDs or {}
+    pending._processedGUIDs[guid] = true
+
+    -- Parse metadata if caller didn't provide it
+    meta = meta or ObjectManager.parseMeta(tileObj)
+
+    -- Helper: reject tile back to original position
+    local function rejectDevelopTile(reason)
+        printToColor(reason, playerColor, {1, 0.3, 0.3})
+        pending._processedGUIDs[guid] = nil
+        if inBag then
+            -- Find the trash can that contains this tile
+            for _, g in ipairs(ObjectManager.guids.trashCans) do
+                local bag = getObjectFromGUID(g)
+                if bag then
+                    local ok, extracted = pcall(bag.takeObject, {
+                        guid = guid,
+                        callback_function = function(obj) rejectTile(obj, playerColor) end,
+                    })
+                    if ok and extracted then return end
+                end
+            end
+        else
+            rejectTile(tileObj, playerColor)
+        end
+    end
+
+    if meta and meta.industry and meta.level then
+        -- Reject noDevelop tiles (e.g. Pottery Lv.1, Lv.3)
+        local costData = BoardData.buildingCosts[meta.industry]
+            and BoardData.buildingCosts[meta.industry][meta.level]
+        if costData and costData.noDevelop then
+            rejectDevelopTile(meta.industry .. " Lv." .. meta.level .. " cannot be developed.")
+            return
+        end
+
+        -- Reject tiles that aren't the lowest developable level for their industry
+        local player = GameState.getPlayer(state, playerColor)
+        if player and player.unbuiltTiles and player.unbuiltTiles[meta.industry] then
+            local lowestLevel = nil
+            for _, tile in ipairs(player.unbuiltTiles[meta.industry]) do
+                if not tile.noDevelop then
+                    lowestLevel = tile.level
+                    break
+                end
+            end
+            if lowestLevel and meta.level ~= lowestLevel then
+                rejectDevelopTile("Must develop lowest level first ("
+                    .. meta.industry .. " Lv." .. lowestLevel .. ").")
+                return
+            end
+        end
+    end
+
+    -- Destroy the tile (it may or may not have entered the bag)
+    if tileObj and not tileObj.isDestroyed() then
+        tileObj.destruct()
+    end
+
+    pending.tilesReceived = pending.tilesReceived + 1
+    printToColor(
+        Lang.format("develop_trash_progress", state.lang, { current = pending.tilesReceived, total = pending.count }),
+        playerColor, {0.4, 0.6, 0.8}
+    )
+
+    if pending.tilesReceived >= pending.count then
+        local count = pending.count
+        state._pendingDevelop = nil
+        Highlights.clearAll()
+
+        -- Pre-calculate how much iron will come from the market
+        -- (iron from buildings is consumed first by Actions.develop)
+        local boardIron = 0
+        local ironSources = Network.findIronSources(state)
+        for _, src in ipairs(ironSources) do
+            boardIron = boardIron + #src.slot.tile.resources
+        end
+        local ironFromMarket = math.max(0, count - boardIron)
+
+        local result = Actions.develop(state, playerColor, { count = count })
+        if result.success then
+            -- Physically remove iron cubes from the market track
+            if ironFromMarket > 0 then
+                _removeMarketCubesPhysical(Constants.Resource.IRON, ironFromMarket)
+            end
+            updateSpendCounterFromState(playerColor)
+            finishButtonAction(playerColor, Lang.format("player_developed", state.lang, { player = playerColor, count = count }))
+        else
+            printToColor(result.error, playerColor, {1, 0, 0})
+        end
     end
 end
 
@@ -789,12 +1058,8 @@ function onLoanAction(playerColor)
     if not requirePendingCard(playerColor) then return end
     local result = Actions.loan(state, playerColor)
     if result.success then
-        local board = ObjectManager.getPlayerBoard(playerColor)
-        if board then
-            local pos = board.getPosition() + Vector(5, 1, 0)
-            ObjectManager.spawnMoney(15, pos)
-            ObjectManager.spawnMoney(15, pos + Vector(1, 0, 0))
-        end
+        updateSpendCounterFromState(playerColor)
+        moveIncomeMarker(playerColor)
         finishButtonAction(playerColor, Lang.format("player_loaned", state.lang, { player = playerColor }))
     else
         printToColor(result.error, playerColor, {1, 0, 0})
@@ -803,12 +1068,64 @@ end
 
 function onScoutAction(playerColor)
     if not requirePendingCard(playerColor) then return end
-    local result = Actions.scout(state, playerColor)
-    if result.success then
-        CardManager.giveWilds(playerColor)
-        finishButtonAction(playerColor, Lang.format("player_scouted", state.lang, { player = playerColor }))
-    else
-        printToColor(result.error, playerColor, {1, 0, 0})
+
+    -- Validate scout prerequisites (wilds, hand size, supply, etc.)
+    local v = Validation.canScout(state, playerColor)
+    if not v.valid then
+        printToColor(v.reason, playerColor, {1, 0, 0})
+        return
+    end
+
+    -- Enter pending discard flow — player must discard 2 cards first
+    state._pendingScout = {
+        playerColor = playerColor,
+        cardsDiscarded = 0,
+        required = 2,
+    }
+    UIManager.hideActionPanel()
+    printToColor(Lang.get("scout_discard_prompt", state.lang), playerColor, {0.6, 0.4, 0.8})
+end
+
+--- Called from EventHandlers when a card is dropped during pending scout.
+function _onScoutCardDiscarded(playerColor, cardObj)
+    local pending = state._pendingScout
+    if not pending then return end
+    if pending.playerColor ~= playerColor then
+        printToColor("Not your scout action.", playerColor, {1, 0.5, 0})
+        return
+    end
+
+    -- Discard the card (moves to discard pile or returns wild to supply)
+    local ok, discardResult = pcall(CardManager.discard, cardObj, playerColor)
+    if discardResult == "wild_location" then
+        state.wildSupply.location = (state.wildSupply.location or 0) + 1
+    elseif discardResult == "wild_industry" then
+        state.wildSupply.industry = (state.wildSupply.industry or 0) + 1
+    end
+
+    -- Decrement hand size
+    local player = GameState.getPlayer(state, playerColor)
+    player.handSize = math.max(0, (player.handSize or 0) - 1)
+
+    pending.cardsDiscarded = pending.cardsDiscarded + 1
+    printToColor(
+        Lang.format("scout_discard_progress", state.lang, { current = pending.cardsDiscarded, total = pending.required }),
+        playerColor, {0.6, 0.4, 0.8}
+    )
+
+    if pending.cardsDiscarded >= pending.required then
+        -- All discards done — execute scout action
+        state._pendingScout = nil
+        local result = Actions.scout(state, playerColor)
+        if result.success then
+            local dealt = CardManager.giveWilds(playerColor)
+            -- Restore handSize: discards decremented it by 2, wilds add back
+            local player = GameState.getPlayer(state, playerColor)
+            player.handSize = (player.handSize or 0) + dealt
+            finishButtonAction(playerColor, Lang.format("player_scouted", state.lang, { player = playerColor }))
+        else
+            printToColor(result.error, playerColor, {1, 0, 0})
+        end
     end
 end
 

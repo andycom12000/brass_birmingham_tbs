@@ -26,7 +26,8 @@ function Highlights.highlightObject(obj, color)
     table.insert(Highlights.activeHighlights.objects, obj)
 end
 
---- Spawn a temporary marker token at a world position
+--- Spawn a temporary marker at a world position
+-- Uses a BlockSquare (built-in, no import dialog) with transparency
 -- @param position Vector or table {x, y, z}
 -- @param color TTS color string or RGB table (default green)
 -- @return Spawned object or nil
@@ -36,17 +37,19 @@ function Highlights._spawnMarker(position, color)
         colorTable = Highlights._colorStringToRGB(color)
     end
 
-    -- Spawn a small custom token as a visual marker
+    -- Use BlockSquare (built-in object, no import needed)
     local marker = spawnObject({
-        type = "Custom_Token",
-        position = position,
+        type = "BlockSquare",
+        position = Vector(position.x, position.y + 0.5, position.z),
         rotation = {0, 0, 0},
-        scale = {0.5, 0.5, 0.5},
+        scale = {1.2, 0.1, 1.2},
     })
 
     if marker then
-        marker.setColorTint(colorTable)
-        marker.setLock(true)  -- prevent accidental movement
+        -- Set color with transparency (alpha = 0.4)
+        marker.setColorTint({colorTable[1], colorTable[2], colorTable[3], 0.4})
+        marker.setLock(true)
+        marker.interactable = false
         table.insert(Highlights.activeHighlights.markers, marker)
     end
 
@@ -78,24 +81,59 @@ function Highlights.showValidBuildSpots(state, color, cardInfo)
 
     local validSlots = {}
 
+    -- Build the list of industry types to try for this card.
+    -- Industry cards: check only the card's allowed industries.
+    -- Location/wild cards: try ALL industry types the player has tiles for.
+    local industryList = cardInfo.industryTypes or {}
+    if #industryList == 0 and cardInfo.industryType then
+        industryList = { cardInfo.industryType }
+    end
+
+    -- For location/wild cards, try every industry type the player has unbuilt tiles for
+    if #industryList == 0 then
+        local player = GameState.getPlayer(state, color)
+        if player and player.unbuiltTiles then
+            for indType, stack in pairs(player.unbuiltTiles) do
+                if #stack > 0 then
+                    industryList[#industryList + 1] = indType
+                end
+            end
+        end
+    end
+
+    local seen = {}  -- avoid duplicate markers for the same slot
+
     -- Iterate through all slots and check if build is valid
-    GameState.forEachSlot(state, function(slotId, slot)
-        local buildParams = {
-            cardType = cardInfo.cardType,
-            location = cardInfo.location,
-            industryType = cardInfo.industryType,
-            level = cardInfo.level,
-            slotId = slotId,
-        }
+    GameState.forEachSlot(state, function(cityName, slot)
+        if seen[slot.id] then return end
 
-        local result = Validation.canBuild(state, color, buildParams)
-        if result.valid then
-            validSlots[#validSlots + 1] = slotId
+        for _, indType in ipairs(industryList) do
+            -- Determine the lowest available tile level for this industry
+            local player = GameState.getPlayer(state, color)
+            local stack = player and player.unbuiltTiles and player.unbuiltTiles[indType]
+            local level = (stack and #stack > 0) and stack[1].level or 1
 
-            -- Get snap point position for this slot from SnapMap
-            local snapPos = SnapMap.getPositionForSlot(slotId)
-            if snapPos then
-                Highlights._spawnMarker(snapPos, "Green")
+            local buildParams = {
+                cardType     = cardInfo.cardType,
+                location     = cardInfo.location,
+                industryType = indType,
+                slotId       = slot.id,
+                level        = level,
+            }
+
+            local result = Validation.canBuild(state, color, buildParams)
+            if result.valid then
+                validSlots[#validSlots + 1] = slot.id
+                seen[slot.id] = true
+
+                local snapPos = SnapMap.getPositionForSlot(slot.id)
+                printToAll("[HIGHLIGHT] " .. slot.id .. " at ("
+                    .. string.format("%.2f", snapPos and snapPos.x or 0) .. ", "
+                    .. string.format("%.2f", snapPos and snapPos.z or 0) .. ")")
+                if snapPos then
+                    Highlights._spawnMarker(snapPos, "Green")
+                end
+                break  -- slot already marked, no need to try other industry types
             end
         end
     end)

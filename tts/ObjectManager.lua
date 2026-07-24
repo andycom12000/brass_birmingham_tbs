@@ -3,12 +3,12 @@ local ObjectManager = {}
 ObjectManager.guids = {
     mainBoard = nil,
     drawDeck = nil,
-    discardZone = nil,
     playerBoards = {},     -- { ["Red"] = GUID, ... }
     playerHandZones = {},  -- { ["Red"] = GUID, ... }
     wildLocationSupply = nil,
     wildIndustrySupply = nil,
     languageToggle = nil,
+    trashCans = {},  -- list of GUIDs for all Trash Can bags
     -- Resource infinite bags (hardcoded from reference mod)
     resourceBags = {
         coal = "bc1987",  -- Coal Bag
@@ -35,14 +35,14 @@ function ObjectManager.scanTable()
             ObjectManager.guids.mainBoard = obj.getGUID()
         elseif name == ON.DRAW_DECK then
             ObjectManager.guids.drawDeck = obj.getGUID()
-        elseif name == ON.DISCARD_ZONE then
-            ObjectManager.guids.discardZone = obj.getGUID()
         elseif name == ON.WILD_LOCATION_SUPPLY then
             ObjectManager.guids.wildLocationSupply = obj.getGUID()
         elseif name == ON.WILD_INDUSTRY_SUPPLY then
             ObjectManager.guids.wildIndustrySupply = obj.getGUID()
         elseif name == ON.LANGUAGE_TOGGLE then
             ObjectManager.guids.languageToggle = obj.getGUID()
+        elseif name == ON.TRASH_CAN then
+            ObjectManager.guids.trashCans[#ObjectManager.guids.trashCans + 1] = obj.getGUID()
         elseif name == ON.COAL_BAG and (obj.type == "Infinite" or obj.type == "Bag") then
             ObjectManager.guids.resourceBags.coal = obj.getGUID()
         elseif name == ON.IRON_BAG and (obj.type == "Infinite" or obj.type == "Bag") then
@@ -75,6 +75,42 @@ function ObjectManager.getObject(role)
         return getObjectFromGUID(guid)
     end
     return nil
+end
+
+--- Check if a GUID belongs to any Trash Can
+function ObjectManager.isTrashCan(guid)
+    for _, g in ipairs(ObjectManager.guids.trashCans) do
+        if g == guid then return true end
+    end
+    return false
+end
+
+--- Get the nearest Trash Can object to a position
+function ObjectManager.getNearestTrashCan(pos)
+    local bestObj, bestDist = nil, math.huge
+    for _, g in ipairs(ObjectManager.guids.trashCans) do
+        local obj = getObjectFromGUID(g)
+        if obj and not obj.isDestroyed() then
+            local p = obj.getPosition()
+            local dx = p.x - pos.x
+            local dz = p.z - pos.z
+            local dist = dx * dx + dz * dz
+            if dist < bestDist then
+                bestDist = dist
+                bestObj = obj
+            end
+        end
+    end
+    return bestObj
+end
+
+--- Parse GMNotes JSON from a TTS object. Returns the decoded table or nil.
+function ObjectManager.parseMeta(obj)
+    if not obj or obj.isDestroyed() then return nil end
+    local notes = obj.getGMNotes()
+    if not notes or notes == "" then return nil end
+    local ok, meta = pcall(JSON.decode, notes)
+    return ok and meta or nil
 end
 
 --- Get a player board by color

@@ -57,10 +57,10 @@ Constants.ObjectName = {
     -- Other identifiable objects
     MAIN_BOARD           = "Main Board",
     DRAW_DECK            = "Draw Deck",
-    DISCARD_ZONE         = "Discard Zone",
-    WILD_LOCATION_SUPPLY = "Wild Location Supply",
-    WILD_INDUSTRY_SUPPLY = "Wild Industry Supply",
+    WILD_LOCATION_SUPPLY = "Wild Location",
+    WILD_INDUSTRY_SUPPLY = "Wild Industry",
     LANGUAGE_TOGGLE      = "Language Toggle",
+    TRASH_CAN            = "Trash Can",
 }
 
 return Constants

@@ -21,6 +21,15 @@ Lang.strings = {
         action_sell = "Sell",
         action_loan = "Loan",
         action_scout = "Scout",
+        -- UI buttons
+        btn_end_turn = "End Turn",
+        btn_sell = "Sell",
+        btn_develop1 = "Develop 1",
+        btn_develop2 = "Develop 2",
+        btn_loan = "Loan",
+        btn_scout = "Scout",
+        btn_single_link = "Single Link Only",
+        btn_accept_vp_loss = "Accept VP Loss",
 
         -- Game events
         player_spent = "{player} spent £{amount}",
@@ -30,6 +39,10 @@ Lang.strings = {
         player_loaned = "{player} took a loan (£30, income -3)",
         player_scouted = "{player} scouted",
         player_developed = "{player} developed {count} tile(s)",
+        scout_discard_prompt = "Scout: discard 2 cards from your hand.",
+        scout_discard_progress = "Discarded {current}/{total} cards.",
+        develop_trash_prompt = "Drop {count} tile(s) onto the trash marker to develop.",
+        develop_trash_progress = "Tiles received: {current}/{total}.",
 
         -- Income
         income_collected = "{player} collected £{amount} income",
@@ -95,6 +108,15 @@ Lang.strings = {
         action_sell = "銷售",
         action_loan = "貸款",
         action_scout = "偵查",
+        -- UI buttons
+        btn_end_turn = "結束回合",
+        btn_sell = "賣貨",
+        btn_develop1 = "研發 1",
+        btn_develop2 = "研發 2",
+        btn_loan = "貸款",
+        btn_scout = "偵察",
+        btn_single_link = "僅建單條路線",
+        btn_accept_vp_loss = "接受扣分",
 
         -- Game events
         player_spent = "{player} 花費了 £{amount}",
@@ -104,6 +126,10 @@ Lang.strings = {
         player_loaned = "{player} 進行了貸款（£30，收入 -3）",
         player_scouted = "{player} 進行了偵查",
         player_developed = "{player} 升級了 {count} 張科技",
+        scout_discard_prompt = "偵查：請從手中棄掉 2 張牌。",
+        scout_discard_progress = "已棄 {current}/{total} 張牌。",
+        develop_trash_prompt = "請將 {count} 張板塊拖到垃圾桶來進行升級。",
+        develop_trash_progress = "已接收板塊：{current}/{total}。",
 
         -- Income
         income_collected = "{player} 收取了 £{amount} 收入",

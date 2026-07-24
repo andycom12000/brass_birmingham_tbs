@@ -51,11 +51,31 @@ function CardManager.dealToAll(state)
     end
 end
 
---- Parse a played card to determine its type
--- Card naming convention: "Location: Birmingham", "Industry: Cotton", "Wild Location", "Wild Industry"
+--- Parse a played card to determine its type.
+-- Primary source: GMNotes JSON metadata (set by inject_scripts.py).
+-- Fallback: name-based parsing for Wild cards or legacy data.
 -- @param cardObj TTS card object
 -- @return Table with cardType and relevant data (location or industryType), or nil if unrecognized
 function CardManager.parseCard(cardObj)
+    -- Primary: GMNotes metadata
+    local notes = cardObj.getGMNotes()
+    if notes and notes ~= "" then
+        local ok, meta = pcall(JSON.decode, notes)
+        if ok and meta and meta.cardType then
+            local info = {
+                cardType      = meta.cardType,
+                location      = meta.location,       -- nil for non-location
+                industryTypes = meta.industryTypes,   -- array, e.g. {"cotton","manufacturer"}
+            }
+            -- Convenience: set singular industryType to first entry
+            if info.industryTypes and #info.industryTypes > 0 then
+                info.industryType = info.industryTypes[1]
+            end
+            return info
+        end
+    end
+
+    -- Fallback: name-based parsing
     local name = cardObj.getName()
     if name:find("^Wild Location") then
         return { cardType = Constants.CardType.WILD_LOCATION }
@@ -71,13 +91,37 @@ function CardManager.parseCard(cardObj)
     return nil
 end
 
---- Move a card to the discard pile, or return it to its wild supply area.
---- Wild cards are detected by name prefix (same logic as parseCard).
--- @param cardObj TTS card object
--- @return string|nil  "wild_location" or "wild_industry" if a wild card was returned, nil otherwise
-function CardManager.discard(cardObj)
-    local name = cardObj.getName()
+--- Per-player discard pile positions (extracted from save file snap points)
+CardManager.DISCARD_POSITIONS = {
+    ["White"]  = Vector(17.622, 1.0, -21.490),
+    ["Orange"] = Vector(17.621, 1.0, 21.175),
+    ["Purple"] = Vector(-17.563, 1.0, 21.182),
+    ["Yellow"] = Vector(-17.564, 1.0, -21.483),
+}
 
+--- Move a card to the player's discard pile, or return it to its wild supply.
+--- Wild cards detected via GMNotes first, then getName() fallback.
+-- @param cardObj TTS card object
+-- @param playerColor TTS seat color string
+-- @return string|nil  "wild_location" or "wild_industry" if a wild card was returned, nil otherwise
+function CardManager.discard(cardObj, playerColor)
+    -- Primary: GMNotes wild card detection
+    local notes = cardObj.getGMNotes()
+    if notes and notes ~= "" then
+        local ok, meta = pcall(JSON.decode, notes)
+        if ok and meta and meta.cardType then
+            if meta.cardType == Constants.CardType.WILD_LOCATION then
+                CardManager.returnWildToSupply(cardObj, Constants.CardType.WILD_LOCATION)
+                return "wild_location"
+            elseif meta.cardType == Constants.CardType.WILD_INDUSTRY then
+                CardManager.returnWildToSupply(cardObj, Constants.CardType.WILD_INDUSTRY)
+                return "wild_industry"
+            end
+        end
+    end
+
+    -- Fallback: name-based wild card detection
+    local name = cardObj.getName()
     if name:find("^Wild Location") then
         CardManager.returnWildToSupply(cardObj, Constants.CardType.WILD_LOCATION)
         return "wild_location"
@@ -86,9 +130,10 @@ function CardManager.discard(cardObj)
         return "wild_industry"
     end
 
-    local discardZone = ObjectManager.getObject("discardZone")
-    if discardZone then
-        cardObj.setPositionSmooth(discardZone.getPosition() + Vector(0, 1, 0))
+    -- Normal card: move to player's discard pile
+    local pos = CardManager.DISCARD_POSITIONS[playerColor]
+    if pos then
+        cardObj.setPositionSmooth(pos + Vector(0, 1, 0))
     end
     return nil
 end
@@ -110,13 +155,18 @@ end
 function CardManager.giveWilds(playerColor)
     local locSupply = ObjectManager.getObject("wildLocationSupply")
     local indSupply = ObjectManager.getObject("wildIndustrySupply")
+    local dealt = 0
 
     if locSupply and locSupply.getQuantity() > 0 then
         locSupply.deal(1, playerColor)
+        dealt = dealt + 1
     end
     if indSupply and indSupply.getQuantity() > 0 then
         indSupply.deal(1, playerColor)
+        dealt = dealt + 1
     end
+
+    return dealt
 end
 
 --- Check if the draw deck is empty

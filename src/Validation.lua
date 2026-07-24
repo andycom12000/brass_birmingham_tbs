@@ -239,7 +239,19 @@ function Validation.canBuild(state, color, params)
         end
         -- No network check needed for location cards
 
-    elseif cardType == Constants.CardType.INDUSTRY or cardType == Constants.CardType.WILD_INDUSTRY then
+    elseif cardType == Constants.CardType.INDUSTRY then
+        -- Industry card: tile must match one of the card's allowed industries
+        local cardIndustries = params.cardIndustryTypes or {}
+        if #cardIndustries > 0 then
+            local tileMatchesCard = false
+            for _, ci in ipairs(cardIndustries) do
+                if ci == industryType then tileMatchesCard = true; break end
+            end
+            if not tileMatchesCard then
+                return fail("Industry card allows {" .. table.concat(cardIndustries, ", ")
+                    .. "} but you are trying to build " .. tostring(industryType))
+            end
+        end
         -- Industry card: city must be in player's network
         -- Exception: if player has NO presence on board, can build anywhere
         if hasPresence then
@@ -247,7 +259,14 @@ function Validation.canBuild(state, color, params)
                 return fail("'" .. cityName .. "' is not in your network (industry card requires network connection)")
             end
         end
-        -- No location restriction — just industry type match (already done via slot.types)
+
+    elseif cardType == Constants.CardType.WILD_INDUSTRY then
+        -- Wild industry: any industry type allowed, but must be in network
+        if hasPresence then
+            if not Network.isInNetwork(state, color, cityName) then
+                return fail("'" .. cityName .. "' is not in your network (industry card requires network connection)")
+            end
+        end
     else
         return fail("Unknown card type: " .. tostring(cardType))
     end

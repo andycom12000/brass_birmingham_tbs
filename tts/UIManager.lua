@@ -1,5 +1,65 @@
 local UIManager = {}
 
+--- Force-load the XML UI from Lua with current language.
+function UIManager.initXmlUI()
+    local lang = UIManager._currentLang or (state and state.lang) or "en"
+    local L = function(key) return Lang.get(key, lang) end
+
+    local xml = '<Defaults>'
+        .. '<Button fontSize="14" fontStyle="Bold" textColor="#FFFFFF"/>'
+        .. '</Defaults>'
+
+        .. '<Panel id="turnPanel" rectAlignment="UpperCenter" offsetXY="0 -50"'
+        .. ' width="400" height="36" color="#1A1A2EE0">'
+        .. '<Text id="turnText" text="" fontSize="15" color="#FFFFFF"'
+        .. ' rectAlignment="MiddleCenter"/>'
+        .. '</Panel>'
+
+        .. '<Button id="endTurnBtn" onClick="onEndTurn"'
+        .. ' rectAlignment="UpperCenter" offsetXY="0 -90"'
+        .. ' width="160" height="42" fontSize="17"'
+        .. ' color="#8B2500" textColor="#FFD700" text="' .. L("btn_end_turn") .. '"/>'
+
+        .. '<Panel id="actionPanel" rectAlignment="UpperCenter" offsetXY="0 -138"'
+        .. ' width="520" height="48" color="#1A1A2EE0">'
+        .. '<HorizontalLayout spacing="6" padding="4 4 4 4"'
+        .. ' rectAlignment="MiddleCenter">'
+        .. '<Button id="sellBtn" onClick="onSellBtn"'
+        .. ' preferredWidth="90" preferredHeight="38"'
+        .. ' color="#4A7C59" textColor="#FFFFFF" fontSize="14" text="' .. L("btn_sell") .. '"/>'
+        .. '<Button id="develop1Btn" onClick="onDevelop1Btn"'
+        .. ' preferredWidth="105" preferredHeight="38"'
+        .. ' color="#5B6A8A" textColor="#FFFFFF" fontSize="13" text="' .. L("btn_develop1") .. '"/>'
+        .. '<Button id="develop2Btn" onClick="onDevelop2Btn"'
+        .. ' preferredWidth="105" preferredHeight="38"'
+        .. ' color="#5B6A8A" textColor="#FFFFFF" fontSize="13" text="' .. L("btn_develop2") .. '"/>'
+        .. '<Button id="loanBtn" onClick="onLoanBtn"'
+        .. ' preferredWidth="90" preferredHeight="38"'
+        .. ' color="#8B6914" textColor="#FFFFFF" fontSize="14" text="' .. L("btn_loan") .. '"/>'
+        .. '<Button id="scoutBtn" onClick="onScoutBtn"'
+        .. ' preferredWidth="90" preferredHeight="38"'
+        .. ' color="#6B4C8A" textColor="#FFFFFF" fontSize="14" text="' .. L("btn_scout") .. '"/>'
+        .. '</HorizontalLayout>'
+        .. '</Panel>'
+
+        .. '<Button id="singleLinkBtn" onClick="onSingleLinkOnly"'
+        .. ' rectAlignment="UpperCenter" offsetXY="0 -190"'
+        .. ' width="200" height="38" fontSize="14"'
+        .. ' color="#2E5090" textColor="#FFFFFF" text="' .. L("btn_single_link") .. '"/>'
+
+        .. '<Button id="acceptVPLossBtn" onClick="onAcceptVPLossBtn"'
+        .. ' rectAlignment="UpperCenter" offsetXY="0 -190"'
+        .. ' width="220" height="38" fontSize="14"'
+        .. ' color="#8B2500" textColor="#FFFFFF" text="' .. L("btn_accept_vp_loss") .. '"/>'
+
+        .. '<Button id="langToggle" onClick="toggleLanguage"'
+        .. ' rectAlignment="LowerLeft" offsetXY="15 15"'
+        .. ' width="80" height="28" fontSize="11"'
+        .. ' color="#8B7355" textColor="#D4C5A0" text="EN / ZH"/>'
+
+    UI.setXml(xml)
+end
+
 -- updateSpendCounter: no-op — spend tracking now handled by on-board Counter objects
 -- that sync to money counters via Global.onSpendChanged.
 function UIManager.updateSpendCounter(color, amount)
@@ -7,28 +67,28 @@ function UIManager.updateSpendCounter(color, amount)
 end
 
 function UIManager.showTurnIndicator(text)
-    UI.setAttribute("turnPanel", "active", "true")
+    UI.show("turnPanel")
     UI.setAttribute("turnText", "text", text)
 end
 
 function UIManager.hideTurnIndicator()
-    UI.setAttribute("turnPanel", "active", "false")
+    UI.hide("turnPanel")
 end
 
 function UIManager.showEndTurnButton()
-    UI.setAttribute("endTurnBtn", "active", "true")
+    UI.show("endTurnBtn")
 end
 
 function UIManager.hideEndTurnButton()
-    UI.setAttribute("endTurnBtn", "active", "false")
+    UI.hide("endTurnBtn")
 end
 
 function UIManager.showSetup()
-    UI.setAttribute("setupPanel", "active", "true")
+    -- No-op: setup handled by physical crown buttons on the table
 end
 
 function UIManager.hideSetup()
-    UI.setAttribute("setupPanel", "active", "false")
+    -- No-op: setup handled by physical crown buttons on the table
 end
 
 -- resetAllCounters: no-op — physical spend counters reset manually or via game logic.
@@ -42,38 +102,39 @@ function UIManager.configureForPlayerCount(playerCount)
 end
 
 function UIManager.updateLanguage(lang)
-    local btnText = (lang == "zh-TW") and "結束回合" or "End Turn"
-    UI.setAttribute("endTurnBtn", "text", btnText)
+    -- Rebuild XML with translated text (UI.setAttribute unreliable after setXml)
+    UIManager._currentLang = lang
+    UIManager.initXmlUI()
 end
 
 --- Show the action button panel (after a card is played).
 function UIManager.showActionPanel()
-    UI.setAttribute("actionPanel", "active", "true")
+    UI.show("actionPanel")
 end
 
 --- Hide the action button panel.
 function UIManager.hideActionPanel()
-    UI.setAttribute("actionPanel", "active", "false")
+    UI.hide("actionPanel")
 end
 
 --- Show the "Single Link" button during double rail flow.
 function UIManager.showSingleLinkButton()
-    UI.setAttribute("singleLinkBtn", "active", "true")
+    UI.show("singleLinkBtn")
 end
 
 --- Hide the "Single Link" button.
 function UIManager.hideSingleLinkButton()
-    UI.setAttribute("singleLinkBtn", "active", "false")
+    UI.hide("singleLinkBtn")
 end
 
 --- Show the "Accept VP Loss" button during shortfall resolution.
 function UIManager.showAcceptVPLossButton()
-    UI.setAttribute("acceptVPLossBtn", "active", "true")
+    UI.show("acceptVPLossBtn")
 end
 
 --- Hide the "Accept VP Loss" button.
 function UIManager.hideAcceptVPLossButton()
-    UI.setAttribute("acceptVPLossBtn", "active", "false")
+    UI.hide("acceptVPLossBtn")
 end
 
 return UIManager

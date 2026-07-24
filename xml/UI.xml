@@ -6,7 +6,7 @@
 
     <!-- ==================== TURN INDICATOR (top center) ==================== -->
     <Panel id="turnPanel" rectAlignment="UpperCenter" offsetXY="0 -10"
-           width="400" height="40" color="#1A1A2EE0" active="false">
+           width="400" height="40" color="#1A1A2EE0" active="true">
         <Text id="turnText" text="" fontSize="16" color="#FFFFFF"
               rectAlignment="MiddleCenter"/>
     </Panel>
@@ -15,11 +15,11 @@
     <Button id="endTurnBtn" onClick="onEndTurn"
             rectAlignment="UpperCenter" offsetXY="0 -55"
             width="160" height="45" fontSize="18"
-            color="#8B2500" textColor="#FFD700" active="false">End Turn</Button>
+            color="#8B2500" textColor="#FFD700" active="true">End Turn</Button>
 
     <!-- ==================== ACTION BUTTONS (top center, below end turn) ==================== -->
     <Panel id="actionPanel" rectAlignment="UpperCenter" offsetXY="0 -105"
-           width="520" height="45" color="#00000000" active="false">
+           width="520" height="50" color="#1A1A2EE0" active="true">
         <HorizontalLayout spacing="6" padding="0 0 0 0"
                           rectAlignment="MiddleCenter">
             <Button id="sellBtn" onClick="onSellBtn"
@@ -44,37 +44,13 @@
     <Button id="singleLinkBtn" onClick="onSingleLinkOnly"
             rectAlignment="UpperCenter" offsetXY="0 -155"
             width="200" height="40" fontSize="14"
-            color="#2E5090" textColor="#FFFFFF" active="false">Single Link Only</Button>
+            color="#2E5090" textColor="#FFFFFF" active="true">Single Link Only</Button>
 
     <!-- ==================== ACCEPT VP LOSS BUTTON (income shortfall) ==================== -->
     <Button id="acceptVPLossBtn" onClick="onAcceptVPLossBtn"
             rectAlignment="UpperCenter" offsetXY="0 -155"
             width="220" height="40" fontSize="14"
-            color="#8B2500" textColor="#FFFFFF" active="false">Accept VP Loss</Button>
-
-    <!-- ==================== SETUP PANEL (center of screen) ==================== -->
-    <Panel id="setupPanel" rectAlignment="MiddleCenter"
-           width="400" height="200" color="#2A1A0AF0" active="true"
-           outline="#D4C5A080" outlineSize="2">
-        <VerticalLayout spacing="12" padding="20 20 15 15"
-                        rectAlignment="MiddleCenter"
-                        childAlignment="MiddleCenter">
-            <Text text="BRASS: BIRMINGHAM" fontSize="24"
-                  color="#D4C5A0" fontStyle="Bold"
-                  preferredHeight="30"/>
-            <Text text="Select Players" fontSize="14"
-                  color="#A89870"
-                  preferredHeight="20"/>
-            <HorizontalLayout spacing="20" preferredHeight="45">
-                <Button onClick="onSetup2P" preferredWidth="80" preferredHeight="40"
-                        fontSize="16" color="#D4C5A0" textColor="#1A0A00">2P</Button>
-                <Button onClick="onSetup3P" preferredWidth="80" preferredHeight="40"
-                        fontSize="16" color="#D4C5A0" textColor="#1A0A00">3P</Button>
-                <Button onClick="onSetup4P" preferredWidth="80" preferredHeight="40"
-                        fontSize="16" color="#D4C5A0" textColor="#1A0A00">4P</Button>
-            </HorizontalLayout>
-        </VerticalLayout>
-    </Panel>
+            color="#8B2500" textColor="#FFFFFF" active="true">Accept VP Loss</Button>
 
     <!-- ==================== LANGUAGE TOGGLE (bottom left) ==================== -->
     <Button id="langToggle" onClick="toggleLanguage"
