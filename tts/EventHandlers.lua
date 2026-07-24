@@ -178,7 +178,8 @@ function EventHandlers.cancelPendingResource()
     state._pendingResource = nil
     -- Abandon the uncommitted build snapshot so it never lingers in later
     -- snapshots or gets mistaken for a committed action.
-    state._buildSnapshot = nil
+    state._buildSnapshot     = nil
+    state._buildCommitSlotId = nil
 end
 
 ------------------------------------------------------
@@ -246,9 +247,16 @@ function EventHandlers.handleCardDrop(playerColor, cardObj)
             .. " industryType=" .. tostring(cardInfo.industryType))
     end
 
+    -- Starting a new action closes the previous action's undo window
+    -- (draws its deferred card and locks its undo) — issue #9.
+    if closeUndoWindow then closeUndoWindow() end
+
     -- Record pending action state
     state._pendingCard   = cardInfo
     state._pendingPlayer = playerColor
+
+    -- Remember the played card so undo can return it to the player's hand.
+    state._undoPlayedCard = { guid = cardObj.getGUID(), color = playerColor }
 
     -- Deduct card from hand tracking
     GameState.playCard(state, playerColor)
@@ -427,7 +435,8 @@ function EventHandlers.handleTilePlaced(playerColor, tileObj, meta)
     -- Capture the pre-execution snapshot for the ActionEngine commit seam.
     -- Build resolves interactively (animated resource consumption across drop
     -- events), so it snapshots here and finalises in _finishBuild via commit().
-    state._buildSnapshot = ActionEngine.beginAction(state)
+    state._buildSnapshot     = ActionEngine.beginAction(state)
+    state._buildCommitSlotId = buildSlotId  -- remembered for undo's tile removal
 
     -- Deduct ONLY base building cost (market costs deducted by buyFromMarket later)
     if cost > 0 then
@@ -847,10 +856,12 @@ function EventHandlers._finishBuild(playerColor, meta, totalSpent)
                 action   = "build",
                 color    = playerColor,
                 params   = meta,
+                slotId   = state._buildCommitSlotId,
                 snapshot = state._buildSnapshot,
             })
         end
-        state._buildSnapshot = nil
+        state._buildSnapshot     = nil
+        state._buildCommitSlotId = nil
         Highlights.clearAll()
         UIManager.hideActionPanel()
         state._pendingCard = nil

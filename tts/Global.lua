@@ -122,6 +122,10 @@ function onSave()
         local pendingFirstLinkBackup = state._pendingFirstLink
         local pendingScoutBackup = state._pendingScout
         local pendingDevelopBackup = state._pendingDevelop
+        local buildSnapshotBackup = state._buildSnapshot
+        local buildSlotIdBackup = state._buildCommitSlotId
+        local undoPlayedCardBackup = state._undoPlayedCard
+        local undoRefillOwedBackup = state._undoRefillOwed
         state._pendingResource = nil
         state._animating = nil
         state._pendingShortfalls = nil
@@ -130,6 +134,12 @@ function onSave()
         state._pendingFirstLink = nil
         state._pendingScout = nil
         state._pendingDevelop = nil
+        -- Undo/build transient fields (issue #9): the pre-execution snapshot is
+        -- large and the undo window does not survive a reload.
+        state._buildSnapshot = nil
+        state._buildCommitSlotId = nil
+        state._undoPlayedCard = nil
+        state._undoRefillOwed = nil
 
         -- cubeGUIDs are fine (string arrays), but remove any Vector refs
         -- that might have leaked into market data
@@ -147,6 +157,10 @@ function onSave()
         state._pendingFirstLink = pendingFirstLinkBackup
         state._pendingScout = pendingScoutBackup
         state._pendingDevelop = pendingDevelopBackup
+        state._buildSnapshot = buildSnapshotBackup
+        state._buildCommitSlotId = buildSlotIdBackup
+        state._undoPlayedCard = undoPlayedCardBackup
+        state._undoRefillOwed = undoRefillOwedBackup
 
         if ok then
             return encoded
@@ -398,6 +412,7 @@ function afterAction(color)
             CardManager.dealToAll(state)
             UIManager.resetAllCounters(state.turnOrder)
             PLAYER_SPEND = {}  -- reset spend tracking for new era
+            closeUndoWindow()  -- cards dealt: lock undo (issue #9)
             broadcastCurrentPlayer()
             return
         else
@@ -409,12 +424,20 @@ function afterAction(color)
         end
     end
 
-    -- Refill hand
-    CardManager.refillHand(state, color)
+    -- Defer the hand refill until the undo window closes (issue #9): drawing a
+    -- new card immediately would let a player peek then undo. The owed draw is
+    -- performed by closeUndoWindow() when the window locks.
+    state._undoRefillOwed = color
 
     -- Advance turn
+    local prevCurrent = GameState.getCurrentPlayerColor(state)
     local oldRound = state.round
     TurnManager.endAction(state)
+    if GameState.getCurrentPlayerColor(state) ~= prevCurrent then
+        -- The next player is about to act: lock the previous player's undo and
+        -- perform their deferred draw.
+        closeUndoWindow()
+    end
     if state.round > oldRound then
         -- New round started — announce income results
         for _, c in ipairs(state.turnOrder) do
@@ -445,7 +468,141 @@ function broadcastCurrentPlayer()
     local actionsText = Lang.format("actions_remaining", state.lang, { count = state.actionsRemaining })
     UIManager.showTurnIndicator(turnText .. " — " .. actionsText)
     UIManager.showEndTurnButton()
+    -- Offer undo only when the current player has an undoable committed action.
+    local last = ActionEngine.getLastCommit()
+    if last and last.color == color then
+        UIManager.showUndoButton()
+    else
+        UIManager.hideUndoButton()
+    end
     printToAll(turnText)
+end
+
+------------------------------------------------------
+-- UNDO (issue #9)
+------------------------------------------------------
+
+-- Find the locked board tile object nearest a world position (within ~1 unit).
+local function _findLockedTileNear(pos)
+    if not pos then return nil end
+    local best, bestD = nil, 1.0
+    for _, obj in ipairs(getAllObjects()) do
+        if not obj.isDestroyed() and obj.getLock and obj.getLock() then
+            local p = obj.getPosition()
+            local dx, dz = p.x - pos.x, p.z - pos.z
+            local d = math.sqrt(dx * dx + dz * dz)
+            if d < bestD then bestD, best = d, obj end
+        end
+    end
+    return best
+end
+
+-- Return a placed tile to the acting player: unlock, turn face-up, lift it off
+-- the board so they can retrieve it.
+local function _returnTileToPlayer(obj)
+    if not obj or obj.isDestroyed() then return end
+    obj.setLock(false)
+    if obj.is_face_down then obj.flip() end
+    local p = obj.getPosition()
+    obj.setPositionSmooth({ p.x, p.y + 3, p.z })
+end
+
+-- Re-sync money / spend / income displays for all players from restored state.
+local function _resyncDerivedUI()
+    for _, c in ipairs(state.turnOrder) do
+        updateSpendCounterFromState(c)
+        moveIncomeMarker(c)
+    end
+end
+
+-- Restore the played card from the discard pile to the player's hand, and add
+-- it back to the (restored, post-play) hand count.
+local function _returnPlayedCardToHand(color)
+    local pc = state._undoPlayedCard
+    if pc and pc.color == color and pc.guid then
+        local card = getObjectFromGUID(pc.guid)
+        if card and not card.isDestroyed() then
+            local zoneGUID = ObjectManager.guids.playerHandZones[color]
+            local zone = zoneGUID and getObjectFromGUID(zoneGUID)
+            if zone then card.setPositionSmooth(zone.getPosition()) end
+        end
+        local p = GameState.getPlayer(state, color)
+        p.handSize = (p.handSize or 0) + 1
+    end
+end
+
+-- Physically reverse the just-undone action's discrete board objects.
+-- Resource-cube *counts* are already correct in the engine (proven by the undo
+-- symmetry tests); reconciling the physical cubes on the table is a follow-up
+-- item to tune against TTS.
+local function _resyncPhysicalAfterUndo(record)
+    _resyncDerivedUI()
+    local action = record.action
+    if action == "build" and record.slotId then
+        _returnTileToPlayer(_findLockedTileNear(SnapMap.getPositionForSlot(record.slotId)))
+    elseif action == "network" and record.params then
+        for _, lid in ipairs({ record.params.linkId, record.params.secondLinkId }) do
+            if lid then
+                _returnTileToPlayer(_findLockedTileNear(SnapMap.getPositionForLink(lid)))
+            end
+        end
+    elseif action == "sell" and record.params and record.params.slotIds then
+        for _, sid in ipairs(record.params.slotIds) do
+            local obj = _findLockedTileNear(SnapMap.getPositionForSlot(sid))
+            if obj and not obj.isDestroyed() and obj.is_face_down then obj.flip() end
+        end
+    end
+end
+
+--- Close the undo window: perform any deferred hand refill, drop the played-card
+--- reference, lock undo, and hide the button. Called when the next player acts,
+--- when the same player starts their next action, or when cards are dealt.
+function closeUndoWindow()
+    if not state then return end
+    if state._undoRefillOwed then
+        CardManager.refillHand(state, state._undoRefillOwed)
+        state._undoRefillOwed = nil
+    end
+    state._undoPlayedCard = nil
+    ActionEngine.clearLastCommit()
+    UIManager.hideUndoButton()
+end
+
+--- TTS UI callback for the Undo button.
+function onUndoBtn(player, value, id)
+    if player then onUndoAction(player.color) end
+end
+
+--- Undo the current player's last committed action and re-sync the table.
+function onUndoAction(color)
+    if not state then return end
+    if not isCurrentPlayer(color) then
+        printToColor("Not your turn.", color, {1, 0.5, 0})
+        return
+    end
+    local record = ActionEngine.getLastCommit()
+    if not record or record.color ~= color then
+        printToColor("Nothing to undo — the window has closed.", color, {1, 0.5, 0})
+        return
+    end
+
+    -- Logical restore: money, board, resources, income, VP, and bookkeeping.
+    ActionEngine.undo(state)
+
+    -- Physical table re-sync + return the played card to hand.
+    _resyncPhysicalAfterUndo(record)
+    _returnPlayedCardToHand(color)
+
+    -- The undone action is reverted: no deferred draw, clear the window and
+    -- return the player to a fresh action (card back in hand, actions restored).
+    state._undoRefillOwed = nil
+    state._undoPlayedCard = nil
+    state._pendingCard    = nil
+    Highlights.clearAll()
+    UIManager.hideActionPanel()
+
+    printToAll(color .. " undid their last action (" .. tostring(record.action) .. ").")
+    broadcastCurrentPlayer()
 end
 
 ------------------------------------------------------

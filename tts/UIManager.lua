@@ -4,7 +4,7 @@ local UIManager = {}
 -- The action buttons live inside actionPanel, so restricting the panel's
 -- visibility restricts the whole group. Turn indicator and language toggle
 -- are intentionally excluded (they stay visible to every seat).
-UIManager.ACTION_OWNED_IDS = { "actionPanel", "endTurnBtn", "singleLinkBtn", "acceptVPLossBtn" }
+UIManager.ACTION_OWNED_IDS = { "actionPanel", "endTurnBtn", "singleLinkBtn", "acceptVPLossBtn", "undoBtn" }
 
 --- Force-load the XML UI from Lua with current language.
 function UIManager.initXmlUI()
@@ -63,6 +63,11 @@ function UIManager.initXmlUI()
         .. ' rectAlignment="UpperCenter" offsetXY="0 -190"'
         .. ' width="220" height="38" fontSize="14"'
         .. ' color="#8B2500" textColor="#FFFFFF" text="' .. L("btn_accept_vp_loss") .. '"/>'
+
+        .. '<Button id="undoBtn" onClick="onUndoBtn"' .. vis
+        .. ' active="false" rectAlignment="UpperLeft" offsetXY="15 -50"'
+        .. ' width="120" height="34" fontSize="13"'
+        .. ' color="#6B2E2E" textColor="#FFD700" text="' .. L("btn_undo") .. '"/>'
 
         .. '<Button id="langToggle" onClick="toggleLanguage"'
         .. ' rectAlignment="LowerLeft" offsetXY="15 15"'
@@ -150,6 +155,16 @@ end
 --- Hide the "Single Link" button.
 function UIManager.hideSingleLinkButton()
     UI.hide("singleLinkBtn")
+end
+
+--- Show the Undo button (current player, after a committed action).
+function UIManager.showUndoButton()
+    UI.show("undoBtn")
+end
+
+--- Hide the Undo button (undo consumed or locked).
+function UIManager.hideUndoButton()
+    UI.hide("undoBtn")
 end
 
 --- Show the "Accept VP Loss" button during shortfall resolution.

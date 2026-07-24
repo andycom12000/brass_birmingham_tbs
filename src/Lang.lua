@@ -30,6 +30,7 @@ Lang.strings = {
         btn_scout = "Scout",
         btn_single_link = "Single Link Only",
         btn_accept_vp_loss = "Accept VP Loss",
+        btn_undo = "Undo",
 
         -- Game events
         player_spent = "{player} spent £{amount}",
@@ -117,6 +118,7 @@ Lang.strings = {
         btn_scout = "偵察",
         btn_single_link = "僅建單條路線",
         btn_accept_vp_loss = "接受扣分",
+        btn_undo = "復原",
 
         -- Game events
         player_spent = "{player} 花費了 £{amount}",
