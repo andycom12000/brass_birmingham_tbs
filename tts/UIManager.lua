@@ -1,9 +1,21 @@
 local UIManager = {}
 
+-- Per-player UI elements: action buttons visible only to the current player.
+-- The action buttons live inside actionPanel, so restricting the panel's
+-- visibility restricts the whole group. Turn indicator and language toggle
+-- are intentionally excluded (they stay visible to every seat).
+UIManager.ACTION_OWNED_IDS = { "actionPanel", "endTurnBtn", "singleLinkBtn", "acceptVPLossBtn" }
+
 --- Force-load the XML UI from Lua with current language.
 function UIManager.initXmlUI()
     local lang = UIManager._currentLang or (state and state.lang) or "en"
     local L = function(key) return Lang.get(key, lang) end
+
+    -- Bake the current action owner's per-player visibility into the markup so
+    -- it survives a full XML rebuild (e.g. a language toggle). An empty owner
+    -- leaves the elements global until the first turn is broadcast.
+    local owner = UIManager._actionOwner
+    local vis = owner and (' visibility="' .. owner .. '"') or ''
 
     local xml = '<Defaults>'
         .. '<Button fontSize="14" fontStyle="Bold" textColor="#FFFFFF"/>'
@@ -15,12 +27,12 @@ function UIManager.initXmlUI()
         .. ' rectAlignment="MiddleCenter"/>'
         .. '</Panel>'
 
-        .. '<Button id="endTurnBtn" onClick="onEndTurn"'
+        .. '<Button id="endTurnBtn" onClick="onEndTurn"' .. vis
         .. ' rectAlignment="UpperCenter" offsetXY="0 -90"'
         .. ' width="160" height="42" fontSize="17"'
         .. ' color="#8B2500" textColor="#FFD700" text="' .. L("btn_end_turn") .. '"/>'
 
-        .. '<Panel id="actionPanel" rectAlignment="UpperCenter" offsetXY="0 -138"'
+        .. '<Panel id="actionPanel"' .. vis .. ' rectAlignment="UpperCenter" offsetXY="0 -138"'
         .. ' width="520" height="48" color="#1A1A2EE0">'
         .. '<HorizontalLayout spacing="6" padding="4 4 4 4"'
         .. ' rectAlignment="MiddleCenter">'
@@ -42,12 +54,12 @@ function UIManager.initXmlUI()
         .. '</HorizontalLayout>'
         .. '</Panel>'
 
-        .. '<Button id="singleLinkBtn" onClick="onSingleLinkOnly"'
+        .. '<Button id="singleLinkBtn" onClick="onSingleLinkOnly"' .. vis
         .. ' rectAlignment="UpperCenter" offsetXY="0 -190"'
         .. ' width="200" height="38" fontSize="14"'
         .. ' color="#2E5090" textColor="#FFFFFF" text="' .. L("btn_single_link") .. '"/>'
 
-        .. '<Button id="acceptVPLossBtn" onClick="onAcceptVPLossBtn"'
+        .. '<Button id="acceptVPLossBtn" onClick="onAcceptVPLossBtn"' .. vis
         .. ' rectAlignment="UpperCenter" offsetXY="0 -190"'
         .. ' width="220" height="38" fontSize="14"'
         .. ' color="#8B2500" textColor="#FFFFFF" text="' .. L("btn_accept_vp_loss") .. '"/>'
@@ -102,9 +114,22 @@ function UIManager.configureForPlayerCount(playerCount)
 end
 
 function UIManager.updateLanguage(lang)
-    -- Rebuild XML with translated text (UI.setAttribute unreliable after setXml)
+    -- Rebuild XML with translated text (UI.setAttribute unreliable after setXml).
+    -- initXmlUI re-bakes the current action owner's visibility, so per-player
+    -- restrictions survive the language toggle for every seat.
     UIManager._currentLang = lang
     UIManager.initXmlUI()
+end
+
+--- Restrict all per-player action controls to a single seat color, live
+--- (no XML reload). Called on every turn change so buttons follow the current
+--- player. The owner is also remembered so a later XML rebuild re-bakes it.
+function UIManager.setActionOwner(color)
+    UIManager._actionOwner = color
+    if not color then return end
+    for _, id in ipairs(UIManager.ACTION_OWNED_IDS) do
+        UI.setAttribute(id, "visibility", color)
+    end
 end
 
 --- Show the action button panel (after a card is played).

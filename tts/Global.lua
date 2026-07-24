@@ -439,6 +439,8 @@ end
 function broadcastCurrentPlayer()
     if not state then return end
     local color = GameState.getCurrentPlayerColor(state)
+    -- Restrict the action buttons to the current player (per-player visibility).
+    UIManager.setActionOwner(color)
     local turnText = Lang.format("your_turn", state.lang, { player = color })
     local actionsText = Lang.format("actions_remaining", state.lang, { count = state.actionsRemaining })
     UIManager.showTurnIndicator(turnText .. " — " .. actionsText)
