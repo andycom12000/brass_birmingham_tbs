@@ -61,6 +61,7 @@ SRC_MODULES = [
     ("Tile",          PROJECT_ROOT / "src" / "Tile.lua"),
     ("IncomeTrack",   PROJECT_ROOT / "src" / "IncomeTrack.lua"),
     ("GameState",     PROJECT_ROOT / "src" / "GameState.lua"),
+    ("SetupGuard",    PROJECT_ROOT / "src" / "SetupGuard.lua"),
     ("Network",       PROJECT_ROOT / "src" / "Network.lua"),
     ("Market",        PROJECT_ROOT / "src" / "Market.lua"),
     ("TurnManager",   PROJECT_ROOT / "src" / "TurnManager.lua"),
