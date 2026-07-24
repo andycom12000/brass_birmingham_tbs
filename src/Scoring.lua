@@ -1,6 +1,7 @@
 local GameState = require("src/GameState")
 local Network   = require("src/Network")
 local BoardData = require("src/BoardData")
+local Constants = require("src/Constants")
 
 local Scoring = {}
 
@@ -101,6 +102,57 @@ function Scoring.scoreEndOfEra(state, isFinal)
             incomeVP = incomeVP,
             totalEraVP = totalEraVP,
             totalVP = p.vp,
+        }
+    end
+    return results
+end
+
+-- ============================================================
+-- Live VP Tracking (issue #10) / Projected VP (issue #11)
+-- ============================================================
+
+--- Confirmed VP totals for every player — the value physical score markers
+--- must always match (issue #10). This is a thin pure wrapper so "what
+--- marker position is correct" is unit-testable on its own, independent of
+--- the TTS object calls that actually move the markers (tts/ScoreTracker).
+---
+--- @param state table  Game state
+--- @return table  { [color] = confirmedVP }
+function Scoring.confirmedTotals(state)
+    local totals = {}
+    for _, color in ipairs(state.turnOrder) do
+        totals[color] = GameState.getPlayer(state, color).vp or 0
+    end
+    return totals
+end
+
+--- Project each player's final VP total if scoring were run right now,
+--- broken down by source, WITHOUT mutating state (issue #11).
+---
+--- Income VP is only projected once the game has reached the final era
+--- (Rail) — that mirrors exactly what Scoring.scoreEndOfEra(state, isFinal)
+--- would compute for the *next* scoring event: a Canal-era-end transition
+--- never includes income, only the Rail-era game-end does. This is what
+--- makes the projection equivalent to actually running era-end scoring
+--- (see tests/test_projected_vp.lua).
+---
+--- @param state table  Game state
+--- @return table  { [color] = { confirmed, buildings, links, income, total } }
+function Scoring.projectedTotals(state)
+    local isFinal = (state.era == Constants.Era.RAIL)
+    local results = {}
+    for _, color in ipairs(state.turnOrder) do
+        local confirmed = GameState.getPlayer(state, color).vp or 0
+        local buildingVP = Scoring.scoreBuildingVP(state, color)
+        local linkVP = Scoring.scoreLinkVP(state, color)
+        local incomeVP = isFinal and Scoring.scoreIncomeVP(state, color) or 0
+
+        results[color] = {
+            confirmed = confirmed,
+            buildings = buildingVP,
+            links = linkVP,
+            income = incomeVP,
+            total = confirmed + buildingVP + linkVP + incomeVP,
         }
     end
     return results

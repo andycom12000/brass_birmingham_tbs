@@ -6,6 +6,11 @@ local UIManager = {}
 -- are intentionally excluded (they stay visible to every seat).
 UIManager.ACTION_OWNED_IDS = { "actionPanel", "endTurnBtn", "singleLinkBtn", "acceptVPLossBtn", "undoBtn" }
 
+-- Projected VP panel row IDs (issue #11). Visible to every seat — never add
+-- these to ACTION_OWNED_IDS. Up to 4 rows, one per turnOrder slot; rows
+-- beyond the active player count are set inactive.
+UIManager.PROJ_VP_ROW_IDS = { "projVPRow1", "projVPRow2", "projVPRow3", "projVPRow4" }
+
 --- Force-load the XML UI from Lua with current language.
 function UIManager.initXmlUI()
     local lang = UIManager._currentLang or (state and state.lang) or "en"
@@ -74,7 +79,67 @@ function UIManager.initXmlUI()
         .. ' width="80" height="28" fontSize="11"'
         .. ' color="#8B7355" textColor="#D4C5A0" text="EN / ZH"/>'
 
+        .. UIManager._projectedVPPanelXml(L)
+
     UI.setXml(xml)
+end
+
+--- Build the projected-VP panel markup (issue #11). Visible to every seat
+--- (no per-player visibility attribute). Bakes the last computed rows back
+--- into the XML so a full rebuild (language toggle) doesn't blank the panel
+--- — refreshProjectedPanel() is also called immediately after every
+--- updateLanguage() to re-localize the numbers themselves.
+function UIManager._projectedVPPanelXml(L)
+    local rows = UIManager._lastProjectionRows or {}
+
+    local xml = '<Panel id="projVPPanel" rectAlignment="UpperRight" offsetXY="-15 -50"'
+        .. ' width="380" height="132" color="#1A1A2EE0">'
+        .. '<VerticalLayout spacing="2" padding="8 8 6 6">'
+        .. '<Text id="projVPTitle" text="' .. L("proj_vp_title") .. '"'
+        .. ' fontSize="14" color="#FFD700" fontStyle="Bold" alignment="MiddleLeft"/>'
+
+    for i, id in ipairs(UIManager.PROJ_VP_ROW_IDS) do
+        local text = rows[i] or ""
+        local activeAttr = (text ~= "") and "" or ' active="false"'
+        xml = xml .. '<Text id="' .. id .. '" text="' .. text .. '"'
+            .. ' fontSize="12" color="#FFFFFF" alignment="MiddleLeft"' .. activeAttr .. '/>'
+    end
+
+    xml = xml .. '</VerticalLayout></Panel>'
+    return xml
+end
+
+--- Recompute and display the projected VP panel from the current state
+--- (issue #11). Pure computation lives in Scoring.projectedTotals; this
+--- function only formats and pushes text to the XML UI. Called by the
+--- single post-commit hook aggregator after every commit and undo, once at
+--- game setup/load, and immediately after every language toggle.
+function UIManager.refreshProjectedPanel(state)
+    if not state then return end
+    local lang = state.lang or UIManager._currentLang or "en"
+    local totals = Scoring.projectedTotals(state)
+
+    local rows = {}
+    for i, color in ipairs(state.turnOrder) do
+        local t = totals[color]
+        rows[i] = Lang.format("proj_vp_row", lang, {
+            player    = color,
+            total     = t.total,
+            confirmed = t.confirmed,
+            buildings = t.buildings,
+            links     = t.links,
+            income    = t.income,
+        })
+    end
+    UIManager._lastProjectionRows = rows
+
+    UI.setAttribute("projVPTitle", "text", Lang.get("proj_vp_title", lang))
+    for i, id in ipairs(UIManager.PROJ_VP_ROW_IDS) do
+        local text = rows[i]
+        UI.setAttribute(id, "text", text or "")
+        UI.setAttribute(id, "active", text ~= nil)
+    end
+    UI.show("projVPPanel")
 end
 
 -- updateSpendCounter: no-op — spend tracking now handled by on-board Counter objects
