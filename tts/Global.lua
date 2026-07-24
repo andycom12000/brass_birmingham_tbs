@@ -10,6 +10,7 @@
 #include src/Tile
 #include src/IncomeTrack
 #include src/GameState
+#include src/SetupGuard
 #include src/Network
 #include src/Market
 #include src/TurnManager
@@ -184,6 +185,21 @@ PREBUILT_DECK_GUIDS = {
 
 function onPhysicalSetupComplete(params)
     local playerCount = params.playerCount
+    local lang = (state and state.lang) or "en"
+
+    local seatedColors = getSeatedPlayers()
+    local guard = SetupGuard.validate(playerCount, seatedColors, Constants.ALL_COLORS)
+    if not guard.ok then
+        local message
+        if guard.reason == "unsupported_seat" then
+            message = Lang.format("setup_unsupported_seat", lang, { seats = table.concat(guard.seats, ", ") })
+        else
+            message = Lang.format("setup_count_mismatch", lang, { expected = guard.expected, actual = guard.actual })
+        end
+        broadcastToAll(message, {1, 0, 0})
+        return
+    end
+
     printToAll("Initializing game state for " .. playerCount .. " players...")
 
     local ok, err = pcall(function()

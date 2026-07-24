@@ -7,6 +7,10 @@ Lang.strings = {
         game_loaded = "Game loaded",
         game_started = "Game started ({count} players)",
 
+        -- Setup guard
+        setup_count_mismatch = "Cannot start: chose {expected} player(s) but {actual} seated in a supported color (White/Purple/Orange/Yellow).",
+        setup_unsupported_seat = "Cannot start: {seats} is not a supported player color. Please move to White, Purple, Orange, or Yellow.",
+
         -- Turn/Round management
         your_turn = "Your turn",
         round_N = "Round {round}",
@@ -95,6 +99,10 @@ Lang.strings = {
         -- Game lifecycle
         game_loaded = "遊戲已載入",
         game_started = "遊戲開始（{count} 位玩家）",
+
+        -- Setup guard
+        setup_count_mismatch = "無法開始遊戲:選擇了 {expected} 位玩家，但目前有 {actual} 位坐在可用顏色座位（白／紫／橘／黃）。",
+        setup_unsupported_seat = "無法開始遊戲：{seats} 不是支援的玩家顏色，請移動到白、紫、橘或黃色座位。",
 
         -- Turn/Round management
         your_turn = "輪到你的回合",
