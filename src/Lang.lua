@@ -79,6 +79,7 @@ Lang.strings = {
         cannot_develop = "Cannot develop this tile",
         cannot_loan = "Income too low for loan",
         cannot_scout = "Cannot scout (already holding wild cards)",
+        card_unrecognized = "Unrecognized card — the build pipeline did not tag this card. Returned to your hand; no action taken.",
 
         -- Industry names (for display)
         industry_cotton = "Cotton Mill",
@@ -167,6 +168,7 @@ Lang.strings = {
         cannot_develop = "無法升級此科技",
         cannot_loan = "收入太低無法貸款",
         cannot_scout = "無法偵查（已持有萬用卡）",
+        card_unrecognized = "無法辨識的卡牌 — 建置流程未標記此卡。已退回你的手牌，未執行任何行動。",
 
         -- Industry names (for display)
         industry_cotton = "棉花廠",
