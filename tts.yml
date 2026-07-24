@@ -108,6 +108,8 @@ globals:
     any: true
   MarketLayout:
     any: true
+  IncomeLayout:
+    any: true
   ResourceAnimation:
     any: true
 
@@ -122,7 +124,14 @@ globals:
     any: true
   COLOR_TO_MONEY_GUID:
     any: true
+  COLOR_TO_BOARD_GUID:
+    any: true
+  COLOR_TO_INCOME_GUID:
+    any: true
   STARTING_MONEY:
+    any: true
+
+  TRASH_POSITION:
     any: true
 
   # ── Global functions (defined in Global.lua, used by tts/ modules) ──
@@ -131,6 +140,12 @@ globals:
   afterAction:
     any: true
   broadcastCurrentPlayer:
+    any: true
+  _onScoutCardDiscarded:
+    any: true
+  _onDevelopTileDropped:
+    any: true
+  moveIncomeMarker:
     any: true
   setCounterValue:
     any: true

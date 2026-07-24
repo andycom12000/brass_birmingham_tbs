@@ -76,6 +76,7 @@ SRC_MODULES = [
     ("UIManager",     PROJECT_ROOT / "tts" / "UIManager.lua"),
     ("EventHandlers",     PROJECT_ROOT / "tts" / "EventHandlers.lua"),
     ("MarketLayout",       PROJECT_ROOT / "tts" / "MarketLayout.lua"),
+    ("IncomeLayout",       PROJECT_ROOT / "tts" / "IncomeLayout.lua"),
     ("ResourceAnimation",  PROJECT_ROOT / "tts" / "ResourceAnimation.lua"),
 ]
 
@@ -351,6 +352,47 @@ INDUSTRY_NAMES = {
     "pottery":      "Pottery",
 }
 
+# Card sheet grid position -> (cardType, value)
+# cardType: "location", "industry", "wild_location", "wild_industry"
+# value:
+#   location  -> city name string
+#   industry  -> list of industry name(s), e.g. ["cotton"] or ["cotton", "manufacturer"]
+#   wild_*    -> None
+# Grid is 7x5; position = row * 7 + col.  Only used positions listed.
+# Uncertain positions marked with TODO — update after running card_labeler.html
+CARD_GRID_MAP = {
+     0: ("location",      "Derby"),
+     1: ("wild_location",  None),
+     2: ("wild_industry",  None),
+     3: ("industry",      ["cotton", "manufacturer"]),
+     4: ("location",      "Birmingham"),
+     5: ("industry",      ["cotton", "manufacturer"]),
+     6: ("industry",      ["pottery"]),
+     7: ("location",      "Stone"),
+     8: ("location",      "Walsall"),
+     9: ("location",      "Burton-on-Trent"),
+    10: ("location",      "Wolverhampton"),
+    11: ("industry",      ["iron"]),
+    12: ("industry",      ["brewery"]),
+    13: ("location",      "Stafford"),
+    14: ("location",      "Cannock"),
+    15: ("location",      "Tamworth"),
+    16: ("location",      "Stoke-on-Trent"),
+    17: ("location",      "Coventry"),
+    18: ("industry",      ["coal"]),
+    19: ("location",      "Dudley"),
+    20: ("industry",      ["cotton", "manufacturer"]),
+    23: ("location",      "Uttoxeter"),
+    24: ("location",      "Coalbrookdale"),
+    25: ("location",      "Kidderminster"),
+    26: ("location",      "Worcester"),
+    27: ("location",      "Leek"),
+    28: ("location",      "Belper"),
+    30: ("industry",      ["coal"]),
+    31: ("location",      "Redditch"),
+    32: ("location",      "Nuneaton"),
+}
+
 
 def _get_face_url(obj: dict) -> str:
     """Return the FaceURL string from a card/deck object, or ''."""
@@ -400,7 +442,19 @@ def _tag_single_card(obj: dict) -> None:
 
     # ---- game card ----
     if _face_url_matches(face_url, CARD_SHEET_IDS):
-        obj["GMNotes"] = json.dumps({"type": "card"}, separators=(",", ":"))
+        card_id = obj.get("CardID", -1)
+        grid_pos = card_id % 100
+        mapping = CARD_GRID_MAP.get(grid_pos)
+        if mapping:
+            card_type, value = mapping
+            notes: dict = {"type": "card", "cardType": card_type}
+            if card_type == "location" and value:
+                notes["location"] = value
+            elif card_type == "industry" and value:
+                notes["industryTypes"] = value  # list of 1-2 industry names
+            obj["GMNotes"] = json.dumps(notes, separators=(",", ":"))
+        else:
+            obj["GMNotes"] = json.dumps({"type": "card"}, separators=(",", ":"))
         return
 
     # Everything else (back sheet, wild tiles, player aid, etc.) — skip
@@ -760,6 +814,35 @@ def lock_resource_cubes(mod_data: dict) -> int:
     return locked
 
 
+# ---------------------------------------------------------------------------
+# Tag link tiles with GMNotes
+# ---------------------------------------------------------------------------
+
+LINK_BAG_NICKNAMES = {"Canal - Canal Era", "Rail - Rail Era"}
+
+
+def tag_link_tiles(mod_data: dict) -> int:
+    """
+    Walk Custom_Model_Bag objects whose Nickname matches link tile bags,
+    and tag their contained Custom_Token objects with GMNotes JSON.
+    """
+    tagged = 0
+    for obj in mod_data.get("ObjectStates", []):
+        nickname = obj.get("Nickname", "")
+        if nickname not in LINK_BAG_NICKNAMES:
+            continue
+        if obj.get("Name") != "Custom_Model_Bag":
+            continue
+        link_type = "canal" if "Canal" in nickname else "rail"
+        for contained in obj.get("ContainedObjects", []):
+            if contained.get("Name") != "Custom_Token":
+                continue
+            notes = {"type": "link", "linkType": link_type}
+            contained["GMNotes"] = json.dumps(notes, separators=(",", ":"))
+            tagged += 1
+    return tagged
+
+
 HAND_TRIGGER_GUIDS = {"8913e3", "38c677", "5c56af", "83dff2"}
 
 
@@ -870,6 +953,117 @@ def tag_snap_points(mod_data: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Snap point position corrections
+# ---------------------------------------------------------------------------
+# Generated from snap_editor.html CURRENT_SLOTS + CURRENT_LINKS.
+# These are the manually-corrected world positions that align with the board art.
+# The reference mod's original snap points are slightly off; this table patches them.
+# Key = snap point index in top-level SnapPoints array.
+# Value = corrected (x, z) world position.  Y is kept from the original.
+
+SNAP_POSITION_PATCHES = {
+    141: ( -5.660, -11.507),  142: ( -0.662, -10.045),  143: ( -5.175,  -7.144),
+    144: ( -8.499,  -6.754),  145: (-11.754,  -1.317),  146: ( -7.388,  -1.276),
+    147: ( -2.077, -14.461),  148: (  0.295, -12.101),  149: (  5.738, -11.260),
+    150: ( -4.262,  -3.716),  151: ( -1.709,  -1.495),  152: (  0.718,  -5.985),
+    153: (  1.976,  -4.400),  154: (  3.980,  -8.918),  155: (  7.655,  -9.164),
+    156: (  7.749,  -7.477),  158: (  6.758,  -2.971),  159: ( 12.644,  -5.265),
+    160: (  9.932,  -1.112),  161: (  4.294,  -1.743),  162: (  6.974,   1.952),
+    163: (  3.035,   0.613),  164: (  1.324,  -0.099),  165: ( -3.743,   0.621),
+    166: ( -4.264,   2.316),  167: ( -0.808,   3.685),  168: (  2.477,   3.545),
+    169: ( -6.275,   5.707),  170: (  0.442,   6.879),  171: ( -1.969,   8.921),
+    172: (  5.863,   8.483),  173: (  8.926,   5.836),  174: ( 11.245,   9.988),
+    175: (  9.337,  11.751),  176: (  4.925,  14.416),  177: ( -1.007,  14.270),
+    178: ( -4.821,  10.058),  179: ( -5.131,  13.742),
+    181: ( -3.666,  11.933),  182: ( -2.933,  13.516),  183: ( -2.097,  11.823),
+    184: (  1.068,  14.348),  185: (  2.593,  14.352),  186: (  7.045,  13.941),
+    187: (  8.637,  13.921),  188: ( 10.193,  13.936),  189: (  1.520,   8.990),
+    190: (  3.053,   8.972),  191: (  8.868,   9.703),  192: (  8.063,   8.131),
+    193: (  9.633,   8.088),  194: ( -7.216,   8.338),  195: ( -5.659,   8.375),
+    196: ( -4.010,   5.160),  197: ( -2.513,   5.176),  198: (  5.459,   4.249),
+    199: (  6.998,   4.213),  201: ( -1.692,   1.758),  202: ( -0.032,   1.781),
+    203: ( -5.098,  -1.390),  204: ( -3.626,  -1.381),  205: ( -8.201,  -2.866),
+    206: ( -9.743,  -2.866),  207: ( -8.984,  -1.263),  208: (  0.314,  -2.130),
+    209: (  1.924,  -2.145),  210: (  5.961,  -0.047),  211: (  7.476,  -0.049),
+    212: (  8.989,  -3.449),  213: ( 10.570,  -3.473),  214: ( -3.594,  -5.524),
+    215: ( -2.000,  -5.512),  216: (  3.663,  -6.824),  217: (  5.178,  -6.849),
+    218: (  3.700,  -5.212),  219: (  5.141,  -5.239),  220: ( 10.493,  -6.234),
+    221: (  9.786,  -7.869),  222: ( 11.284,  -7.889),  223: (  2.114, -10.818),
+    224: (  3.629, -10.786),  225: ( -5.912,  -8.953),  226: ( -4.379,  -9.001),
+    227: ( -5.424, -13.336),  228: ( -3.873, -13.366),
+}
+
+
+def patch_snap_positions(mod_data: dict) -> int:
+    """Patch top-level SnapPoints to match SnapMap corrected positions."""
+    snaps = mod_data.get("SnapPoints", [])
+    patched = 0
+    for idx, (x, z) in SNAP_POSITION_PATCHES.items():
+        if idx < len(snaps):
+            snaps[idx]["Position"]["x"] = x
+            snaps[idx]["Position"]["z"] = z
+            patched += 1
+    return patched
+
+
+TRASH_CAN_POSITIONS = {
+    # (GUID, posX, posZ) — one per player corner, mirrored
+    "tc_wht": ( 14.0, -22.0),   # White  (bottom-right)
+    "tc_org": ( 14.0,  22.0),   # Orange (top-right)
+    "tc_pur": (-14.0,  22.0),   # Purple (top-left)
+    "tc_yel": (-14.0, -22.0),   # Yellow (bottom-left)
+}
+
+
+def add_trash_cans(mod_data: dict) -> int:
+    """Add or update the 4 Trash Can objects (one per player) for the Develop action."""
+    # Remove existing trash cans (idempotent)
+    all_guids = set(TRASH_CAN_POSITIONS.keys())
+    mod_data["ObjectStates"] = [
+        o for o in mod_data["ObjectStates"]
+        if o.get("GUID") not in all_guids
+    ]
+
+    for guid, (px, pz) in TRASH_CAN_POSITIONS.items():
+        trash_can = {
+            "GUID": guid,
+            "Name": "Bag",
+            "Transform": {
+                "posX": px, "posY": 1.4, "posZ": pz,
+                "rotX": 0.0, "rotY": 0.0, "rotZ": 0.0,
+                "scaleX": 1.0, "scaleY": 1.0, "scaleZ": 1.0,
+            },
+            "Nickname": "Trash Can",
+            "Description": "Drop building tiles here during Develop action.",
+            "GMNotes": json.dumps({"type": "trash_can"}),
+            "AltLookAngle": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "ColorDiffuse": {"r": 0.4, "g": 0.4, "b": 0.4},
+            "LayoutGroupSortIndex": 0,
+            "Value": 0,
+            "Locked": False,
+            "Grid": True,
+            "Snap": True,
+            "IgnoreFoW": False,
+            "MeasureMovement": False,
+            "DragSelectable": True,
+            "Autoraise": True,
+            "Sticky": True,
+            "Tooltip": True,
+            "GridProjection": False,
+            "HideWhenFaceDown": False,
+            "Hands": False,
+            "Bag": {"Order": 0},
+            "ContainedObjects": [],
+            "LuaScript": "",
+            "LuaScriptState": "",
+            "XmlUI": "",
+        }
+        mod_data["ObjectStates"].append(trash_can)
+
+    return len(TRASH_CAN_POSITIONS)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -957,13 +1151,28 @@ def main():
     n_cubes = lock_resource_cubes(mod_data)
     print(f"  Locked {n_cubes} resource cube(s).")
 
+    # 4g2. Tag link tiles with GMNotes
+    print()
+    print("Tagging link tiles with GMNotes metadata...")
+    n_links = tag_link_tiles(mod_data)
+    print(f"  Tagged {n_links} link tile(s).")
+
     print()
     print("Enabling hand zones...")
     n_hands = enable_hand_zones(mod_data)
     print(f"  Enabled {n_hands} hand zone(s).")
 
-    # NOTE: Snap point city mapping is hardcoded in SnapMap.lua, NOT via TTS Tags.
-    # TTS Tags restrict snapping to tagged objects only, breaking free snap behavior.
+    # 4h. Patch top-level snap point positions to match SnapMap corrections
+    print()
+    print("Patching snap point positions (sync with SnapMap)...")
+    n_snaps = patch_snap_positions(mod_data)
+    print(f"  Patched {n_snaps} snap point(s).")
+
+    # 4i. Add Trash Can object for Develop action
+    print()
+    print("Adding Trash Cans (Bag x4)...")
+    n_cans = add_trash_cans(mod_data)
+    print(f"  Added {n_cans} Trash Can(s).")
 
     # 5. Write output JSON
     print()
